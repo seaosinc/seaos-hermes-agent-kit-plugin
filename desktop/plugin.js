@@ -219,7 +219,7 @@ function SettingsPage({ ctx }) {
       setLog(res.lines || [])
       setNotice(
         res.changed
-          ? 'このプラグインを新しい版にしました。画面へ反映するにはアプリを再起動してください。'
+          ? 'プラグインを更新しました。画面へ反映するにはアプリを再起動してください。'
           : 'すでに最新です。'
       )
     } catch (e) {
@@ -357,14 +357,14 @@ function SettingsPage({ ctx }) {
           jsxs('div', {
             className: 'min-w-0 flex-1',
             children: [
-              jsx('div', { className: 'text-sm', children: 'このプラグイン自体' }),
+              jsx('div', { className: 'text-sm', children: 'プラグイン' }),
               jsx('div', {
                 className: 'text-xs opacity-60',
-                children: 'GitHub から新しい版を取り込みます。反映にはアプリの再起動が要ります'
+                children: 'この画面そのものを新しくします。反映にはアプリの再起動が要ります'
               })
             ]
           }),
-          jsx(Button, { label: '新しい版を取り込む', onClick: selfUpdate, disabled: busy })
+          jsx(Button, { label: 'プラグインを更新', onClick: selfUpdate, disabled: busy })
         ]
       }),
 
