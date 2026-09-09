@@ -8,7 +8,7 @@
  * その先の core/ が CLI とまったく同じ関数を実行する。
  */
 
-import { host, useValue } from '@hermes/plugin-sdk'
+import { ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, host } from '@hermes/plugin-sdk'
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -171,11 +171,30 @@ function KitPane({ ctx }) {
 export default {
   id: ID,
   name: 'Agent Kit',
-  areas: {
-    pane: {
-      id: `${ID}.pane`,
-      title: 'Agent Kit',
-      render: (ctx) => jsx(KitPane, { ctx })
-    }
+  register(ctx) {
+    // **ペインではなくフルページにする。** 鍵が7本・役が8つ並ぶので、
+    // 細い枠に押し込むと縦に長くなって読めない。サイドバーの行から開く。
+    ctx.registerMany([
+      {
+        id: 'page',
+        area: ROUTES_AREA,
+        data: { path: '/agent-kit' },
+        render: () => jsx(KitPane, { ctx })
+      },
+      {
+        id: 'nav',
+        area: SIDEBAR_NAV_AREA,
+        data: { path: '/agent-kit', label: 'Agent Kit', codicon: 'organization' }
+      },
+      {
+        id: 'palette',
+        area: PALETTE_AREA,
+        data: {
+          id: `${ID}.open`,
+          title: 'Agent Kit を開く',
+          run: () => host.navigate('/agent-kit')
+        }
+      }
+    ])
   }
 }
