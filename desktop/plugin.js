@@ -37,6 +37,67 @@ function Row({ label, value, tone }) {
   })
 }
 
+/** 鍵の1行。**入力欄を必ず置く。**
+ *
+ * 値は読み取れないので（API が返さない）、欄は常に空で始まる。入れて「保存」を
+ * 押したときだけ送る。設定済みの鍵は伏せ字のプレースホルダにして、
+ * 「空欄＝変更しない」と分かる形にする。 */
+function SecretRow({ secret, onSave, busy }) {
+  const [value, setValue] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  const save = async () => {
+    if (!value) return
+    await onSave(secret.name, value)
+    setValue('')
+    setSaved(true)
+    window.setTimeout(() => setSaved(false), 1500)
+  }
+
+  return jsxs('div', {
+    className: 'flex items-center gap-2 py-1.5 border-b border-(--ui-border) last:border-0',
+    children: [
+      jsx('span', {
+        className: 'w-52 shrink-0 text-sm',
+        children: secret.name + (secret.required ? ' *' : '')
+      }),
+      jsx('input', {
+        type: 'password',
+        value,
+        disabled: busy,
+        placeholder: secret.configured ? '設定済み（変えるときだけ入力）' : '値を入力',
+        className:
+          'min-w-0 flex-1 rounded border border-(--ui-border) bg-(--ui-surface) px-2 py-1 text-xs ' +
+          'focus:border-(--ui-accent) focus:outline-none',
+        onChange: (e) => setValue(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === 'Enter') save()
+        }
+      }),
+      jsx('button', {
+        type: 'button',
+        disabled: busy || !value,
+        className:
+          'shrink-0 rounded border border-(--ui-border) px-2 py-1 text-xs disabled:opacity-40',
+        onClick: save,
+        children: '保存'
+      }),
+      jsx('span', {
+        className:
+          'w-16 shrink-0 text-right text-xs ' +
+          (saved
+            ? 'text-(--ui-success)'
+            : secret.configured
+              ? 'text-(--ui-success)'
+              : secret.required
+                ? 'text-(--ui-warning)'
+                : 'text-(--ui-text-tertiary)'),
+        children: saved ? '保存した' : secret.configured ? '設定済み' : '未設定'
+      })
+    ]
+  })
+}
+
 function KitPane({ ctx }) {
   const [roles, setRoles] = useState([])
   const [secrets, setSecrets] = useState([])
@@ -57,6 +118,22 @@ function KitPane({ ctx }) {
   useEffect(() => {
     load()
   }, [load])
+
+  const saveSecret = useCallback(
+    async (name, value) => {
+      setError('')
+      try {
+        await call(ctx, '/secrets', {
+          method: 'POST',
+          body: JSON.stringify({ name, value })
+        })
+        await load()
+      } catch (e) {
+        setError(e.message)
+      }
+    },
+    [ctx, load]
+  )
 
   const run = useCallback(
     async (path, body) => {
@@ -98,15 +175,12 @@ function KitPane({ ctx }) {
         children: [
           jsx('div', { className: 'text-xs uppercase tracking-wide text-(--ui-text-tertiary)', children: '1. 鍵' }),
           ...secrets.map((s) =>
-            jsx(Row, {
-              label: s.name + (s.required ? ' *' : ''),
-              value: s.configured ? '設定済み' : '未設定',
-              tone: s.configured ? 'ok' : s.required ? 'warn' : 'muted'
-            }, s.name)
+            jsx(SecretRow, { secret: s, onSave: saveSecret, busy }, s.name)
           ),
           jsx('div', {
             className: 'pt-1 text-xs text-(--ui-text-tertiary)',
-            children: '値は画面に表示しません。保存先はキット直下の .env です。'
+            children:
+              '入れた値は画面に表示しません（読み返せません）。保存先はキット直下の .env です。'
           })
         ]
       }),
