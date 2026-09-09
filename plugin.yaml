@@ -1,0 +1,28 @@
+# Hermes ネイティブプラグインのマニフェスト。
+# **このリポジトリ全体が1つのプラグインである。** 役の定義（templates/）も
+# 生成器（core/）も GUI（desktop/）も、この1フォルダで入り、1フォルダで消える。
+manifest_version: 2
+name: seaos-hermes-agent-kit
+version: 0.0.0
+description: SEAOS のエージェント役一式を、GUI から導入・更新・検査するキット
+author: seaos
+license: UNLICENSED
+
+# 役が使う鍵。**値はここに書かない。** 画面か CLI から受け取り、キットの .env に置く。
+requires_env:
+  - OPENROUTER_API_KEY
+optional_env:
+  - GH_TOKEN
+  - BACKLOG_DOMAIN
+  - BACKLOG_API_KEY
+  - NOTION_TOKEN
+  - SLACK_BOT_TOKEN
+  - SLACK_APP_TOKEN
+
+platforms:
+  - darwin
+  - linux
+  - win32
+
+python_dependencies:
+  - pyyaml

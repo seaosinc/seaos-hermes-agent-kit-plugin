@@ -1,0 +1,11 @@
+# 秘密の正。**git に入れない。**
+.env
+**/.env
+
+# 生成物（配布物はビルドして install する）
+dist/
+
+__pycache__/
+*.pyc
+.DS_Store
+**/.DS_Store
