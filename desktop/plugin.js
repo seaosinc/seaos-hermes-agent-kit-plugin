@@ -27,14 +27,27 @@ const BORDER = '1px solid var(--ui-border, rgba(127,127,127,.3))'
 const SURFACE = 'var(--ui-surface, Canvas)'
 const SURFACE_2 = 'var(--ui-surface-2, rgba(127,127,127,.08))'
 
-/** バックエンドが落ちている（＝Python 側が無効）ときは、そう言う。 */
+/** バックエンドを呼ぶ。
+ *
+ * **body はオブジェクトで渡す。** ctx.rest が直列化まで面倒を見るので、
+ * JSON 文字列を渡すと二重に包まれて 422 になる（実際に「更新」がこれで落ちた）。
+ *
+ * **失敗した理由をそのまま出す。** 全部を「バックエンドが無効です」に丸めると、
+ * 応答しているのに接続エラーが出るという嘘をつく——これも実際に起きた。
+ * その文言は、本当に繋がっていないときだけに使う。
+ */
 async function call(ctx, path, init) {
   try {
     return await ctx.rest(path, init)
   } catch (error) {
-    throw new Error(
-      'バックエンドに接続できません。設定 → プラグインで、この拡張の Python 側を有効にしてください。'
-    )
+    const detail = error?.detail || error?.message || String(error)
+    if (/404|not found|ECONNREFUSED|failed to fetch/i.test(detail)) {
+      throw new Error(
+        `バックエンドに繋がりません（${detail}）。設定 → プラグインで Python 側を有効にし、` +
+          'それでも直らなければゲートウェイを再起動してください。'
+      )
+    }
+    throw new Error(detail)
   }
 }
 
@@ -169,7 +182,7 @@ function SettingsPage({ ctx }) {
 
   const saveSecret = useCallback(
     async (name, value) => {
-      await call(ctx, '/secrets', { method: 'POST', body: JSON.stringify({ name, value }) })
+      await call(ctx, '/secrets', { method: 'POST', body: { name, value } })
       await load()
     },
     [ctx, load]
@@ -180,7 +193,12 @@ function SettingsPage({ ctx }) {
     setError('')
     setNotice('')
     try {
-      const res = await call(ctx, '/update', { method: 'POST', body: '{}' })
+      // 8役ぶん生成して配るので、既定のタイムアウトでは足りない。
+      const res = await call(ctx, '/update', {
+        method: 'POST',
+        body: { forceConfig: false },
+        timeoutMs: 180000
+      })
       setLog(res.lines || [])
       await load()
     } catch (e) {
@@ -195,7 +213,7 @@ function SettingsPage({ ctx }) {
     setError('')
     setNotice('')
     try {
-      const res = await call(ctx, '/self-update', { method: 'POST', body: '{}' })
+      const res = await call(ctx, '/self-update', { method: 'POST', body: {}, timeoutMs: 60000 })
       setLog(res.lines || [])
       setNotice(
         res.changed
