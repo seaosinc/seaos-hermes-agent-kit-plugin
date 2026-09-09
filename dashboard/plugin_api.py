@@ -36,21 +36,60 @@ router = APIRouter()
 
 # ── 読み取り ──────────────────────────────────────────────────────────────
 
+# 役の一行説明。**describe は decomposer 向けの長文**なので画面には出さない
+# （「〜してはならない」のような機械向けの指示が混ざる）。人が読む用に短く持つ。
+_SUMMARY = {
+    "operator": "ユーザーとの窓口。依頼を受けて結果を報告する",
+    "fixer": "詰まりを解決し、完了を判定する",
+    "broker": "外部エージェントとの連携",
+    "avatar": "画面を操作する（人が呼んだときだけ動く）",
+    "developer": "実装・検証・PR 作成",
+    "senior-developer": "難度の高い実装。セキュリティと品質も見る",
+    "handler": "外部サービスの読み書き（GitHub / Backlog / Notion / Slack）",
+    "recruiter": "エージェントそのものを新設・改修する",
+}
+
+
 @router.get("/roles")
 def list_roles() -> List[Dict]:
-    """役の一覧。導入済みかどうかも返す（画面の初期表示に要る）。"""
+    """役の一覧。導入済みかどうかと、人が読む一行説明を返す。"""
     out: List[Dict] = []
-    board_less = set(roles.without_board())
     for name in roles.names():
         out.append(
             {
                 "name": name,
                 "installed": profile_dir(name).is_dir(),
-                "onBoard": name not in board_less,
-                "describe": roles.describe(name),
+                "summary": _SUMMARY.get(name, roles.describe(name)[:40]),
             }
         )
     return out
+
+
+@router.post("/self-update")
+def self_update() -> Dict:
+    """**このプラグイン自身**を最新にする（git pull）。
+
+    更新するのはファイルだけで、動いているプロセスは差し替わらない。
+    画面へ反映するにはアプリの再起動が要る——それを呼び手へ伝える。
+    """
+    import subprocess
+
+    root = _REPO
+    if not (root / ".git").is_dir():
+        raise HTTPException(status_code=400, detail="git から入れていないので更新できません")
+    proc = subprocess.run(
+        ["git", "-C", str(root), "pull", "--ff-only"],
+        capture_output=True, text=True, stdin=subprocess.DEVNULL,
+    )
+    out = (proc.stdout or "") + (proc.stderr or "")
+    if proc.returncode != 0:
+        raise HTTPException(status_code=500, detail=out.strip()[:400])
+    changed = "Already up to date" not in out
+    return {
+        "ok": True,
+        "changed": changed,
+        "lines": [l for l in out.splitlines() if l.strip()][:12],
+    }
 
 
 @router.get("/secrets")
@@ -109,7 +148,7 @@ class UpdateIn(BaseModel):
 
 @router.post("/update")
 def run_update(body: Optional[UpdateIn] = None) -> Dict:
-    """生成 → 全役へ反映 → 説明文 → 鍵。ウィザードの最後の一押し。
+    """生成 → 全役へ反映 → 説明文 → 鍵。画面の「更新」が呼ぶ唯一の実行口。
 
     **役は選ばせない。** 8役はチームとして設計されていて、欠けると成立しない
     （fixer が居ないと詰まりが解けない、operator が居ないと窓口が無い）。
