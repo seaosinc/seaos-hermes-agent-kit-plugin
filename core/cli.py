@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import booking  # noqa: E402
 import doctor as doctor_mod  # noqa: E402
+import install as install_mod  # noqa: E402
 import kit  # noqa: E402
+import platform_ops  # noqa: E402
 import mem0  # noqa: E402
 import roles  # noqa: E402
 import selftest  # noqa: E402
@@ -73,6 +75,18 @@ def main(argv: list[str] | None = None) -> int:
     m0sub.add_parser("up", help="起動して各役へ繋ぐ")
     m0sub.add_parser("down", help="停止する")
     m0sub.add_parser("check", help="状態を見る")
+
+    gw = sub.add_parser("gateway", help="ゲートウェイの常駐（OS ごとの作法を吸収する）")
+    gwsub = gw.add_subparsers(dest="gcmd", required=True)
+    gr = gwsub.add_parser("restart", help="再起動する")
+    gr.add_argument("profile", nargs="?", help="省略時はゲートが載っている役")
+    gr.add_argument("--when-idle", action="store_true",
+                    help="走行中のカードが無くなってから（誰も落とさない）")
+    gwsub.add_parser("status", help="いまの状態")
+
+    ins = sub.add_parser("install", help="全役を導入し、配布物に載らないものを揃える")
+    unins = sub.add_parser("uninstall", help="撤去する（既定はキット自身の痕跡だけ）")
+    unins.add_argument("--profiles", action="store_true", help="役のプロファイルも消す")
 
     gu = sub.add_parser("guest", help="ゲストのアクセス許可")
     gu.add_argument("rest", nargs=argparse.REMAINDER)
@@ -157,6 +171,26 @@ def main(argv: list[str] | None = None) -> int:
             _print(f"起動中: {mem0.running()}")
             _print(f"記憶を引く役: {' '.join(mem0.memory_roles())}")
             return 0
+
+    if args.cmd == "gateway":
+        prof = getattr(args, "profile", None) or booking.gate_profile()
+        if args.gcmd == "restart":
+            fn = platform_ops.restart_when_idle if args.when_idle else platform_ops.restart_gateway
+            return 0 if fn(prof, log=_print) else 1
+        if args.gcmd == "status":
+            _print(f"役: {prof}")
+            _print(f"pid: {platform_ops.gateway_pid(prof) or '（動いていない）'}")
+            _print(f"走行中カード: {platform_ops.running_cards()}")
+            _print(platform_ops.autostart_hint())
+            return 0
+
+    if args.cmd == "install":
+        res = install_mod.install(log=print)
+        return 0 if res.ok() else 1
+
+    if args.cmd == "uninstall":
+        res = install_mod.uninstall(remove_profiles=args.profiles, log=print)
+        return 0 if res.ok() else 1
 
     if args.cmd == "guest":
         code, out = booking.guest([a for a in args.rest if a != "--"])

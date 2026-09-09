@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | `core/` | 生成・差分・説明文の同期・鍵配布・反映。**Python のみ** |
-| `core/cli.py` | 薄い皮（13コマンド） |
+| `core/cli.py` | 薄い皮（16コマンド） |
 | `core/worker.py` | 業務別ワーカーの CRUD |
 | `core/workspace.py` | 作業部屋（CA / build / warm / verify / clean / gc） |
 | `core/mem0.py` | 共有記憶（起動・接続・切り離し） |
@@ -18,6 +18,8 @@
 | `core/doctor.py` | 設定漏れの検証（全モジュールの check を束ねる） |
 | `core/selftest.py` | 生成物の形の検査 |
 | `core/selfupdate.py` | pull → 反映 → 検証 |
+| `core/platform_ops.py` | **OS で違うことだけ**（常駐 / コマンドの置き場 / 自動起動） |
+| `core/install.py` | 導入と撤去（配布物に載らないもの） |
 | `dashboard/plugin_api.py` | GUI から core を呼ぶ口。全ルート応答を実機で確認済み |
 | `desktop/plugin.js` | 鍵 → 役 → 反映 の3段ウィザード。素の ESM（ビルド不要） |
 | `templates/` | 役の定義。旧キットから持ち込み、**現行の8役と一致**（diff が全て `=`） |
@@ -41,11 +43,22 @@ hermes plugins enable seaos-hermes-agent-kit
 - **`.env` はインストール先ごとに別。** git に入らないので、配った先では
   ウィザードで入れ直す。これは仕様（1フォルダで自己完結する）。
 
+## 対応 OS
+
+**利用者向けは Windows と macOS の2つ。** Linux は落とさない——terraform が立てる
+AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすため（`terraform/main.tf`）。
+つまり Linux は「自分自身を動かす先」としてだけ残る。
+
+| | 常駐 | コマンドの置き場 |
+|---|---|---|
+| macOS | 素のプロセス（launchd は使わない。plist が再生成され HERMES_PROFILE が消えるため） | `~/.local/bin/kit`（symlink） |
+| Windows | 素のプロセス ＋ Scheduled Task | `%LOCALAPPDATA%\Programs\hermes-kit\kit.cmd` |
+| Linux（AWS のみ） | systemd user unit ＋ linger | `~/.local/bin/kit`（symlink） |
+
 ## 残っている作業
 
-1. **OS 依存の 578 行**（常駐・コマンド配置）。`_gateway` / `_init` / `_install` / `_uninstall`
-   に相当する部分。Windows は Scheduled Task、macOS は launchd、Linux は systemd + linger。
-   **paths.py 以外に platform 分岐を書かないこと。**
+1. **Windows の実機確認。** 実装は入れたが、動かしていない
+   （`gateway_pid` の PowerShell 経由の検出、`kit.cmd` のラッパ、Scheduled Task）。
 2. **採番。** いま `0.0.0` 固定。旧キットは全役 `0.1.0` のまま動かず、更新が届いたか
    判定できなくなっていた。ビルド時に git から採番する。
 3. **GUI の実機確認。** デスクトップアプリで Python 側・desktop 側のトグルを
