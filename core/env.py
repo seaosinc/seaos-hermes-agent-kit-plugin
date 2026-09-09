@@ -107,3 +107,16 @@ def apply() -> Tuple[List[str], List[str]]:
         )
 
     return report, missing
+
+
+def set_value(name: str, value: str, desc: str = "") -> None:
+    """正の .env に1件書く。**GUI と CLI の共通の入口。**
+
+    呼び手が変数名を検証すること（キットが知らない名前を書かせない）。
+    ここは書き込みだけを担い、どこへ配るかは apply() が決める。
+    """
+    path = env_file()
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    lines = _upsert(lines, name, value, desc or f"{name}")
+    path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
+    _secure(path)
