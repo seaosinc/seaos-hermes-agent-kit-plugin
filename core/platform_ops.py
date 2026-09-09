@@ -234,24 +234,34 @@ def command_target() -> Path:
     return Path.home() / ".local" / "bin"
 
 
+def _interpreter() -> str:
+    """このキットを走らせる Python。
+
+    **解釈系を固定する。** `#!/usr/bin/env python3` に任せると、呼ぶ側の PATH で
+    中身が変わる——実際、板から起動したエージェントの環境では `yaml` の無い
+    python3 が引かれ、`seaos-kit roles` が落ちた。Hermes の venv には
+    `pip_dependencies` が入っているので、そこを指す。
+    """
+    venv = hermes_home() / "hermes-agent" / "venv" / "bin" / "python"
+    if os_kind() == "win32":
+        venv = hermes_home() / "hermes-agent" / "venv" / "Scripts" / "python.exe"
+    return str(venv) if venv.is_file() else ("python" if os_kind() == "win32" else "python3")
+
+
 def link_command(log: Optional[Log] = None) -> Path:
     """PATH から叩けるようにする。
 
-    macOS / Linux は**シンボリックリンク**（pull すれば本体も入れ替わる）。
-    Windows はシンボリックリンクに管理者権限が要ることがあるので、
-    **バッチのラッパを書く**（中身は python を呼ぶだけなので、pull で追随する）。
+    **シンボリックリンクではなくラッパを書く**（Hermes 自身の `hermes` と同じ形）。
+    解釈系を書き込む必要があるため。中身は本体を呼ぶだけなので、pull で追随する。
     """
     target = command_target()
     target.mkdir(parents=True, exist_ok=True)
     entry = kit_root() / "core" / "cli.py"
+    python = _interpreter()
 
     if os_kind() == "win32":
         path = target / f"{COMMAND}.cmd"
-        path.write_text(
-            "@echo off\r\n"
-            f'python "{entry}" %*\r\n',
-            encoding="utf-8",
-        )
+        path.write_text(f'@echo off\r\n"{python}" "{entry}" %*\r\n', encoding="utf-8")
         if log:
             log(f"+ {path}")
             log(f"  PATH に {target} を足すこと")
@@ -260,7 +270,13 @@ def link_command(log: Optional[Log] = None) -> Path:
     path = target / COMMAND
     if path.is_symlink() or path.exists():
         path.unlink()
-    path.symlink_to(entry)
+    path.write_text(
+        "#!/bin/sh\n"
+        "# SEAOS のコマンド。**解釈系を固定してある**（PATH 次第で中身が変わると、\n"
+        "# 板から起動したエージェントの環境で依存が足りずに落ちる）。\n"
+        f'exec "{python}" "{entry}" "$@"\n',
+        encoding="utf-8",
+    )
     path.chmod(0o755)
     if log:
         log(f"+ {path} → {entry}")
