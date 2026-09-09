@@ -201,7 +201,7 @@ function SettingsPage({ ctx }) {
       })
       setLog(res.lines || [])
       // **成否を一言で言う。** ログだけ出して黙ると、読める人しか結果が分からない。
-      setNotice(res.ok ? '更新しました。' : '一部が失敗しました。下の実行結果を確認してください。')
+      setNotice(res.ok ? '反映しました。' : '一部が失敗しました。下の実行結果を確認してください。')
       await load()
     } catch (e) {
       setError(e.message)
@@ -219,7 +219,7 @@ function SettingsPage({ ctx }) {
       setLog(res.lines || [])
       setNotice(
         res.changed
-          ? 'プラグインを更新しました。画面へ反映するにはアプリを再起動してください。'
+          ? 'プラグインを更新しました。アプリを再起動してください。'
           : 'すでに最新です。'
       )
     } catch (e) {
@@ -254,7 +254,7 @@ function SettingsPage({ ctx }) {
             ]
           }),
           jsx(Button, {
-            label: busy ? '実行中…' : 'エージェントに反映',
+            label: busy ? '実行中…' : '反映',
             onClick: update,
             disabled: busy,
             primary: true
@@ -360,11 +360,11 @@ function SettingsPage({ ctx }) {
               jsx('div', { className: 'text-sm', children: 'プラグイン' }),
               jsx('div', {
                 className: 'text-xs opacity-60',
-                children: 'この画面そのものを新しくします。反映にはアプリの再起動が要ります'
+                children: '新しい版を取り込みます。取り込んだあとはアプリの再起動が要ります'
               })
             ]
           }),
-          jsx(Button, { label: 'プラグインを更新', onClick: selfUpdate, disabled: busy })
+          jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy })
         ]
       }),
 
