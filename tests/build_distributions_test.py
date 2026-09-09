@@ -151,7 +151,12 @@ def test_manifest_declares_env_and_ownership():
     names = {e["name"] for e in m["env_requires"]}
     assert "SLACK_BOT_TOKEN" in names and "OPENROUTER_API_KEY" in names, names
     owned = set(m["distribution_owned"])
-    assert {"SOUL.md", "config.yaml", "skills/", "plugins/", "scripts/"} <= owned, owned
+    assert {"SOUL.md", "config.yaml", "plugins/", "scripts/"} <= owned, owned
+    # **`skills/` とまとめて持たない。** 持ち物のフォルダは更新のたびに rmtree
+    # されるので、まとめて宣言すると実機で生えたスキルが毎回消える。
+    assert "skills/" not in owned and "skills" not in owned, owned
+    for name in bd.skills_of(ROOT, "operator"):
+        assert f"skills/{name}" in owned, (name, owned)
     # .env は配布物に含めない（公式が除外するが、こちらでも作らない）
     assert not (OUT / "operator/.env").exists()
 
