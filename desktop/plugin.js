@@ -200,6 +200,8 @@ function SettingsPage({ ctx }) {
         timeoutMs: 180000
       })
       setLog(res.lines || [])
+      // **成否を一言で言う。** ログだけ出して黙ると、読める人しか結果が分からない。
+      setNotice(res.ok ? '更新しました。' : '一部が失敗しました。下の実行結果を確認してください。')
       await load()
     } catch (e) {
       setError(e.message)
@@ -217,7 +219,7 @@ function SettingsPage({ ctx }) {
       setLog(res.lines || [])
       setNotice(
         res.changed
-          ? 'SEAOS を更新しました。画面へ反映するにはアプリを再起動してください。'
+          ? 'このプラグインを新しい版にしました。画面へ反映するにはアプリを再起動してください。'
           : 'すでに最新です。'
       )
     } catch (e) {
@@ -251,17 +253,11 @@ function SettingsPage({ ctx }) {
               })
             ]
           }),
-          jsxs('div', {
-            className: 'flex shrink-0 gap-2',
-            children: [
-              jsx(Button, { label: 'SEAOS を更新', onClick: selfUpdate, disabled: busy }),
-              jsx(Button, {
-                label: busy ? '実行中…' : '更新',
-                onClick: update,
-                disabled: busy,
-                primary: true
-              })
-            ]
+          jsx(Button, {
+            label: busy ? '実行中…' : 'エージェントに反映',
+            onClick: update,
+            disabled: busy,
+            primary: true
           })
         ]
       }),
@@ -353,6 +349,24 @@ function SettingsPage({ ctx }) {
             ]
           })
         : null,
+
+      jsxs('section', {
+        className: 'mt-auto flex items-center gap-3 pt-4',
+        style: { borderTop: BORDER },
+        children: [
+          jsxs('div', {
+            className: 'min-w-0 flex-1',
+            children: [
+              jsx('div', { className: 'text-sm', children: 'このプラグイン自体' }),
+              jsx('div', {
+                className: 'text-xs opacity-60',
+                children: 'GitHub から新しい版を取り込みます。反映にはアプリの再起動が要ります'
+              })
+            ]
+          }),
+          jsx(Button, { label: '新しい版を取り込む', onClick: selfUpdate, disabled: busy })
+        ]
+      }),
 
       editing
         ? jsx(SecretDialog, {

@@ -75,7 +75,7 @@ def sync_descriptions(log: Optional[Log] = None) -> Result:
             continue
         code, _out = hermes.set_description(name, text)
         if code == 0:
-            result.lines.append(f"= {name}")
+            result.lines.append(f"{name} の説明文を合わせた")
         else:
             result.failures += 1
             result.lines.append(f"✗ {name}（説明文を設定できず）")
@@ -90,7 +90,7 @@ def apply_env(log: Optional[Log] = None) -> Result:
     report, missing = env_mod.apply()
     result.lines.extend(report)
     for item in missing:
-        result.lines.append(f"! 値が空のまま: {item}")
+        result.lines.append(f"値が空のまま: {item}")
     if log:
         for line in result.lines:
             log(line)
@@ -106,30 +106,36 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     result = Result()
     out = build(log=log)
 
+    result.lines.append("── エージェントを配る ──")
     for name in roles.names():
         dist = out / name
         if not dist.is_dir():
             continue
         if not hermes.profile_exists(name):
             code, _ = hermes.install(dist)
-            result.lines.append(f"+ {name}（新規に導入）" if code == 0 else f"✗ {name} の導入に失敗")
+            result.lines.append(f"{name} を新しく導入した" if code == 0 else f"{name} の導入に失敗")
             result.failures += 0 if code == 0 else 1
             continue
         if not hermes.is_distribution(name):
             # 旧方式で作られたプロファイル。一度だけ配布物として入れ直す
             code, _ = hermes.install(dist, force=True)
-            result.lines.append(f"+ {name}（配布物へ移行）" if code == 0 else f"✗ {name} の移行に失敗")
+            result.lines.append(f"{name} を配布物として入れ直した" if code == 0 else f"{name} の移行に失敗")
             result.failures += 0 if code == 0 else 1
             continue
         code, _ = hermes.update(name, force_config=force_config)
-        result.lines.append(f"~ {name}" if code == 0 else f"✗ {name} の更新に失敗")
+        result.lines.append(f"{name} を更新した" if code == 0 else f"{name} の更新に失敗")
         result.failures += 0 if code == 0 else 1
 
     described = sync_descriptions(log=log)
-    result.lines.extend(described.lines)
+    # 役ごとの1行は畳む。**成否だけが要る情報で、8行並べても読む人は居ない。**
+    ok = len(described.lines) - described.failures
+    result.lines.append("── 説明文を合わせる（担当の振り分けに使われる）──")
+    result.lines.append(f"{ok} 役ぶん合わせた")
+    result.lines.extend(l for l in described.lines if l.startswith("✗"))
     result.failures += described.failures
 
     applied = apply_env()
+    result.lines.append("── 鍵を配る ──")
     result.lines.extend(applied.lines)
 
     if log:

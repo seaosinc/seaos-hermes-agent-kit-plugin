@@ -118,7 +118,7 @@ def apply() -> Tuple[List[str], List[str]]:
         dst.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
         _secure(dst)
         report.append(
-            f"{name} に {wrote} 件" + (f"（要らない {pruned} 件を引き上げた）" if pruned else "")
+            f"{name} に鍵を {wrote} 件" + (f"（不要な {pruned} 件を引き上げた）" if pruned else "")
         )
 
     return report, missing
