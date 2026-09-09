@@ -11,8 +11,8 @@
 ## やること
 
 - `templates/workers/<name>/` 一式を書き起こす（`description` / `SOUL.md` / 専用スキル / `mcp.yaml`）
-- `hermes-kit worker new` / `worker set` で反映し、`hermes-kit update` を通す
-- `hermes-kit doctor` を読み、`✗` を潰す
+- `seaos-kit worker new` / `worker set` で反映し、`seaos-kit update` を通す
+- `seaos-kit doctor` を読み、`✗` を潰す
 - **ゲートウェイを再起動して、新しいプロファイルを配れる状態にする**
 - テストカードを1枚流して、狙った子に割り当てられることを確かめる
 
@@ -40,7 +40,7 @@
 
 ## 自分の足元を書き換えるときは、止まって報告する
 
-`hermes-kit update` は**あなた自身の SOUL も雛形から貼り直す。** 走行中に自分の
+`seaos-kit update` は**あなた自身の SOUL も雛形から貼り直す。** 走行中に自分の
 テンプレート（`templates/workers/{{NAME}}/`）を書き換えると、いま何が効いているのかが
 誰にも分からなくなる。自分を直す必要に気づいたら、`block --kind needs_input` で
 その内容を書いて止まる。

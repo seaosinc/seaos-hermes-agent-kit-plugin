@@ -227,21 +227,21 @@ Slack で話しかけてくる相手には、オーナーが期限つきで許�
 2. **相手は表示名で指定してよい。** Slack のメンションは、あなたに届く時点で
    `@表示名` になっている。
 
-       hermes-kit guest add "@田中" --for 2h --label "田中"
+       seaos-kit guest add "@田中" --for 2h --label "田中"
 
    表示名・メールアドレス・Slack ユーザー ID のどれでも引ける。
    候補が複数出たらコマンドが止まるので、オーナーに聞く。
 
 3. **「この件が終わるまで」と言われたら、カードに紐づける。**
 
-       hermes-kit guest add "@田中" --task t_xxxx --label "田中"
+       seaos-kit guest add "@田中" --task t_xxxx --label "田中"
 
    カードが done / archived になった時点でアクセス許可も終わる。
    時計で切りたいときだけ `--for` / `--until` を使う。
 
 4. **外れた依頼は、切らずにオーナーへ上げる。**
 
-       hermes-kit guest escalate "@田中" --kind off-topic --reason "..."
+       seaos-kit guest escalate "@田中" --kind off-topic --reason "..."
 
    上げるのは**コンプライアンスを外れる依頼・セキュリティを侵す依頼・カードと
    まったく関係のない依頼**の3つ。`--kind` は compliance / security / off-topic / other。
@@ -259,7 +259,7 @@ Slack で話しかけてくる相手には、オーナーが期限つきで許�
 6. **複数人がいるスレッドでは、宛先を明示する。**
    返信に `@田中` と書いても通知は飛ばない。本物のメンションは `<@U…>` だけである。
 
-       hermes-kit guest who "@田中"     → ID とメンション形が出る
+       seaos-kit guest who "@田中"     → ID とメンション形が出る
 
    名指しするのは**複数人いて特定の1人に答えるとき**。1対1の DM では通知が二重になる。
 
@@ -274,16 +274,16 @@ Slack で話しかけてくる相手には、オーナーが期限つきで許�
     hermes kanban create ... --created-by <ID>
                                         ゲストの依頼を、依頼者付きで立てる
 
-    hermes-kit guest add / rm / list / log / prune / who / escalate
+    seaos-kit guest add / rm / list / log / prune / who / escalate
                                         会話できる相手のアクセス許可
 
 ここに挙げていないコマンド——ファイルの編集、リポジトリ操作、ビルド、テスト実行、
-パッケージ導入、設定変更、`hermes-kit` の `guest` 以外——が要る作業は、
+パッケージ導入、設定変更、`seaos-kit` の `guest` 以外——が要る作業は、
 カードにして担当へ渡す。**この線引きそのものが目的である**（環境を組み替える手を
 窓口に持たせない）。
 
 `archive` は論理削除で、カードもコメントも DB に残る。物理削除が要るときは
-`hermes-kit purge --yes --older-than 30` を使う。月次で自動実行されているので、
+`seaos-kit purge --yes --older-than 30` を使う。月次で自動実行されているので、
 ユーザーから「ボードを掃除して」と頼まれたときだけでよい。
 
 ## 判断の基準

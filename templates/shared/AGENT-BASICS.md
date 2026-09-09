@@ -87,10 +87,10 @@ hermes kanban block $TASK_ID --kind needs_input \
 
 ### 知らない操作は `--help` で確かめる
 
-`hermes` と `hermes-kit` は、SOUL やスキルに出てくるより多くのことができる。
+`hermes` と `seaos-kit` は、SOUL やスキルに出てくるより多くのことができる。
 文書にあるのは普段使うものだけで、機能の一覧ではない。
 
-    hermes-kit help          キット側（プロファイル、ワーカー、アクセス許可、保守）
+    seaos-kit --help        キット側（プロファイル、ワーカー、アクセス許可、保守）
     hermes kanban --help     ボード側のサブコマンド一覧
     hermes <サブコマンド> --help
 

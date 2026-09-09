@@ -21,13 +21,13 @@ HERMES_HOME = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
 ROOT = HERMES_HOME.parent.parent if HERMES_HOME.parent.name == "profiles" else HERMES_HOME
 MEM0_ENV = ROOT / "mem0" / ".env"
 LOG_PATH = ROOT / "logs" / "mem0-up.log"
-MANIFEST = ROOT / ".hermes-kit-manifest.json"
+MANIFEST = ROOT / ".seaos-kit-manifest.json"
 
 
 def _compose_file() -> Path | None:
     """compose.yml はキットのリポジトリ側にある（版管理したいので）。
 
-    場所は hermes-kit update がマニフェストに書いている。
+    場所は seaos-kit update がマニフェストに書いている。
     """
     try:
         kit = json.loads(MANIFEST.read_text(encoding="utf-8")).get("kit_root")
@@ -54,7 +54,7 @@ async def _up() -> None:
         _log("compose.yml が見つからないので何もしない（キットが未導入）")
         return
     if not MEM0_ENV.exists():
-        _log(f"{MEM0_ENV} が無いので何もしない（hermes-kit install が作る）")
+        _log(f"{MEM0_ENV} が無いので何もしない（seaos-kit install が作る）")
         return
     try:
         proc = await asyncio.create_subprocess_exec(

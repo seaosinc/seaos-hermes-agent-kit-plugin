@@ -2,7 +2,7 @@
 # 規約の反映と配布だけを回す（軽い）。cron の --no-agent で走るので、
 # **標準出力に出したものがそのまま通知される。** 変化があったときだけ喋る。
 set -u
-KIT="$HOME/.local/bin/hermes-kit"
+KIT="$HOME/.local/bin/seaos-kit"
 
 # **手元で直す環境と、git で受け取る環境がある。**
 # 手元（開発機）は templates/ を直接編集するので、pull するものが無い。
@@ -21,7 +21,7 @@ if git -C "$root" remote | grep -q . && [ -z "$(git -C "$root" status --porcelai
 fi
 
 out=$("$KIT" update 2>&1) || {
-  printf '%s\n' "hermes-kit update が失敗した:"
+  printf '%s\n' "seaos-kit update が失敗した:"
   printf '%s\n' "$out" | tail -20
   exit 0
 }

@@ -222,10 +222,15 @@ def restart_when_idle(profile: str, log: Optional[Log] = None) -> bool:
 
 # ── コマンドの置き場 ─────────────────────────────────────────────────────
 
+# PATH に置く名前。**`kit` のような一般名は使わない**——他のツールと衝突するし、
+# エージェントの規約に書いたときに何のコマンドか分からない。
+COMMAND = "seaos-kit"
+
+
 def command_target() -> Path:
-    """`kit` コマンドを置く場所。"""
+    """`seaos-kit` コマンドを置く場所。"""
     if os_kind() == "win32":
-        return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Programs" / "hermes-kit"
+        return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Programs" / COMMAND
     return Path.home() / ".local" / "bin"
 
 
@@ -241,7 +246,7 @@ def link_command(log: Optional[Log] = None) -> Path:
     entry = kit_root() / "core" / "cli.py"
 
     if os_kind() == "win32":
-        path = target / "kit.cmd"
+        path = target / f"{COMMAND}.cmd"
         path.write_text(
             "@echo off\r\n"
             f'python "{entry}" %*\r\n',
@@ -252,7 +257,7 @@ def link_command(log: Optional[Log] = None) -> Path:
             log(f"  PATH に {target} を足すこと")
         return path
 
-    path = target / "kit"
+    path = target / COMMAND
     if path.is_symlink() or path.exists():
         path.unlink()
     path.symlink_to(entry)

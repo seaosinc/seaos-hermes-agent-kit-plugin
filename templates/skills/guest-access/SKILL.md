@@ -46,7 +46,7 @@ Slack で話しかけてくる相手は2種類いる。
       --created-by "U01ABCDEF" --triage
 
 - `--created-by` に**依頼者の Slack ユーザー ID をそのまま**入れる。表示名ではなく ID。
-  ID は会話のイベントに載っている。分からなければ `hermes-kit guest list` で照合する
+  ID は会話のイベントに載っている。分からなければ `seaos-kit guest list` で照合する
 - **本文の1行目にも `依頼者: <ID>（名前）` を書く。** 本文は作成後に変更できないので、
   ここが動かない記録になる。`created_by` は列、本文は経緯。両方に残す
 
@@ -60,7 +60,7 @@ Slack で話しかけてくる相手は2種類いる。
 （アダプタが読みやすい形に直すため）。オーナーが「@田中さんを2時間」と書いたら、
 **その表示名をそのまま渡せばよい。**
 
-    hermes-kit guest add "@田中" --for 2h --label "田中" --by "足達"
+    seaos-kit guest add "@田中" --for 2h --label "田中" --by "足達"
 
 受けつける指定は3通り。
 
@@ -95,7 +95,7 @@ Slack で話しかけてくる相手は2種類いる。
     hermes kanban create "<タイトル>" --body "依頼者: U01ABCDEF（田中）
 
     <内容>" --created-by "U01ABCDEF" --triage
-    hermes-kit guest add "@田中" --task t_xxxx --label "田中" --by "足達"
+    seaos-kit guest add "@田中" --task t_xxxx --label "田中" --by "足達"
 
 期限とカードは併用でき、`--task t_xxxx --until 18:00` なら**先に来たほうで切れる**
 （「この件が終わるまで、ただし今日中」）。
@@ -110,7 +110,7 @@ Slack で話しかけてくる相手は2種類いる。
 効かない。効くのは `--task` に渡した id だけである。
 
 `--unlimited` はオーナーが明示的に「無期限で」と言ったときだけ使い、使ったことを報告する
-（`hermes-kit doctor` が残り続けるかぎり警告する）。指定が無ければ既定は1時間である。
+（`seaos-kit doctor` が残り続けるかぎり警告する）。指定が無ければ既定は1時間である。
 
 ### 誰の指示かを残す
 
@@ -118,10 +118,10 @@ Slack で話しかけてくる相手は2種類いる。
 「この人はなぜ入っていたのか」を追える。**あなたの判断で入れたのではない**ことを示す
 記録でもある。
 
-    hermes-kit guest add "@田中" --for 2h --label "田中" --by "足達"
-    hermes-kit guest rm "@田中" --by "足達" --reason "..."
-    hermes-kit guest log                     直近の出し入れを読む
-    hermes-kit guest log --user "@田中"       その人の履歴だけ
+    seaos-kit guest add "@田中" --for 2h --label "田中" --by "足達"
+    seaos-kit guest rm "@田中" --by "足達" --reason "..."
+    seaos-kit guest log                     直近の出し入れを読む
+    seaos-kit guest log --user "@田中"       その人の履歴だけ
 
 ## 3. 外れた依頼は、切らずにオーナーへ上げる
 
@@ -152,7 +152,7 @@ Slack で話しかけてくる相手は2種類いる。
 
 ### 上げかた
 
-    hermes-kit guest escalate "@田中" --kind off-topic \
+    seaos-kit guest escalate "@田中" --kind off-topic \
       --reason "紐づいたカードと無関係な調査を繰り返し依頼している"
 
 `--kind` は `compliance` / `security` / `off-topic` / `other`。
@@ -193,7 +193,7 @@ Slack で話しかけてくる相手は2種類いる。
 
 ID は次で引く。
 
-    hermes-kit guest who "@田中"
+    seaos-kit guest who "@田中"
     → UDLPW50EQ
        返信に貼るメンション: <@UDLPW50EQ>
 
@@ -224,7 +224,7 @@ ID は次で引く。
 |---|---|
 | A と B が同じスレッドにいる | 両方の発言を読み、**答える相手を `<@U…>` で名指しする** |
 | B の許可が切れた | B の発言は届かなくなる。**返事が来ないのは切れたからだと理解する** |
-| B が「まだ話せる？」と別経路で聞いてきた | 残りを `hermes-kit guest list` で見て答え、延長はオーナーへ取り次ぐ |
+| B が「まだ話せる？」と別経路で聞いてきた | 残りを `seaos-kit guest list` で見て答え、延長はオーナーへ取り次ぐ |
 | A と B の依頼が混ざる | **依頼ごとに、誰の依頼かを取り違えない。** カードの `--created-by` は言い出した本人 |
 
 **スレッドは1つでも、依頼者は1人ずつである。** カードを作るときの `--created-by` は、
@@ -242,4 +242,4 @@ ID は次で引く。
   聞かれたときだけ出す
 - オーナーに対するときと同じく、依頼はユーザーの言葉に近い粒度のまま扱う
 - 許可が切れると会話は途中でも止まる。長引きそうなら、残り時間を先に伝えておく
-  （`hermes-kit guest list` で分かる）
+  （`seaos-kit guest list` で分かる）

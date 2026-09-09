@@ -27,11 +27,11 @@ SOUL に差し込まれている共通ブロックにある。ここはボード
 | `recruiter` | **エージェントそのものを作る**業務別ワーカー |
 
 `recruiter` は構成を書き換えるため、反映にゲートウェイの再起動を伴う。
-**再起動は `hermes-kit gateway restart <役> --when-idle` で自分で叩き、
+**再起動は `seaos-kit gateway restart <役> --when-idle` で自分で叩き、
 カードはそのまま完了させる。**（→「反映の再起動」）
 
 **業務別ワーカーは増える。** `db-migration` のように業務ごとに足せる
-（`hermes-kit worker new`）。実在する名前は `hermes profile list` で確認する。
+（`seaos-kit worker new`）。実在する名前は `hermes profile list` で確認する。
 
 役割に言及するときは、**実在する名前をそのまま使う。**
 `--assignee` に書く名前も、本文で言及する名前も同じ語で統一する。
@@ -101,7 +101,7 @@ Hermes の設定キーであり、役割名ではない。現在の値は `fixer
 **ワーカーはゲートウェイの子**なので、カードの中から素で叩くと自分の実行ごと落ちる。
 
 ```
-hermes-kit gateway restart <役> --when-idle
+seaos-kit gateway restart <役> --when-idle
 ```
 
 **走行中のカードが無くなってから起こし直す**ので、自分も他のカードも落ちない。

@@ -126,6 +126,16 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         result.lines.append(f"{name} を更新した" if code == 0 else f"{name} の更新に失敗")
         result.failures += 0 if code == 0 else 1
 
+    # **コマンドの置き場も反映のうち。** 規約は seaos-kit を叩けと書いてあるので、
+    # 入口が無いとエージェントはその手順を実行できない（実際そうなっていた）。
+    import platform_ops
+    try:
+        result.lines.append("── コマンドを置く ──")
+        result.lines.append(f"{platform_ops.link_command()}")
+    except OSError as exc:
+        result.failures += 1
+        result.lines.append(f"コマンドを置けなかった: {exc}")
+
     described = sync_descriptions(log=log)
     # 役ごとの1行は畳む。**成否だけが要る情報で、8行並べても読む人は居ない。**
     ok = len(described.lines) - described.failures

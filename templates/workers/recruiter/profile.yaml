@@ -1,4 +1,4 @@
-# このワーカーの定義。hermes-kit update が ~/.hermes へ反映する。
+# このワーカーの定義。seaos-kit update が ~/.hermes へ反映する。
 name: recruiter
 
 # decomposer はこの説明文を読んで子カードの担当を決める。

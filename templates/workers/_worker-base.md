@@ -1,5 +1,5 @@
 <!-- 業務別ワーカーが例外なく守る規約。SOUL.md の {{WORKER_BASE}} に差し込まれる。
-     ここを直せば全ワーカーに一度で反映される（hermes-kit update）。
+     ここを直せば全ワーカーに一度で反映される（seaos-kit update）。
      ディレクトリではなくファイルなので、ワーカー一覧（templates/workers/*(/N)）には出ない。
      全役割に共通の作法は templates/shared/AGENT-BASICS.md にある。重複させない。 -->
 

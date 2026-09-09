@@ -52,7 +52,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 組織の TLS 傍受プロキシの CA。**ホストは信頼していてもコンテナは知らない**ので、
 # 入れないと clone も mise install も npm も全部 certificate エラーで落ちる。
-# 中身は hermes-kit workspace build が用意する（無い環境では空ファイルになり、
+# 中身は seaos-kit workspace build が用意する（無い環境では空ファイルになり、
 # update-ca-certificates は何もしない）。
 COPY extra-ca.crt /usr/local/share/ca-certificates/hermes-extra.crt
 RUN if [ -s /usr/local/share/ca-certificates/hermes-extra.crt ]; then \

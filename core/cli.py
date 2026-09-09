@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """CLI の薄い皮。**ロジックはここに書かない。**
 
 GUI（dashboard/plugin_api.py）も同じ core を呼ぶ。皮が2枚あっても中身は1つで、
@@ -16,6 +17,7 @@ import booking  # noqa: E402
 import doctor as doctor_mod  # noqa: E402
 import install as install_mod  # noqa: E402
 import kit  # noqa: E402
+import maintain as maintain_mod  # noqa: E402
 import platform_ops  # noqa: E402
 import mem0  # noqa: E402
 import roles  # noqa: E402
@@ -56,6 +58,31 @@ def main(argv: list[str] | None = None) -> int:
     wk = sub.add_parser("worker", help="業務別ワーカーの CRUD")
     wsub = wk.add_subparsers(dest="wcmd", required=True)
     wsub.add_parser("list", help="一覧")
+
+    # **新設と改修。** recruiter の本業なので、ここが無いとエージェントは
+    # 増やせない（実装は core/worker.py にあったが CLI に繋がっていなかった）。
+    def _shared(sp, *, required_desc: bool) -> None:
+        sp.add_argument("name")
+        sp.add_argument("--desc", required=required_desc,
+                        help="decomposer が読む説明。**担当の割り振りはこれで決まる**")
+        sp.add_argument("--model", help="使うモデル")
+        sp.add_argument("--extra", help="profile.yaml に足す YAML 片")
+        sp.add_argument("--soul", type=Path, help="SOUL.md のもと")
+        sp.add_argument("--skill", action="append", type=Path, default=[], metavar="PATH",
+                        help="載せるスキルのフォルダ（繰り返し可）")
+        sp.add_argument("--mcp", action="append", default=[], metavar="KEY=JSON",
+                        help="足す MCP サーバ（繰り返し可）")
+        sp.add_argument("--env", action="append", default=[], metavar="NAME=説明",
+                        help="必要な環境変数（繰り返し可）")
+
+    wnew = wsub.add_parser("new", help="新しい役を作る")
+    _shared(wnew, required_desc=True)
+    wnew.add_argument("--from", dest="source", default="_template", help="下敷きにする役")
+
+    wset = wsub.add_parser("set", help="既存の役を直す")
+    _shared(wset, required_desc=False)
+    wset.add_argument("--rm-skill", action="append", default=[], metavar="NAME",
+                      help="外すスキル（繰り返し可）")
     wshow = wsub.add_parser("show", help="1体の詳細")
     wshow.add_argument("name")
     wrm = wsub.add_parser("rm", help="削除")
@@ -90,6 +117,13 @@ def main(argv: list[str] | None = None) -> int:
 
     gu = sub.add_parser("guest", help="ゲストのアクセス許可")
     gu.add_argument("rest", nargs=argparse.REMAINDER)
+
+    pg = sub.add_parser("purge", help="archived のカードを物理削除する（戻せない）")
+    pg.add_argument("--yes", action="store_true", help="実際に消す（既定は数えるだけ）")
+    pg.add_argument("--older-than", type=int, default=0, metavar="日数",
+                    help="この日数より古いものだけ。0 なら archived すべて")
+
+    sub.add_parser("maintain", help="日次の保守一式（反映 → 掃除 → 検証）")
 
     args = parser.parse_args(argv)
 
@@ -140,6 +174,34 @@ def main(argv: list[str] | None = None) -> int:
                 mark = "yes" if r["deployed"] else "-"
                 print(f"{r['name']:<20} {r['model']:<24} {mark:<10} {r['description'][:44]}")
             return 0
+        if args.wcmd in ("new", "set"):
+            def _pairs(items):
+                out = {}
+                for item in items:
+                    key, _, value = item.partition("=")
+                    if not key or not value:
+                        raise worker_mod.WorkerError(f"KEY=VALUE の形で書くこと: {item}")
+                    out[key] = value
+                return out
+
+            if args.wcmd == "new":
+                res = worker_mod.new(
+                    args.name, desc=args.desc, model=args.model or "", extra=args.extra or "",
+                    soul=args.soul, source=args.source, skills=args.skill,
+                    mcps=_pairs(args.mcp), envs=_pairs(args.env))
+                _print(f"{args.name} を作った: {res.path}")
+                _print("反映するには update を実行する")
+                return 0
+
+            changed = worker_mod.update_worker(
+                args.name, desc=args.desc, model=args.model, extra=args.extra,
+                soul=args.soul, add_skills=args.skill, rm_skills=args.rm_skill,
+                mcps=_pairs(args.mcp), envs=_pairs(args.env))
+            _print(f"{args.name}: {', '.join(changed) if changed else '変更なし'}")
+            if changed:
+                _print("反映するには update を実行する")
+            return 0
+
         if args.wcmd == "show":
             for key, value in worker_mod.show(args.name).items():
                 shown = ", ".join(value) if isinstance(value, list) else value
@@ -190,6 +252,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "uninstall":
         res = install_mod.uninstall(remove_profiles=args.profiles, log=print)
+        return 0 if res.ok() else 1
+
+    if args.cmd == "purge":
+        res = maintain_mod.purge(confirm=args.yes, older_than=args.older_than, log=_print)
+        return 0 if res.ok() else 1
+
+    if args.cmd == "maintain":
+        res = maintain_mod.maintain(log=_print)
+        for line in res.lines:
+            _print(line)
         return 0 if res.ok() else 1
 
     if args.cmd == "guest":

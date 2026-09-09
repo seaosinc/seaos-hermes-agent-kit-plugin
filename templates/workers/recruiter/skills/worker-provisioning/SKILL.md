@@ -5,7 +5,7 @@ version: 1.0.0
 platforms: [macos, linux]
 metadata:
   hermes:
-    tags: [worker, provisioning, soul, skill, mcp, hermes-kit]
+    tags: [worker, provisioning, soul, skill, mcp, seaos-kit]
 ---
 
 # エージェントを1体つくる
@@ -23,11 +23,11 @@ metadata:
 | `mcp.yaml` | 外部サービスへの口（任意） | その仕事ができない |
 
 **編集するのは常に `templates/workers/` 側である。** `~/.hermes/profiles/` は生成物なので直接触らない。
-反映は `hermes-kit update` が行う。
+反映は `seaos-kit update` が行う。
 
 ## 0. まず「作らない」を検討する
 
-    hermes-kit worker list
+    seaos-kit worker list
 
 **既存のワーカーの `description` を広げれば済むなら、それが正解である。**
 ワーカーが増えるほど decomposer の判別は難しくなり、似た説明が2つ並ぶと配り先が揺れる。
@@ -38,7 +38,7 @@ metadata:
 - **専用の手順や判断基準がある**（毎回同じ確認項目を踏む、独自の受け入れ基準がある）
 - **専用の外部接続が要る**（その MCP を他の子に持たせたくない）
 
-当てはまらないなら `hermes-kit worker set <既存> --desc "..."` で説明を広げて終わりにする。
+当てはまらないなら `seaos-kit worker set <既存> --desc "..."` で説明を広げて終わりにする。
 
 **増やせるのは業務別ワーカーだけである。** 固定3役（operator / fixer / broker）は
 構成として決まっていて、人と話す窓口は operator ひとつである。
@@ -58,7 +58,7 @@ metadata:
 | 役そのものが要らない | `worker rm <役>` |
 
 `--skill` は**同名があれば中身ごと差し替える**ので、既存スキルの修正もこれで行う。
-直す前に `hermes-kit worker show <役>` で、いま何が載っているかを読む。
+直す前に `seaos-kit worker show <役>` で、いま何が載っているかを読む。
 
 **直せるのは業務別ワーカー（`templates/workers/<役>/`）だけである。**
 固定役の規約（`templates/profiles/`）、全役に差し込まれる共通ブロック
@@ -66,7 +66,7 @@ metadata:
 対象外——**1つ直すと全員の振る舞いが変わる**ので、そこは人が判断する。
 頼まれたら「そこは人が決めるところである」と書いて `block --kind needs_input` で止まる。
 
-反映は新設と同じで、`hermes-kit update` を通す（6節）。
+反映は新設と同じで、`seaos-kit update` を通す（6節）。
 
 ## 1. 要件はカード本文から読む
 
@@ -119,7 +119,7 @@ decomposer が読むのは**この文だけ**である。SOUL もスキルも読
     mkdir -p /tmp/recruiter/<name>
     cp <KIT>/templates/workers/_template/SOUL.md /tmp/recruiter/<name>/SOUL.md
 
-**プレースホルダを3つとも残すこと。** 消すと `hermes-kit worker new --soul` が受け付けない:
+**プレースホルダを3つとも残すこと。** 消すと `seaos-kit worker new --soul` が受け付けない:
 
 | 記号 | 意味 | 置き場所 |
 |---|---|---|
@@ -167,7 +167,7 @@ frontmatter は他のスキルに揃える（`name` / `description` / `version` 
 - **使う変数は `--env` で宣言する。** 宣言しないと `env apply` が配らず、
   サーバは起動しても認証されないまま「有効」に見える
 
-      hermes-kit worker set <役> --env FOO_TOKEN="何のトークンか。どこで取るか"
+      seaos-kit worker set <役> --env FOO_TOKEN="何のトークンか。どこで取るか"
 
 - `.env` への値の記入は**オーナーの作業**である。宣言まで済ませ、
   「この変数を .env に入れてほしい」と報告して止まる
@@ -189,7 +189,7 @@ frontmatter は他のスキルに揃える（`name` / `description` / `version` 
 
 ここまでの成果物を渡して一気に作る:
 
-    hermes-kit worker new <name> \
+    seaos-kit worker new <name> \
       --desc "$(cat /tmp/recruiter/<name>/DESC.txt)" \
       --soul /tmp/recruiter/<name>/SOUL.md \
       --skill /tmp/recruiter/<name>/skills/<skill-name> \
@@ -198,8 +198,8 @@ frontmatter は他のスキルに揃える（`name` / `description` / `version` 
 
 `--json` の `ok: true` を確認してから次へ。ここまでは `templates/` に書いただけで、まだ動かない。
 
-    hermes-kit update --dry-run    # 何が変わるか読む
-    hermes-kit update              # プロファイル作成 → SOUL/model/MCP/skills/description を反映
+    seaos-kit update --dry-run    # 何が変わるか読む
+    seaos-kit update              # プロファイル作成 → SOUL/model/MCP/skills/description を反映
 
 `update` は最後に `doctor` を回す。**`✗` が1つでも出たら、そこで止まって報告する。**
 特に見るのは:
@@ -254,7 +254,7 @@ operator のゲートウェイに埋め込まれていて、走行中のワー�
 
 そのうえで叩く:
 
-    hermes-kit gateway restart operator --detach
+    seaos-kit gateway restart operator --detach
 
 **`--detach` を外さないこと。** あなたの実行はゲートウェイの子プロセスなので、
 前面で叩くと再起動の途中で自分が死に、ゲートウェイが停止したまま戻らない。
@@ -262,11 +262,11 @@ operator のゲートウェイに埋め込まれていて、走行中のワー�
 
 **`hermes gateway restart` を直に叩かないこと。** macOS では定義が再生成されて
 `HERMES_PROFILE` が消え、以後カードの発言者が全部 `worker` になって誰が言ったか
-追えなくなる。`hermes-kit gateway restart` は OS ごとの作法を吸収する。
+追えなくなる。`seaos-kit gateway restart` は OS ごとの作法を吸収する。
 
 ### 7-4. 再開したら、上がっていることを確かめる
 
-    hermes-kit doctor
+    seaos-kit doctor
 
 `=== ゲートウェイの HERMES_PROFILE ===` が `✓ operator`、
 `=== ディスパッチャ ===` が `✓ kanban dispatcher: …` になっていること。
@@ -279,15 +279,15 @@ doctor が通っただけでは「配られる」ことの証明にならない�
     hermes kanban create "<その子に来るはずの、いちばん典型的な依頼>" --triage
 
 分解の結果 `--assignee <name>` の子カードができれば description は効いている。
-別の子に行ったなら description が弱い。`hermes-kit worker set <name> --desc "..."` で直して
-`hermes-kit update` からやり直す。
+別の子に行ったなら description が弱い。`seaos-kit worker set <name> --desc "..."` で直して
+`seaos-kit update` からやり直す。
 
 確認が済んだらテストカードは片付ける（`hermes kanban archive <ID>`）。
 
 ## 9. 失敗したら戻す
 
-    hermes-kit worker rm <name>          # テンプレートとプロファイルの両方を消す
-    hermes-kit worker rm <name> --keep-profile   # プロファイルは残す
+    seaos-kit worker rm <name>          # テンプレートとプロファイルの両方を消す
+    seaos-kit worker rm <name> --keep-profile   # プロファイルは残す
 
 進行中のカードを抱えているワーカーは消せない（そう作ってある）。先に片付けること。
 
@@ -298,13 +298,13 @@ doctor が通っただけでは「配られる」ことの証明にならない�
 | 確かめること | 外すとどうなるか |
 |---|---|
 | 編集したのは `templates/` 側か（`~/.hermes/profiles/` ではないか） | 次の `update` で消える |
-| `hermes-kit worker new` を通したか（`hermes profile create` を直に叩いていないか） | `config.yaml` が作られず中途半端になる |
+| `seaos-kit worker new` を通したか（`hermes profile create` を直に叩いていないか） | `config.yaml` が作られず中途半端になる |
 | `description` は具体的か（→ 2.） | 仕事が来ないか、間違った仕事が来る |
 | SOUL に共通規約を書き写していないか（→ 3.） | 共通側を直してもこの子だけ古いまま |
 | 鍵は `${VAR}` 参照か | リポジトリへ漏れる |
 | 走行中・レビュー待ちのカードを数えたか（→ 7-2.） | 走っている作業が黙って落ちる |
 | **直しただけなのに再起動していないか**（→ 7.） | 走っている作業を理由なく落とす |
-| 新しい役を作ったとき、再起動は `hermes-kit gateway restart` で行ったか（→ 7-3.） | 新しい役に仕事が来ない |
+| 新しい役を作ったとき、再起動は `seaos-kit gateway restart` で行ったか（→ 7-3.） | 新しい役に仕事が来ない |
 | 再起動に `--detach` を付けたか（→ 7-3.） | 自分が死んで、ゲートウェイが停止したまま戻らない |
 | 増やしたのは業務別ワーカーか | 窓口は operator ひとつと決まっている |
 | 自分自身のテンプレートに触れていないか | いま何が効いているのか分からなくなる |

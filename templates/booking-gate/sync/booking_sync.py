@@ -3,7 +3,7 @@
 
 launchd から1分ごとに起動される。やることは3つだけ。
 
-  1. 手で出したアクセス許可 grants.json を読む（hermes-kit grant が書く）
+  1. 手で出したアクセス許可 grants.json を読む（seaos-kit guest が書く）
   2. アクセス許可表 reservations.json を原子的に置き換える（プラグインが読む）
   3. いま有効な人だけを pairing の承認済みに置く
 
@@ -101,7 +101,7 @@ def audit(event: str, **fields) -> None:
 
     grants.json は「いまの状態」しか持たないので、prune すると
     「あの日あの人をなぜ入れたのか」が消える。アクセス許可の出し入れと、実際に会話が
-    開いた／閉じた瞬間だけをここに積む。読むのはオーナーと ``hermes-kit guest log``。
+    開いた／閉じた瞬間だけをここに積む。読むのはオーナーと ``seaos-kit guest log``。
     """
     record = {
         "at": datetime.now(timezone.utc).astimezone().isoformat(),
@@ -197,7 +197,7 @@ def task_status(task_id: str) -> str | None:
 
 
 def load_guests() -> list[dict]:
-    """hermes-kit guest が書いたアクセス許可。壊れていれば「許可なし」として扱う。"""
+    """seaos-kit guest が書いたアクセス許可。壊れていれば「許可なし」として扱う。"""
     path = GUESTS_PATH if GUESTS_PATH.exists() else _LEGACY_GUESTS_PATH
     try:
         data = json.loads(path.read_text(encoding="utf-8"))

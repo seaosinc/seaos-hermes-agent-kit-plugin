@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """booking-guest — Slack で会話できるゲストを足す／外す。
 
-``hermes-kit guest`` の実体。引数だけで完結するので、operator 自身が terminal から
+``seaos-kit guest`` の実体。引数だけで完結するので、operator 自身が terminal から
 実行できる（オーナーが Slack で「この人を16時まで」と言えば operator がこれを打つ）。
 
 アクセス許可は ``grants.json`` に書き、書いた直後に booking-sync を1回走らせて
@@ -259,7 +259,7 @@ def cmd_add(args) -> int:
         print("✓ アクセス許可を出した")
         print("  " + describe(grant, now))
         if end is None and not task_id:
-            print("  ! 無期限。外すときは hermes-kit guest rm " + uid)
+            print("  ! 無期限。外すときは seaos-kit guest rm " + uid)
     return 0
 
 
@@ -278,7 +278,7 @@ def cmd_list(args) -> int:
     for g in sorted(live, key=lambda x: x.get("end") or "9999"):
         print("  " + describe(g, now))
     if expired:
-        print(f"\n  （期限切れ {len(expired)} 件。次の hermes-kit grant prune で消える）")
+        print(f"\n  （期限切れ {len(expired)} 件。次の seaos-kit guest prune で消える）")
     return 0
 
 
@@ -346,7 +346,7 @@ def cmd_escalate(args) -> int:
     if mention:
         print(f"\n  {mention} {uid} から次の依頼がありました。許可を続けますか。")
         print(f"  理由: {args.reason}")
-        print(f"\n  外す場合: hermes-kit guest rm {uid} --by \"<オーナー名>\" --reason \"...\"")
+        print(f"\n  外す場合: seaos-kit guest rm {uid} --by \"<オーナー名>\" --reason \"...\"")
     else:
         print("  ! オーナーの Slack ID が設定に無い（owner_slack_id / always_allow）")
     return 0
@@ -414,7 +414,7 @@ def cmd_who(args) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(prog="hermes-kit guest", description="Slack で会話できるゲストのアクセス許可")
+    ap = argparse.ArgumentParser(prog="seaos-kit guest", description="Slack で会話できるゲストのアクセス許可")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("add", help="アクセス許可を出す")

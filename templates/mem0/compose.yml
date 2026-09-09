@@ -4,10 +4,10 @@
 # 記憶の共有だけが目的なので entity relationship は実質使わないが、mem0 サーバーが
 # graph_store: neo4j を main.py にハードコードしていて外せないため Neo4j も載せている。
 #
-# 起動: hermes-kit install（または docker compose -f このファイル up -d）
-# 停止: hermes-kit uninstall --yes
+# 起動: seaos-kit install（または docker compose -f このファイル up -d）
+# 停止: seaos-kit uninstall --yes
 
-name: hermes-kit-mem0
+name: seaos-kit-mem0
 
 services:
   postgres:
@@ -61,7 +61,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: hermes-kit/mem0-api:latest
+    image: seaos-kit/mem0-api:latest
     container_name: hermes-mem0-api
     depends_on:
       postgres:
