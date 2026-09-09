@@ -105,25 +105,16 @@ def set_secret(body: SecretIn) -> Dict:
 
 class UpdateIn(BaseModel):
     forceConfig: bool = False
-    # ON にした役。**None なら現状維持**（いま入っている役だけを更新する）。
-    enabled: Optional[List[str]] = None
 
 
 @router.post("/update")
 def run_update(body: Optional[UpdateIn] = None) -> Dict:
-    """生成 → 各役へ反映 → 説明文 → 鍵。ウィザードの最後の一押し。
+    """生成 → 全役へ反映 → 説明文 → 鍵。ウィザードの最後の一押し。
 
-    `enabled` が来たら、**あるべき状態に合わせる**——ON は入れ、OFF は消す。
-    OFF はプロファイル削除なので、走行中のカードを抱えた役は消さずに残す。
+    **役は選ばせない。** 8役はチームとして設計されていて、欠けると成立しない
+    （fixer が居ないと詰まりが解けない、operator が居ないと窓口が無い）。
     """
-    force = bool(body and body.forceConfig)
-    if body is not None and body.enabled is not None:
-        unknown = set(body.enabled) - set(roles.names())
-        if unknown:
-            raise HTTPException(status_code=400, detail=f"知らない役: {', '.join(sorted(unknown))}")
-        result = kit.apply_roles(set(body.enabled), force_config=force)
-    else:
-        result = kit.update(force_config=force)
+    result = kit.update(force_config=bool(body and body.forceConfig))
     return {"ok": result.ok(), "lines": result.lines}
 
 

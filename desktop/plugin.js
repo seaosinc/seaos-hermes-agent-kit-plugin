@@ -103,61 +103,8 @@ function SecretRow({ secret, onSave, busy }) {
   })
 }
 
-/** 役の1行。**トグルが「あるべき状態」で、反映で実際の状態が追いつく。**
- *
- * OFF はプロファイル削除（セッションと記憶ごと消える）なので、押した時点では
- * 何もせず、意図を色で見せるだけにする。実際に消えるのは「反映」を押したとき。 */
-function RoleRow({ role, on, busy, onToggle }) {
-  const changing = on !== role.installed
-  return jsxs('div', {
-    className: 'flex items-center gap-3 py-1.5 border-b border-(--ui-border) last:border-0',
-    children: [
-      jsx('button', {
-        type: 'button',
-        role: 'switch',
-        'aria-checked': on,
-        disabled: busy,
-        onClick: onToggle,
-        className:
-          'relative h-4 w-8 shrink-0 rounded-full transition-colors disabled:opacity-40 ' +
-          (on ? 'bg-(--ui-accent)' : 'bg-(--ui-border)'),
-        children: jsx('span', {
-          className:
-            'absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ' +
-            (on ? 'left-4.5' : 'left-0.5')
-        })
-      }),
-      jsx('span', {
-        className: 'flex-1 text-sm',
-        children: role.name + (role.onBoard ? '' : '（板に載らない）')
-      }),
-      jsx('span', {
-        className:
-          'text-xs ' +
-          (changing
-            ? on
-              ? 'text-(--ui-accent)'
-              : 'text-(--ui-warning)'
-            : role.installed
-              ? 'text-(--ui-success)'
-              : 'text-(--ui-text-tertiary)'),
-        children: changing
-          ? on
-            ? '反映で導入'
-            : '反映で削除'
-          : role.installed
-            ? '導入済み'
-            : '未導入'
-      })
-    ]
-  })
-}
-
 function KitPane({ ctx }) {
   const [roles, setRoles] = useState([])
-  // **トグルは「こうしたい」を持つ。** 実際の状態（installed）とは別に持ち、
-  // 反映を押したときに初めて追いつく。
-  const [wanted, setWanted] = useState(() => new Set())
   const [secrets, setSecrets] = useState([])
   const [log, setLog] = useState([])
   const [busy, setBusy] = useState(false)
@@ -166,9 +113,7 @@ function KitPane({ ctx }) {
   const load = useCallback(async () => {
     setError('')
     try {
-      const rs = await call(ctx, '/roles')
-      setRoles(rs)
-      setWanted(new Set(rs.filter((r) => r.installed).map((r) => r.name)))
+      setRoles(await call(ctx, '/roles'))
       setSecrets(await call(ctx, '/secrets'))
     } catch (e) {
       setError(e.message)
@@ -216,16 +161,7 @@ function KitPane({ ctx }) {
   )
 
   const missing = secrets.filter((s) => s.required && !s.configured)
-  const removing = roles.filter((r) => r.installed && !wanted.has(r.name)).map((r) => r.name)
 
-  const toggleRole = useCallback((name) => {
-    setWanted((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-  }, [])
 
   return jsxs('div', {
     className: 'flex h-full flex-col gap-4 overflow-y-auto p-4 text-sm',
@@ -261,21 +197,18 @@ function KitPane({ ctx }) {
         children: [
           jsx('div', { className: 'text-xs uppercase tracking-wide text-(--ui-text-tertiary)', children: '2. 役' }),
           ...roles.map((r) =>
-            jsx(RoleRow, {
-              role: r,
-              on: wanted.has(r.name),
-              busy,
-              onToggle: () => toggleRole(r.name)
+            jsx(Row, {
+              label: r.name + (r.onBoard ? '' : '（板に載らない）'),
+              value: r.installed ? '導入済み' : '未導入',
+              tone: r.installed ? 'ok' : 'muted'
             }, r.name)
           ),
-          removing.length
-            ? jsx('div', {
-                className: 'pt-1 text-xs text-(--ui-warning)',
-                children:
-                  `OFF にした ${removing.length} 役は、反映すると削除されます` +
-                  `（${removing.join(', ')}）。セッションと記憶も消えて戻せません。`
-              })
-            : null
+          jsx('div', {
+            className: 'pt-1 text-xs text-(--ui-text-tertiary)',
+            children:
+              '8役はチームとして動きます（選べません）。fixer が居ないと詰まりが解けず、' +
+              'operator が居ないと窓口がありません。'
+          })
         ]
       }),
 
@@ -297,7 +230,7 @@ function KitPane({ ctx }) {
                 className:
                   'rounded bg-(--ui-accent) px-3 py-1.5 text-xs text-(--ui-accent-foreground) disabled:opacity-50',
                 disabled: busy,
-                onClick: () => run('/update', { enabled: [...wanted] }),
+                onClick: () => run('/update'),
                 children: busy ? '実行中…' : '生成して反映'
               }),
               jsx('button', {
