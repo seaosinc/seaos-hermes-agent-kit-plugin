@@ -16,6 +16,7 @@ from typing import Callable, List, Optional
 import yaml
 
 import booking
+import check_mcp_tools
 import hermes
 import hotl
 import mem0
@@ -209,6 +210,12 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     # 綴りの誤りが世代を越えて残る。
     rep.section("規約が名指しした名前（コマンド・道具・スキル・役）")
     refcheck.run(rep, deep=deep)
+
+    # **MCP の allowlist は綴りを間違えても黙って落ちる。** 実在しない名前を
+    # 8個並べたまま、担当が「取れない前提」のカードを4時間ぶん立てた事故がある。
+    if deep:
+        rep.section("MCP の allowlist（サーバに実在するか）")
+        check_mcp_tools.run(rep)
 
     rep.section("HOTL（承認を待たない設定）")
     if not hotl.check(log=rep.lines.append):

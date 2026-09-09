@@ -93,11 +93,10 @@ def tools_of(url: str, headers: dict[str, str]) -> set[str] | None:
         return None
 
 
-def main() -> int:
+def run(rep) -> None:
     root = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes") / "profiles"
     if not root.is_dir():
-        return 0
-    fail = 0
+        return
     for prof in sorted(p for p in root.iterdir() if p.is_dir()):
         cfg = prof / "config.yaml"
         if not cfg.exists():
@@ -123,24 +122,40 @@ def main() -> int:
                 else:
                     headers[hk] = got
             if not ok:
-                print(f"= {prof.name}/{name}: 鍵が未設定なので照合しない")
+                rep.note(f"{prof.name}/{name}: 鍵が未設定なので照合しない")
                 continue
             actual = tools_of(url, headers)
             if actual is None:
-                print(f"? {prof.name}/{name}: 道具の一覧を取れなかった（疎通か認証）")
+                rep.note(f"{prof.name}/{name}: 道具の一覧を取れなかった（疎通か認証）")
                 continue
             ghost = [t for t in include if t not in actual]
             if not ghost:
-                print(f"✓ {prof.name}/{name}: {len(include)} 個すべて実在する")
+                rep.ok(f"{prof.name}/{name}: allowlist の {len(include)} 個すべて実在する")
                 continue
-            print(f"✗ {prof.name}/{name}: 実在しない名前が {len(ghost)} 個ある"
-                  "（黙って落ちるので、その役はその手を持っていない）")
-            for t in ghost:
-                print(f"    {t}")
-            print(f"  サーバが出している {len(actual)} 個: "
-                  f"{', '.join(sorted(actual))}")
-            fail = 1
-    return fail
+            rep.ng(f"{prof.name}/{name}: allowlist に実在しない名前 "
+                   f"{', '.join(ghost)}（黙って落ちるので、その役はその手を持っていない）")
+
+
+
+def main() -> int:
+    """単体で叩いたときの皮。**doctor から呼ぶ run(rep) が本体。**"""
+    class _Rep:
+        def __init__(self) -> None:
+            self.failures = 0
+
+        def ok(self, msg: str) -> None:
+            print(f"✓ {msg}")
+
+        def ng(self, msg: str) -> None:
+            print(f"✗ {msg}")
+            self.failures += 1
+
+        def note(self, msg: str) -> None:
+            print(f"= {msg}")
+
+    rep = _Rep()
+    run(rep)
+    return 1 if rep.failures else 0
 
 
 if __name__ == "__main__":

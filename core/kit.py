@@ -97,6 +97,42 @@ def apply_env(log: Optional[Log] = None) -> Result:
     return result
 
 
+def prune_skills(log: Optional[Log] = None) -> Result:
+    """**その役に載らなくなったキット由来のスキルを、実機から外す。**
+
+    配布物の持ち物は `skills/<名前>` と1つずつ宣言してある（まとめて `skills/` と
+    書くと、更新のたびにフォルダごと作り直されて、実機で生えたスキルが消える）。
+    その代わり、**配置表から外したスキルは持ち物でなくなり、実機に残り続ける。**
+    存在しない規約を担当が読むことになるので、ここで外す。
+
+    見分けはキットの中にあるかどうかで付く。キットが配りうるスキル
+    （`templates/skills/` と `templates/workers/<役>/skills/`）に名前があるのに、
+    その役には載っていない——これがキット由来の残骸である。
+    **キットが知らないスキルには触らない**（Hermes やエージェントが生やしたもの）。
+    """
+    import build_distributions as gen
+
+    root = kit_root()
+    ours = {p.name for p in (root / "templates" / "skills").glob("*") if p.is_dir()}
+    ours |= {p.name for p in (root / "templates" / "workers").glob("*/skills/*") if p.is_dir()}
+
+    result = Result()
+    for name in roles.names():
+        pdir = profile_dir(name)
+        if not pdir.is_dir():
+            continue
+        declared = set(gen.skills_of(root, name))
+        for skill in sorted((pdir / "skills").glob("*")):
+            if not skill.is_dir() or skill.name in declared or skill.name not in ours:
+                continue
+            shutil.rmtree(skill, ignore_errors=True)
+            result.lines.append(f"{name} から {skill.name} を外した（配置表から外れた）")
+    if log:
+        for line in result.lines:
+            log(line)
+    return result
+
+
 def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     """templates/ → 配布物 → 各プロファイル → 説明文。
 
@@ -135,6 +171,11 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     except OSError as exc:
         result.failures += 1
         result.lines.append(f"コマンドを置けなかった: {exc}")
+
+    pruned = prune_skills()
+    if pruned.lines:
+        result.lines.append("── 載らなくなったスキルを外す ──")
+        result.lines.extend(pruned.lines)
 
     described = sync_descriptions(log=log)
     # 役ごとの1行は畳む。**成否だけが要る情報で、8行並べても読む人は居ない。**
