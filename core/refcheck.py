@@ -15,7 +15,9 @@
   1. **コマンド** `seaos-kit X` / `hermes X` が実在する下位コマンドか
   2. **道具** `名前(` の形で呼ばれたものを、その役が実際に持っているか
   3. **スキル** 配置表が載せると言ったスキルが、実機の役に届いているか
-  4. **役** 廃止・改名した名前が文書に残っていないか（RETIRED と突き合わせる）
+  4. **名前** `` ` `` で括られた語が、いま実在するものか。**台帳は持たない**
+     ——手で足し忘れたら黙って効かなくなるので、役・スキル・下位コマンド・
+     選択肢・道具・MCP を実物から集めて、そこに無いものを挙げる
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
+import roles as roles_mod
 from paths import hermes_bin, hermes_home, kit_root, profile_dir, profiles_dir
 
 # `名前(` の形。道具名は snake_case。
@@ -215,49 +218,170 @@ def missing_skills(role: str) -> List[str]:
     return sorted(set(declared) - landed)
 
 
-# ── 4. 役 ────────────────────────────────────────────────────────────────
+# ── 4. 括られた名前が現役か ──────────────────────────────────────────────
 
-def retired_mentions(role: str) -> Dict[str, List[str]]:
-    """**廃止・改名した役の名前が規約に残っていないか。**
+_BACKTICK = re.compile(r"`([^`\n]{1,60})`")
+# 名前の形。パス・コード片・フラグ・環境変数（大文字）は最初から見ない。
+_NAME = re.compile(r"[a-z][a-z0-9-]{2,}")
 
-    生成物は正しいのに、エージェントが読む文書だけが古いという形で残る。
-    build も test も気づかないので、名指しで照合する。
+# 機械的な出どころが無い語。**ここは短いままに保つこと**——長くなってきたら、
+# それは導出元を見つけていないという意味である。
+_PROSE = {
+    "auto-decomposer", "decomposer", "swarm",  # Hermes の仕組みの呼び名
+    "capability", "dependency",                # カードの関係の呼び名
+    "artifacts", "compliance", "security",     # 分類の語
+    "off-topic", "other",                      # 判定の語
+}
+
+
+def _choice_groups(text: str) -> Set[str]:
+    """`--help` が出す `{a,b,c}` を全部拾う。状態・種別・並び順がここに出る。"""
+    out: Set[str] = set()
+    for group in re.findall(r"\{([a-z0-9_,-]+)\}", text):
+        out |= set(group.split(","))
+    return out
+
+
+def _help_text(argv: List[str]) -> str:
+    try:
+        proc = subprocess.run(argv + ["--help"], capture_output=True, text=True,
+                              timeout=60, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return proc.stdout
+
+
+def vocabulary(used: Set[str]) -> Set[str]:
+    """**現役の名前の全体。** 出どころのあるものは、すべて実物から引く。
+
+    `used` は文書に出てきた語。**下位コマンドの `--help` は、実際に使われて
+    いるものだけ叩く**（72 個すべてを起動すると doctor が数分になる）。
     """
+    known: Set[str] = set(_PROSE)
+
     import build_distributions as gen
 
-    retired = getattr(gen, "RETIRED", ())
-    if not retired:
-        return {}
-    bad: Dict[str, List[str]] = {}
+    known |= set(roles_mod.names())
+    known |= {p.name for p in (kit_root() / "templates" / "skills").glob("*") if p.is_dir()}
+    # 役ごとの専用スキル（`templates/workers/<役>/skills/`）も名前である
+    known |= {p.name for p in (kit_root() / "templates" / "workers").glob("*/skills/*") if p.is_dir()}
+    known |= set(getattr(gen, "CRON_JOBS", {}))
+
+    kit_cli = [sys.executable, str(kit_root() / "core" / "cli.py")]
+    hermes = hermes_bin()
+    for entry, argv in (("seaos-kit", kit_cli), ("hermes", [hermes] if hermes else None)):
+        if argv is None:
+            continue
+        text = _help_text(argv)
+        subs = _choice_groups(text)
+        known |= subs | {entry}
+        # **3階層まで降りる。** `hermes kanban list --help` にカードの状態が出る
+        # ように、語彙は下の階層に置かれている。使われている枝だけ叩く。
+        for sub in sorted(subs & used):
+            deeper = _choice_groups(_help_text(argv + [sub]))
+            known |= deeper
+            for leaf in sorted(deeper & used):
+                known |= _choice_groups(_help_text(argv + [sub, leaf]))
+
+    # 設定ファイルのキー。`description` や `platforms` は「名前」ではなく項目名で、
+    # 出どころは雛形そのものにある。
+    for spec in (kit_root() / "templates" / "workers" / "_template" / "profile.yaml",
+                 kit_root() / "plugin.yaml"):
+        if spec.is_file():
+            known |= set(re.findall(r"^\s*([a-z][a-z0-9_-]*):", _read(spec), re.M))
+    for d in profiles_dir().glob("*"):
+        meta = d / "distribution.yaml"
+        if meta.is_file():
+            known |= set(re.findall(r"^\s*([a-z][a-z0-9_-]*):", _read(meta), re.M))
+
+    # 設定ファイルのキー。`description` や `platforms` は「名前」ではなく項目名で、
+    # 出どころは雛形そのものにある。
+    for spec in (kit_root() / "templates" / "workers" / "_template" / "profile.yaml",
+                 kit_root() / "plugin.yaml"):
+        if spec.is_file():
+            known |= set(re.findall(r"^\s*([a-z][a-z0-9_-]*):", _read(spec), re.M))
+    for d in profiles_dir().glob("*"):
+        meta = d / "distribution.yaml"
+        if meta.is_file():
+            known |= set(re.findall(r"^\s*([a-z][a-z0-9_-]*):", _read(meta), re.M))
+
+    members = _toolset_members()
+    known |= set(members)
+    for tools in members.values():
+        known |= tools
+
+    for d in profiles_dir().glob("*"):
+        if not d.is_dir() or d.name.startswith("."):
+            continue
+        known |= {p.name for p in (d / "skills").glob("*") if p.is_dir()}
+        known |= _provider_tools(d.name)
+        cfg = d / "config.yaml"
+        if not cfg.is_file():
+            continue
+        # MCP サーバの名前と、その役に見えている道具
+        for m in re.finditer(r"^  ([a-z][a-z0-9_-]*):$", _read(cfg), re.M):
+            known.add(m.group(1))
+        known |= set(re.findall(r"^\s+-\s+([a-z][a-z0-9_-]+)$", _read(cfg), re.M))
+    return known
+
+
+def _quoted_names(role: str) -> Dict[str, List[str]]:
+    """規約が `` ` `` で括った、名前の形をした語 -> どのファイルで。
+
+    **コード片は ``` で囲う約束**なので、そこは見ない（囲われていないコード片が
+    混ざると、シェルのコマンド名まで名前として数えてしまう）。
+    """
+    out: Dict[str, List[str]] = {}
     for path in _rule_files(role):
-        body = _read(path)
-        for name in retired:
-            if re.search(rf"\b{re.escape(name)}\b", body):
-                bad.setdefault(name, []).append(path.name)
-    return bad
+        body = re.sub(r"```.*?```", "", _read(path), flags=re.S)
+        for token in _BACKTICK.findall(body):
+            token = token.strip()
+            if _NAME.fullmatch(token):
+                out.setdefault(token, []).append(path.name)
+    return out
+
+
+def unknown_names(role: str, known: Set[str]) -> Dict[str, List[str]]:
+    return {n: w for n, w in _quoted_names(role).items() if n not in known}
 
 
 # ── まとめ ───────────────────────────────────────────────────────────────
+
+def used_words(role: str) -> Set[str]:
+    """その役の規約に出てきた語。**語彙をどこまで掘るかを決める。**"""
+    out = set(_quoted_names(role))
+    for path in _rule_files(role):
+        for _tool, sub in _invocations(_read(path)):
+            out.add(sub)
+    return out
+
 
 def run(rep, *, deep: bool = True) -> None:
     """doctor から呼ばれる。`deep=False` なら道具の照合（役ごとに hermes を起動）を省く。"""
     root = profiles_dir()
     if not root.is_dir():
         return
-    known = _known_commands()
+    commands = _known_commands()
+    live = [q for q in sorted(root.iterdir()) if q.is_dir() and not q.name.startswith(".")]
+    used: Set[str] = set()
+    for d in live:
+        used |= used_words(d.name)
+    known = vocabulary(used)
     members = _toolset_members() if deep else {}
     # `.deleted` のような、役ではないディレクトリは見ない
-    for d in sorted(p for p in root.iterdir() if p.is_dir() and not p.name.startswith(".")):
+    for d in live:
         role = d.name
         problems = 0
 
-        for spelling, where in sorted(missing_commands(role, known).items()):
+        for spelling, where in sorted(missing_commands(role, commands).items()):
             rep.ng(f"{role}: 実在しないコマンド `{spelling}` ← {', '.join(sorted(set(where)))}")
             problems += 1
 
-        for name, where in sorted(retired_mentions(role).items()):
-            rep.ng(f"{role}: 廃止した役 `{name}` を参照 ← {', '.join(sorted(set(where)))}")
-            problems += 1
+        unknown = sorted(unknown_names(role, known).items())
+        for name, where in unknown:
+            # **落とすのではなく挙げる。** 現役に無い＝間違いとは限らず、
+            # 括り方の約束から外れているだけのこともある（コード片、架空の例）。
+            rep.note(f"{role}: 照合できない名前 `{name}` ← {', '.join(sorted(set(where)))}")
 
         for name in missing_skills(role):
             rep.ng(f"{role}: 載るはずのスキルが届いていない `{name}`")
@@ -271,5 +395,5 @@ def run(rep, *, deep: bool = True) -> None:
                 rep.ng(f"{role}: 実在しない道具 `{name}` ← {', '.join(sorted(set(where)))}")
                 problems += 1
 
-        if problems == 0:
+        if problems == 0 and not unknown:
             rep.ok(f"{role}: 名指しした名前はすべて実在する")

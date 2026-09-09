@@ -37,6 +37,7 @@ class Rep:
     def __init__(self) -> None:
         self.bad: list[str] = []
         self.good: list[str] = []
+        self.notes: list[str] = []
 
     def ok(self, msg: str) -> None:
         self.good.append(msg)
@@ -45,7 +46,7 @@ class Rep:
         self.bad.append(msg)
 
     def note(self, msg: str) -> None:
-        pass
+        self.notes.append(msg)
 
 
 def _profile(home: Path, name: str, soul: str) -> None:
@@ -94,9 +95,16 @@ def test_adjacent_lines_are_not_joined():
     assert not rep.bad, rep.bad
 
 
-def test_retired_role_is_caught():
-    rep = _scan("調べものは researcher に投げる。\n")
-    assert any("廃止した役" in b for b in rep.bad), rep.bad
+def test_unknown_name_is_reported():
+    """**現役に無い名前は挙げる。** 落とさないのは、括り方の約束から外れて
+    いるだけのこともあるため（コード片、架空の例）。"""
+    rep = _scan("調べものは `researcher` に投げる。\n")
+    assert any("照合できない名前" in n and "researcher" in n for n in rep.notes), rep.notes
+
+
+def test_live_role_is_not_reported():
+    rep = _scan("実装は `developer` に渡す。\n")
+    assert not any("developer" in n for n in rep.notes), rep.notes
 
 
 if __name__ == "__main__":
@@ -104,7 +112,8 @@ if __name__ == "__main__":
     check("実在するコマンドは咎めない", test_existing_command_is_not_flagged)
     check("-p の値を下位コマンドと読み違えない", test_profile_option_is_not_mistaken_for_a_subcommand)
     check("隣の行とつなげて読まない", test_adjacent_lines_are_not_joined)
-    check("廃止した役の参照を検知する", test_retired_role_is_caught)
+    check("現役に無い名前を挙げる", test_unknown_name_is_reported)
+    check("現役の役は挙げない", test_live_role_is_not_reported)
     print()
     if failures:
         print(f"★ {len(failures)} 件失敗")

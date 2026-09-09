@@ -30,7 +30,7 @@ SOUL に差し込まれている共通ブロックにある。ここはボード
 **再起動は `seaos-kit gateway restart <役> --when-idle` で自分で叩き、
 カードはそのまま完了させる。**（→「反映の再起動」）
 
-**業務別ワーカーは増える。** `db-migration` のように業務ごとに足せる
+**業務別ワーカーは増える。** db-migration のように業務ごとに足せる
 （`seaos-kit worker new`）。実在する名前は `hermes profile list` で確認する。
 
 役割に言及するときは、**実在する名前をそのまま使う。**

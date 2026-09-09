@@ -29,18 +29,6 @@ from pathlib import Path
 
 import yaml
 
-# **廃止・改名した役の台帳。** 生成物は正しいのに、エージェントが読む文書だけが
-# 古い名前のまま残る——という形で2回踏んだ（researcher の廃止、messenger の改名）。
-# build も test も気づかないので、doctor が名指しで照合する（core/refcheck.py）。
-# **役を消す・改名したら、ここに足すこと。**
-RETIRED = (
-    "researcher",   # → handler（読むだけでなく書き込みも行う役に作り替えた）
-    "messenger",    # → broker
-    "driver",       # → avatar
-    "e2e-worker",   # 廃止
-    "clerk",        # 候補で終わった名前。採用していない
-)
-
 FAST = os.environ.get("MODEL_FAST", "openai/gpt-5.6-luna")
 SMART = os.environ.get("MODEL_SMART", "openai/gpt-6-astra")
 # 難度の高い実装だけに充てる上位モデル。**単価が高いので既定では使わない**——
