@@ -244,7 +244,7 @@ function KitPane({ ctx }) {
 
 export default {
   id: ID,
-  name: 'Agent Kit',
+  name: 'SEAOS',
   register(ctx) {
     // **ペインではなくフルページにする。** 鍵が7本・役が8つ並ぶので、
     // 細い枠に押し込むと縦に長くなって読めない。サイドバーの行から開く。
@@ -258,14 +258,14 @@ export default {
       {
         id: 'nav',
         area: SIDEBAR_NAV_AREA,
-        data: { path: '/agent-kit', label: 'Agent Kit', codicon: 'organization' }
+        data: { path: '/agent-kit', label: 'SEAOS', codicon: 'organization' }
       },
       {
         id: 'palette',
         area: PALETTE_AREA,
         data: {
           id: `${ID}.open`,
-          title: 'Agent Kit を開く',
+          title: 'SEAOS を開く',
           run: () => host.navigate('/agent-kit')
         }
       }
