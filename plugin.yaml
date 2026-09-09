@@ -1,12 +1,14 @@
 # Hermes ネイティブプラグインのマニフェスト。
 # **このリポジトリ全体が1つのプラグインである。** 役の定義（templates/）も
 # 生成器（core/）も GUI（desktop/）も、この1フォルダで入り、1フォルダで消える。
-manifest_version: 2
+# **v1 で書く。** ローダ（plugins.py）は v2 を読めるが、**インストーラ
+# （plugins_cmd.py の _SUPPORTED_MANIFEST_VERSION）が 1 までしか受け付けない。**
+# v2 を宣言すると install の時点で弾かれる。入口に合わせること。
+manifest_version: 1
 name: seaos-hermes-agent-kit
 version: 0.0.0
 description: SEAOS のエージェント役一式を、GUI から導入・更新・検査するキット
 author: seaos
-license: UNLICENSED
 
 # 役が使う鍵。**値はここに書かない。** 画面か CLI から受け取り、キットの .env に置く。
 requires_env:
@@ -24,5 +26,6 @@ platforms:
   - linux
   - win32
 
-python_dependencies:
+# 生成器が使う。v1 の語彙で書く（python_dependencies は v2 のフィールド）。
+pip_dependencies:
   - pyyaml
