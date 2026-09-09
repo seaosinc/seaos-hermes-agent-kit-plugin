@@ -17,6 +17,8 @@ import doctor as doctor_mod  # noqa: E402
 import kit  # noqa: E402
 import mem0  # noqa: E402
 import roles  # noqa: E402
+import selftest  # noqa: E402
+import selfupdate  # noqa: E402
 import worker as worker_mod  # noqa: E402
 import workspace as ws  # noqa: E402
 
@@ -44,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
         help="config.yaml も入れ替える（モデル・mcp_servers を変えたときに要る）",
     )
     sub.add_parser("doctor", help="設定漏れを検証する（問題があれば終了コード 1）")
+    sub.add_parser("test", help="生成物の形を検査する（本番に触らない）")
+    ug = sub.add_parser("upgrade", help="pull → 反映 → 検証")
+    ug.add_argument("--dry-run", action="store_true", help="反映せず、何が起きるかだけ見る")
+    ug.add_argument("--force-config", action="store_true", help="config.yaml も入れ替える")
 
     wk = sub.add_parser("worker", help="業務別ワーカーの CRUD")
     wsub = wk.add_subparsers(dest="wcmd", required=True)
@@ -104,6 +110,14 @@ def main(argv: list[str] | None = None) -> int:
         print()
         print("✓ 問題なし" if rep.passed() else f"★ {rep.failures} 件の問題")
         return 0 if rep.passed() else 1
+
+    if args.cmd == "test":
+        ok, _lines = selftest.run(log=print)
+        return 0 if ok else 1
+
+    if args.cmd == "upgrade":
+        ok = selfupdate.run(dry_run=args.dry_run, force_config=args.force_config, log=print)
+        return 0 if ok else 1
 
     if args.cmd == "worker":
         if args.wcmd == "list":

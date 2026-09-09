@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | `core/` | 生成・差分・説明文の同期・鍵配布・反映。**Python のみ** |
-| `core/cli.py` | 薄い皮（11コマンド） |
+| `core/cli.py` | 薄い皮（13コマンド） |
 | `core/worker.py` | 業務別ワーカーの CRUD |
 | `core/workspace.py` | 作業部屋（CA / build / warm / verify / clean / gc） |
 | `core/mem0.py` | 共有記憶（起動・接続・切り離し） |
@@ -16,6 +16,8 @@
 | `core/hotl.py` | HOTL 設定の検証 |
 | `core/terraform.py` | AWS の箱に渡す値の書き出し |
 | `core/doctor.py` | 設定漏れの検証（全モジュールの check を束ねる） |
+| `core/selftest.py` | 生成物の形の検査 |
+| `core/selfupdate.py` | pull → 反映 → 検証 |
 | `dashboard/plugin_api.py` | GUI から core を呼ぶ口。全ルート応答を実機で確認済み |
 | `desktop/plugin.js` | 鍵 → 役 → 反映 の3段ウィザード。素の ESM（ビルド不要） |
 | `templates/` | 役の定義。旧キットから持ち込み、**現行の8役と一致**（diff が全て `=`） |
