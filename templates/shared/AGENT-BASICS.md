@@ -107,3 +107,7 @@ hermes kanban block $TASK_ID --kind needs_input \
 
 実装を外へ出したいときの経路は委譲であり、これは別物である
 （`delegate-to-cli-agents` スキル）。
+
+**規約や報告に書くコマンド・道具・スキル・役の名前は `` ` `` で括る。**
+`seaos-kit doctor` が括られた名前を実在確認する（`core/refcheck.py`）ので、
+括らないと検査から漏れ、実在しない綴りが黙って残る。

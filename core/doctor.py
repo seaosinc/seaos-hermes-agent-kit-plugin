@@ -19,6 +19,7 @@ import booking
 import hermes
 import hotl
 import mem0
+import refcheck
 import roles
 import workspace
 from paths import profile_dir, profiles_dir
@@ -195,13 +196,19 @@ def _assignees(rep: Report) -> None:
         rep.note(f"過去の担当（実体なし・履歴のみ）: {' '.join(stale)}")
 
 
-def run(log: Optional[Log] = None) -> Report:
+def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     rep = Report()
 
     _orphan_profiles(rep)
     _profiles(rep)
     _env_hint(rep)
     _assignees(rep)
+
+    # **規約が名指しした名前の実在確認。** 書いてあるのに無い、が一番静かに壊れる
+    # ——エージェントは呼べないまま「できない」と正しく報告して止まるだけなので、
+    # 綴りの誤りが世代を越えて残る。
+    rep.section("規約が名指しした名前（コマンド・道具・スキル・役）")
+    refcheck.run(rep, deep=deep)
 
     rep.section("HOTL（承認を待たない設定）")
     if not hotl.check(log=rep.lines.append):
