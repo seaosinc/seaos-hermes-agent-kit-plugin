@@ -82,11 +82,25 @@ def apply() -> Tuple[List[str], List[str]]:
         dst = pdir / ".env"
         lines = dst.read_text(encoding="utf-8").splitlines() if dst.is_file() else []
 
+        existing = {}
+        for line in lines:
+            if not line.startswith("#") and "=" in line:
+                k, _, v = line.partition("=")
+                existing[k.strip()] = v
+
         declared: List[str] = []
         wrote = 0
         for var, required, desc in roles.env_requirements(name):
             declared.append(var)
             value = source.get(var, "")
+            if not value and existing.get(var):
+                # **既にある値を空で潰さない。** 正に無いのは「まだ入れていない」
+                # だけかもしれず、消すと動いている役の鍵が飛ぶ。
+                # 配布物として入れ直した直後の .env は空なので、ここを踏むと
+                # 8役ぶんの鍵が同時に消える（実際に踏みかけた）。
+                if required:
+                    missing.append(f"{name}:{var}（正に無いので既存値を残した）")
+                continue
             if required and not value:
                 missing.append(f"{name}:{var}")
             lines = _upsert(lines, var, value, desc)
