@@ -604,7 +604,13 @@ def build_one(kit: Path, out: Path, name: str, spec: dict) -> None:
         yaml.safe_dump(build_config(kit, name, spec), allow_unicode=True, sort_keys=False),
         encoding="utf-8")
     copy_skills(kit, d, spec)
-    owned = ["SOUL.md", "config.yaml", "skills/", "distribution.yaml"] + copy_runtime(kit, d, spec)
+    # **スキルは1つずつ名指しする。** `skills/` とまとめて宣言すると、更新のたびに
+    # そのフォルダが rmtree されて作り直される（profile_distribution.py の
+    # `_copy_dist_payload`）。**実機で Hermes やエージェントが生やしたスキルが
+    # 毎回消える。** 配るものだけを持ち物にすれば、増えたぶんは触られない。
+    owned = ["SOUL.md", "config.yaml", "distribution.yaml"]
+    owned += [f"skills/{p.name}" for p in sorted((d / "skills").iterdir()) if p.is_dir()]
+    owned += copy_runtime(kit, d, spec)
     (d / "distribution.yaml").write_text(
         yaml.safe_dump(build_manifest(name, spec, owned), allow_unicode=True, sort_keys=False),
         encoding="utf-8")

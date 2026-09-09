@@ -116,6 +116,29 @@ def test_user_data_survives_update():
     assert "ユーザーが足した行" in cfg.read_text(encoding="utf-8"), "config が上書きされた"
 
 
+def test_runtime_skill_survives_update():
+    """**実機で生えたスキルが更新で消えないか。**
+
+    Hermes もエージェントも profile の skills/ に自分でスキルを書く。配布物が
+    `skills/` をまとめて持ち物に宣言していると、更新のたびにそのフォルダごと
+    rmtree されて作り直され（profile_distribution.py の `_copy_dist_payload`）、
+    育ったぶんが毎回消えた。持ち物は配るスキルだけを1つずつ名指しする。
+    """
+    grown = HOME / "profiles/fixer/skills/grown-at-runtime"
+    grown.mkdir(parents=True, exist_ok=True)
+    (grown / "SKILL.md").write_text("実機で生えた", encoding="utf-8")
+
+    shipped = HOME / "profiles/fixer/skills/kanban-collaboration/SKILL.md"
+    assert shipped.is_file(), "キットが配るスキルが見当たらない"
+    shipped.write_text("荒らした", encoding="utf-8")
+
+    r = run([str(HERMES), "profile", "update", "fixer", "-y"], HOME)
+    assert r.returncode == 0, r.stderr
+    assert (grown / "SKILL.md").is_file(), "実機で生えたスキルが消えた"
+    # 配るぶんは持ち物なので、荒らしても元に戻る
+    assert shipped.read_text(encoding="utf-8") != "荒らした", "配布物のスキルが更新されない"
+
+
 if __name__ == "__main__":
     print(f"まっさらな環境（{HOME}）")
     check("全役が入る", test_install_all_roles)
@@ -124,6 +147,7 @@ if __name__ == "__main__":
     check("プロファイルとして認識され、版が出る", test_profiles_are_listed)
     check("同じ配布物で update できる", test_update_is_idempotent)
     check("更新でユーザーのデータが残る", test_user_data_survives_update)
+    check("実機で生えたスキルが更新で消えない", test_runtime_skill_survives_update)
     shutil.rmtree(HOME, ignore_errors=True)
     print()
     if failures:
