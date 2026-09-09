@@ -8,9 +8,11 @@ platform 実装に閉じる。ここには platform 分岐を書かないこと�
 from __future__ import annotations
 
 import importlib.util
+import io
 import shutil
 import sys
 import tempfile
+from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, List, Optional
@@ -48,9 +50,17 @@ def build(out: Optional[Path] = None, log: Optional[Log] = None) -> Path:
     target = out or (root / "dist")
     # **関数を直接呼ぶ。** 生成器の CLI 分岐（__main__）は zsh 版が使っていた口で、
     # Python から使うときに argv を差し替えるのは事故のもと。
-    _generator().build(root, target)
+    #
+    # **進捗出力は飲む。** 生成器は「+ operator …」を stdout へ書く。CLI では
+    # それが表示になるが、GUI から呼ぶと API のレスポンス経路とサーバログへ
+    # そのまま漏れる。出したい呼び手には log 経由で渡す。
+    captured = io.StringIO()
+    with redirect_stdout(captured):
+        _generator().build(root, target)
     if log:
-        log(f"配布物を {target} に生成した")
+        for line in captured.getvalue().splitlines():
+            if line.strip():
+                log(line.strip())
     return target
 
 
