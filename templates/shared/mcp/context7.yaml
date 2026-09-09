@@ -1,0 +1,18 @@
+# ライブラリ・フレームワーク・API の**現在の**文書を引く。
+#
+# **モデルは知らない綴りを、それらしく作る。** 道具の名前も、引数も、設定キーも、
+# 「ありそうな形」で出てくる。**外れても静かに落ちるだけ**の場所（MCP の allowlist、
+# 設定ファイルのキー）では、当たったか外れたかが誰にも見えない。
+#
+# 綴りを推測する代わりに、ここへ聞く。読み取り専用で、鍵も要らない。
+#
+# 使う道具は2つ。resolve-library-id で `/org/project` を得てから、query-docs で引く。
+context7:
+  url: https://mcp.context7.com/mcp
+  tools:
+    include:
+      - resolve-library-id
+      - query-docs
+  timeout: 60
+  connect_timeout: 60
+  enabled: true

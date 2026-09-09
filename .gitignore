@@ -9,3 +9,6 @@ __pycache__/
 *.pyc
 .DS_Store
 **/.DS_Store
+
+# 旧キットから持ち込んだ作業用（新リポジトリでは配らない）
+tests/__pycache__/

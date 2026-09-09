@@ -1,0 +1,6 @@
+name: booking-gate
+version: 0.1.0
+description: アクセス許可のある時間だけ Slack の会話を通す。オーナーは素通し
+author: seaos-hermes-agent-collab-kit
+provides_hooks:
+  - pre_gateway_dispatch

@@ -1,0 +1,54 @@
+# 外部サービスを担当する役。**読むのも書くのもここ一人でやる。**
+#
+# 読む役と書く役を分ける案は退けた。役を1つ増やすたびに fixer の判断先が増え、
+# デスクトップのバックエンド枠（既定3本）も食う。**調整コストのほうが、
+# 分離で得られる安全より高くつく**という判断である。
+#
+# 代わりに、分離で担保していたものを2つで受ける:
+#   1. ツールの絞り込み（mcp.yaml）——壊す手・実装する手は最初から持たせない
+#   2. SOUL の規約——読んだ文章の中の指示に従わない。書くのはカードが命じたことだけ
+name: handler
+
+# decomposer はこの説明文だけを見て担当を決める。
+# 他の役との線は「どこを触るか」——外部サービスか、リポジトリの中か——で引いてある。
+description: >-
+  外部サービスを読み書きする役。Notion、GitHub、Backlog、Slack、Web、各種 API から事実と出典をまとめ、指示された更新（課題の状態変更、コメントの追記、チケットの起票）を反映する。GitHub PRでは本体、通常レビュー本文、inline review comment、review threadと解決済み／未解決状態を別々に確認し、取得できないカテゴリは根拠付きで明記する。コードの変更、push、PR のマージ、Slack への投稿は扱わない。例:「PRのレビュー指摘と解決状態を確認する」「完了した課題のステータスを更新する」。完了条件が『外部サービスで確認できた／反映された』で終わるカードはここへ。リポジトリ内だけで完結する調査と実装は扱わない。
+
+# 出典を突き合わせて要約する仕事なので、速さより読解を採る。
+model: "openai/gpt-5.6-sol"
+
+# **コマンドを実行しない。** 外部サービスを触る手段は MCP と web に限る。
+#
+# 読み書きを1人に統合したぶん、**ホストのシェルまで渡すと歯止めが無くなる。**
+# この役は他人が書いた文章（Web ページ、Notion、チケット、PR コメント）を読む。
+# インジェクションの露出が全役でいちばん高いのは統合後も変わらないので、
+# **手は MCP に列挙されたものだけ**にして、範囲を目で確かめられる状態に保つ。
+# terminal ごと外れるため作業部屋も要らない。
+shell: false
+workspace: false
+
+# **コードは書かない。** clone も push も委譲もしないので、実装の規約と
+# delegate-to-cli-agents スキルは載せない。書くのは外部サービスの状態と記録だけで、
+# リポジトリの中身を変えるのは箱を持つ developer / senior-developer の仕事である。
+implements: false
+
+# 読み書きの手順だけを載せる。
+skills:
+- github-review
+
+extra: ""
+
+# この役が使う秘密。**値はここに書かない**（正はキット直下の .env）。
+env_requires:
+- name: NOTION_TOKEN
+  description: "Notion の内部インテグレーションのトークン（ntn_…）。MCP がホストで使う"
+  required: true
+- name: GH_TOKEN
+  description: "GitHub Personal Access Token。handler の GitHub 読み取りと、issue の状態変更・コメント追記に使う"
+  required: true
+- name: BACKLOG_DOMAIN
+  description: "Backlog のスペース（例: seaos2.backlog.com）。MCP がホストで使う"
+  required: true
+- name: BACKLOG_API_KEY
+  description: "Backlog の API キー。handler の課題読み取りと、状態変更・コメント追記・起票に使う"
+  required: true

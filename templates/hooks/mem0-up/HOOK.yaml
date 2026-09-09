@@ -1,0 +1,4 @@
+name: mem0-up
+description: ゲートウェイの起動時に、全役の共有記憶（mem0）を立ち上げる
+events:
+  - gateway:startup

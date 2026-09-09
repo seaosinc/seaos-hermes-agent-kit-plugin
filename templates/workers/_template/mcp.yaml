@@ -1,0 +1,3 @@
+# このワーカー専用の MCP サーバ。空なら何も追加しない。
+# update が config.yaml の mcp セクションへマージする。
+servers: {}

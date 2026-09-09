@@ -1,0 +1,174 @@
+# この役に載せる MCP サーバ。**外部サービスの鍵はここに閉じる。**
+# MCP はホスト側で動くので、使い捨てコンテナへトークンが入らない。
+#
+# **無人で成立する認証だけを使う。** ブラウザを開く OAuth は、初回も期限切れも
+# 人の操作が要る。ここは誰も見ていない場所で動くので、そのたびに止まる
+# （実際、mcp.notion.com は一度も認証されないまま `✓ enabled` と表示されていた）。
+#
+# **この役は読むだけでなく書く。** 読む役と書く役を分けないと決めた以上
+# （profile.yaml の冒頭を見ること）、歯止めはここの include リストが持つ。
+# 方針は2つ:
+#   ・**壊す手を持たせない**——削除、プロジェクト構成の変更、他人のコメントの書き換え
+#   ・**他の役の仕事を持たせない**——リポジトリの中身を変える手（developer）、
+#     Slack への投稿（operator が唯一の窓口）
+# 「読めるが書けない」ではなく「**書ける範囲が目で数えられる**」で担保する。
+
+servers:
+  notion:
+    # 自前で起動する stdio 版。トークンはホストのプロセスが持つ。
+    #
+    # **空トークンでも `✓ Connected` して 24 個のツールを出し、呼んだ時だけ 400 を返す。**
+    # 繋がっているように見えて繋がっていない状態になるので、鍵が無いときは
+    # `enabled: false` で道具ごと隠すこと（2026-09-08 まで実際にその状態だった）。
+    # 疎通は接続の成否ではなく、**実際にツールを1つ呼んで確かめる。**
+    command: npx
+    args: ["-y", "@notionhq/notion-mcp-server"]
+    env:
+      # 新しい版はこれを直接読む
+      NOTION_TOKEN: "${NOTION_TOKEN}"
+      # 古い版はヘッダ経由でしか受け取らないので、両方渡す
+      OPENAPI_MCP_HEADERS: '{"Authorization":"Bearer ${NOTION_TOKEN}","Notion-Version":"2025-09-03"}'
+  github:
+    # **HTTP 版を使う。** stdio 版（npx @modelcontextprotocol/server-github）は
+    # 起動して "running on stdio" まで出したあと、ツールを呼ぶ前に落ちる
+    # （`MCP stdio subprocess for 'github' has exited`）。`hermes mcp test` は
+    # 起動直後に問い合わせるので通ってしまい、**実行時だけ落ちる**——
+    # 疎通確認では見つからない形だった。
+    #
+    # HTTP なら子プロセスが無いので、この落ち方をしない。認証は同じ PAT。
+    url: https://api.githubcopilot.com/mcp/
+    headers:
+      Authorization: Bearer ${GH_TOKEN}
+    # **読む道具だけを登録する。** サーバは26個のツールを出し、その中には
+    # create_or_update_file / push_files / merge_pull_request のような
+    # 書き換える手が含まれる。この役は他人が書いた文章を読むので、
+    # インジェクションの露出が全役でいちばん高い——**読んだ内容に影響された状態で
+    # リポジトリを書き換える経路を、そもそも持たせない。**
+    #
+    # 鍵は broker と同じ GH_TOKEN（書き込み権限あり）を共有している。
+    # 鍵で絞れない以上、**手のほうで絞る。**
+    tools:
+      include:
+        - get_file_contents
+        - get_commit
+        - list_commits
+        - list_branches
+        - list_tags
+        - pull_request_read
+        - list_pull_requests
+        - search_pull_requests
+        - issue_read
+        - list_issues
+        - search_code
+        - search_commits
+        - search_issues
+        - search_repositories
+        - search_users
+        # ---- ここから書き込み ----
+        # issue の状態を動かす（open/close、担当、ラベル）。
+        - issue_write
+        # 根拠と経緯を残す。issue にも PR にも付けられる。
+        - add_issue_comment
+        # 入れないもの:
+        #   create_or_update_file / push_files / delete_file / create_branch
+        #   create_pull_request / update_pull_request / update_pull_request_branch
+        #   merge_pull_request
+        #     — リポジトリの中身と歴史を変える手。箱を持つ developer /
+        #       senior-developer の仕事であり、箱を持たないこの役に渡すと
+        #       「調べていたはずが実装を始める」が起きる
+        #   pull_request_review_write / add_comment_to_pending_review /
+        #   add_reply_to_pull_request_comment / request_copilot_review
+        #     — レビューを送る手。読んで確認することと、承認/変更要求を出すことは別の責任
+        #   create_repository / fork_repository / run_secret_scanning / sub_issue_write
+        #     — この役の仕事に要らない
+    timeout: 60
+    connect_timeout: 60
+    enabled: true
+  backlog:
+    # 課題管理（Backlog）。**公式サーバ**（nulab/backlog-mcp-server）を stdio で起動する。
+    # 鍵はホストのプロセスが持つので、使い捨てコンテナには入らない。
+    #
+    # **`op run` は使わない。** 他の seaos リポジトリは 1Password 参照
+    # （op://Employee/apps.nulab.com/api-key）を mcp-op-run.cjs 経由で解決しているが、
+    # あれは Touch ID の認可を伴う。この役は誰も見ていない場所で走るので、
+    # そのたびに鍵の解決待ちで止まる（上の「無人で成立する認証だけを使う」と同じ理由）。
+    # 値はキット直下の .env に置き、ここでは名前だけ参照する。
+    command: npx
+    args: ["-y", "backlog-mcp-server"]
+    env:
+      BACKLOG_DOMAIN: "${BACKLOG_DOMAIN}"
+      BACKLOG_API_KEY: "${BACKLOG_API_KEY}"
+      # サーバはツールセット単位でも絞れる。**まず粗く落としてから**、下の
+      # include で手のレベルまで絞る（二重に閉じる）。
+      ENABLE_TOOLSETS: "space,project,issue"
+    # **読む道具だけを登録する。** サーバは40個のツールを出し、うち16個が
+    # add_issue / update_issue / delete_issue のように課題を書き換える手である。
+    # github と同じ理由でここを絞る——他人が書いたチケット本文を読む役に、
+    # 読んだ内容に影響された状態で課題を作り変える経路を持たせない。
+    #
+    # **mark_watching_as_read は入れない。** get_ で始まらないだけでなく、
+    # 名前に read とあるが既読状態を書き換える。名前で読み書きを判断しないこと。
+    tools:
+      include:
+        - get_space
+        - get_space_activities
+        - get_myself
+        - get_users
+        - get_user_recent_updates
+        - get_user_stars_count
+        - get_project
+        - get_project_list
+        - get_project_users
+        - get_issue
+        - get_issues
+        - count_issues
+        - get_issue_comments
+        - get_issue_attachment
+        - get_issue_types
+        - get_related_issues
+        - get_categories
+        - get_custom_fields
+        - get_priorities
+        - get_resolutions
+        - get_version_milestone_list
+        - get_watching_list_count
+        - get_watching_list_items
+        # ---- ここから書き込み ----
+        # 課題の状態・完了理由を動かす。この役の主目的。
+        - update_issue
+        # 根拠と経緯を残す。**追記だけ**で、既存コメントの書き換えはしない
+        # （update_issue_comment は入れない。他人の記録を消せてしまう）。
+        - add_issue_comment
+        # 起票。調査の結果として新しい課題が要る場面がある。
+        - add_issue
+        # 課題どうしの関連付け。構成ではなく課題間の線なので許す。
+        - add_related_issue
+        - remove_related_issue
+        # 入れないもの:
+        #   delete_issue — 消したら戻せない。課題は閉じるもので、消すものではない
+        #   add_project / update_project / add_category
+        #   add_version_milestone / update_version_milestone / delete_version
+        #     — プロジェクトの構成そのものを変える手。課題の話ではない
+        #   update_issue_comment — 他人が書いたコメントを書き換えられる
+        #   add_watching / update_watching / delete_watching / mark_watching_as_read
+        #     — 人の通知設定。エージェントが触るものではない
+    timeout: 60
+    connect_timeout: 60
+    enabled: true
+  slack:
+    # **読むだけ。** SLACK_MCP_ENABLED_TOOLS で履歴とチャンネル一覧に限っている。
+    # 投稿しないのは能力の問題ではなく分担で、**ユーザーと話す窓口は operator ただ一つ**
+    # という決めがある（operator の describe）。ここから投げると、ユーザーから見て
+    # 誰が喋っているのか分からなくなる。
+    command: npx
+    args:
+    - -y
+    - slack-mcp-server@1.3.0
+    - --transport
+    - stdio
+    env:
+      SLACK_MCP_XOXB_TOKEN: ${SLACK_BOT_TOKEN}
+      SLACK_MCP_ENABLED_TOOLS: conversations_history,conversations_replies,channels_list
+    timeout: 60
+    connect_timeout: 60
+    enabled: true

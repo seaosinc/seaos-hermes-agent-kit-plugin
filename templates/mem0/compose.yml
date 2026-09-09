@@ -1,0 +1,104 @@
+# ワーカー間で共有する記憶（mem0 セルフホスト）
+#
+# Hermes の mem0 プラグインが "Self-hosted dashboard" モードで HTTP 接続する構成。
+# 記憶の共有だけが目的なので entity relationship は実質使わないが、mem0 サーバーが
+# graph_store: neo4j を main.py にハードコードしていて外せないため Neo4j も載せている。
+#
+# 起動: hermes-kit install（または docker compose -f このファイル up -d）
+# 停止: hermes-kit uninstall --yes
+
+name: hermes-kit-mem0
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: hermes-mem0-postgres
+    environment:
+      POSTGRES_USER: ${MEM0_PG_USER:-mem0}
+      POSTGRES_PASSWORD: ${MEM0_PG_PASSWORD:?MEM0_PG_PASSWORD is required}
+      POSTGRES_DB: ${MEM0_PG_DB:-mem0}
+    volumes:
+      - mem0-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MEM0_PG_USER:-mem0} -d ${MEM0_PG_DB:-mem0}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    # ホストには晒さない。API コンテナからのみ参照する
+    expose:
+      - "5432"
+
+  neo4j:
+    # mem0 サーバーは graph_store: neo4j を main.py にハードコードしており、
+    # 環境変数では外せない。記憶の共有だけなら実質使わないが、起動には要る。
+    image: neo4j:5-community
+    container_name: hermes-mem0-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/${MEM0_NEO4J_PASSWORD:?MEM0_NEO4J_PASSWORD is required}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      # **宣言されている場所には、全部名前を付ける。** neo4j のイメージは
+      # /data /logs /import /plugins を VOLUME 宣言していて、名前を与えなかった
+      # ぶんは**コンテナを作り直すたびに匿名ボリュームが新しく増える**
+      # （99個・16GB まで溜まった）。名前を付ければ再利用される。
+      - mem0-neo4j:/data
+      - mem0-neo4j-logs:/logs
+      - mem0-neo4j-import:/import
+      - mem0-neo4j-plugins:/plugins
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    expose:
+      - "7687"
+
+  api:
+    # 公式イメージ mem0/mem0-api-server は pgvector を使うのに psycopg を含まず、
+    # 起動時に ImportError で落ちる。依存を足しただけの薄いイメージを建てる。
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hermes-kit/mem0-api:latest
+    container_name: hermes-mem0-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    environment:
+      ADMIN_API_KEY: ${MEM0_API_KEY:?MEM0_API_KEY is required}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${MEM0_PG_USER:-mem0}
+      POSTGRES_PASSWORD: ${MEM0_PG_PASSWORD}
+      POSTGRES_DB: ${MEM0_PG_DB:-mem0}
+      # 事実抽出と埋め込みに使うモデル。OpenRouter 経由で揃える
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${MEM0_NEO4J_PASSWORD}
+      OPENAI_API_KEY: ${MEM0_LLM_API_KEY:-}
+      OPENAI_BASE_URL: ${MEM0_LLM_BASE_URL:-https://openrouter.ai/api/v1}
+    volumes:
+      # 履歴 DB（SQLite）の置き場。無いと起動時に
+      # "unable to open database file" で落ちる
+      - mem0-history:/app/history
+    # 既定の起動コマンドだと sitecustomize が読まれず、互換ミドルウェアが入らない。
+    # PYTHONSTARTUP は uvicorn には効かないので、明示的に import してから起動する。
+    command: >-
+      python -c "import sitecustomize, uvicorn;
+      uvicorn.run('main:app', host='0.0.0.0', port=8000)"
+    ports:
+      # localhost からのみ。外部には晒さない
+      - "127.0.0.1:${MEM0_PORT:-8888}:8000"
+    restart: unless-stopped
+
+volumes:
+  mem0-pgdata:
+  mem0-history:
+  mem0-neo4j:
+  mem0-neo4j-logs:
+  mem0-neo4j-import:
+  mem0-neo4j-plugins:
