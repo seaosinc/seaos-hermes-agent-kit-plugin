@@ -12,8 +12,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import booking  # noqa: E402
+import doctor as doctor_mod  # noqa: E402
 import kit  # noqa: E402
+import mem0  # noqa: E402
 import roles  # noqa: E402
+import worker as worker_mod  # noqa: E402
+import workspace as ws  # noqa: E402
 
 
 def _print(line: str) -> None:
@@ -38,6 +43,33 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="config.yaml も入れ替える（モデル・mcp_servers を変えたときに要る）",
     )
+    sub.add_parser("doctor", help="設定漏れを検証する（問題があれば終了コード 1）")
+
+    wk = sub.add_parser("worker", help="業務別ワーカーの CRUD")
+    wsub = wk.add_subparsers(dest="wcmd", required=True)
+    wsub.add_parser("list", help="一覧")
+    wshow = wsub.add_parser("show", help="1体の詳細")
+    wshow.add_argument("name")
+    wrm = wsub.add_parser("rm", help="削除")
+    wrm.add_argument("name")
+    wrm.add_argument("--keep-profile", action="store_true", help="プロファイルは残す")
+
+    wp = sub.add_parser("workspace", help="作業部屋（使い捨てコンテナ）")
+    wpsub = wp.add_subparsers(dest="wpcmd", required=True)
+    wpsub.add_parser("verify", help="建ててあるイメージの中身を確かめる")
+    wpb = wpsub.add_parser("build", help="イメージを建てる")
+    wpb.add_argument("--no-warm", action="store_true", help="キャッシュを温めない")
+    wpsub.add_parser("ca", help="組織の TLS 傍受プロキシの CA を取り出す")
+    wpsub.add_parser("gc", help="匿名ボリュームと dangling イメージだけ落とす")
+
+    m0 = sub.add_parser("mem0", help="共有記憶")
+    m0sub = m0.add_subparsers(dest="mcmd", required=True)
+    m0sub.add_parser("up", help="起動して各役へ繋ぐ")
+    m0sub.add_parser("down", help="停止する")
+    m0sub.add_parser("check", help="状態を見る")
+
+    gu = sub.add_parser("guest", help="ゲストのアクセス許可")
+    gu.add_argument("rest", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
 
@@ -66,6 +98,56 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "update":
         result = kit.update(force_config=args.force_config, log=_print)
         return 0 if result.ok() else 1
+
+    if args.cmd == "doctor":
+        rep = doctor_mod.run(log=lambda l: print(l if l.startswith("=== ") or not l else f"  {l}"))
+        print()
+        print("✓ 問題なし" if rep.passed() else f"★ {rep.failures} 件の問題")
+        return 0 if rep.passed() else 1
+
+    if args.cmd == "worker":
+        if args.wcmd == "list":
+            print(f"{'NAME':<20} {'MODEL':<24} {'DEPLOYED':<10} DESCRIPTION")
+            for r in worker_mod.listing():
+                mark = "yes" if r["deployed"] else "-"
+                print(f"{r['name']:<20} {r['model']:<24} {mark:<10} {r['description'][:44]}")
+            return 0
+        if args.wcmd == "show":
+            for key, value in worker_mod.show(args.name).items():
+                shown = ", ".join(value) if isinstance(value, list) else value
+                print(f"  {key:<12} {shown}")
+            return 0
+        if args.wcmd == "rm":
+            out = worker_mod.remove(args.name, keep_profile=args.keep_profile)
+            print(f"  ✓ {out['name']} を削除（プロファイル: {'削除' if out['profile_removed'] else '残置'}）")
+            return 0
+
+    if args.cmd == "workspace":
+        if args.wpcmd == "verify":
+            return 0 if ws.verify(log=_print) else 1
+        if args.wpcmd == "build":
+            return 0 if ws.build(warm=not args.no_warm, log=_print) else 1
+        if args.wpcmd == "ca":
+            ws.extract_ca(log=_print)
+            return 0
+        if args.wpcmd == "gc":
+            ws.gc(log=_print)
+            return 0
+
+    if args.cmd == "mem0":
+        if args.mcmd == "up":
+            return 0 if mem0.up(log=_print) else 1
+        if args.mcmd == "down":
+            return 0 if mem0.down(log=_print) else 1
+        if args.mcmd == "check":
+            _print(f"起動中: {mem0.running()}")
+            _print(f"記憶を引く役: {' '.join(mem0.memory_roles())}")
+            return 0
+
+    if args.cmd == "guest":
+        code, out = booking.guest([a for a in args.rest if a != "--"])
+        print(out.rstrip())
+        return code
 
     return 2
 

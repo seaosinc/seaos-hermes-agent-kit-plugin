@@ -8,7 +8,14 @@
 | | |
 |---|---|
 | `core/` | 生成・差分・説明文の同期・鍵配布・反映。**Python のみ** |
-| `core/cli.py` | 薄い皮（`roles` / `build` / `diff` / `describe` / `env` / `update`） |
+| `core/cli.py` | 薄い皮（11コマンド） |
+| `core/worker.py` | 業務別ワーカーの CRUD |
+| `core/workspace.py` | 作業部屋（CA / build / warm / verify / clean / gc） |
+| `core/mem0.py` | 共有記憶（起動・接続・切り離し） |
+| `core/booking.py` | アクセスゲートの検証とゲスト操作 |
+| `core/hotl.py` | HOTL 設定の検証 |
+| `core/terraform.py` | AWS の箱に渡す値の書き出し |
+| `core/doctor.py` | 設定漏れの検証（全モジュールの check を束ねる） |
 | `dashboard/plugin_api.py` | GUI から core を呼ぶ口。全ルート応答を実機で確認済み |
 | `desktop/plugin.js` | 鍵 → 役 → 反映 の3段ウィザード。素の ESM（ビルド不要） |
 | `templates/` | 役の定義。旧キットから持ち込み、**現行の8役と一致**（diff が全て `=`） |
@@ -37,12 +44,9 @@ hermes plugins enable seaos-hermes-agent-kit
 1. **OS 依存の 578 行**（常駐・コマンド配置）。`_gateway` / `_init` / `_install` / `_uninstall`
    に相当する部分。Windows は Scheduled Task、macOS は launchd、Linux は systemd + linger。
    **paths.py 以外に platform 分岐を書かないこと。**
-2. **OS 非依存の残り**（`_worker` / `_workspace` / `_booking` / `_mem0` / `_terraform` / `_hotl`）。
-   呼び先が `hermes` / `git` / `docker` / `npx` だけなので、素直な引っ越しで済む。
-3. **doctor と test の移植**（zsh 版の `hermes-kit doctor` / `test` 相当）。
-4. **採番。** いま `0.0.0` 固定。旧キットは全役 `0.1.0` のまま動かず、更新が届いたか
+2. **採番。** いま `0.0.0` 固定。旧キットは全役 `0.1.0` のまま動かず、更新が届いたか
    判定できなくなっていた。ビルド時に git から採番する。
-5. **GUI の実機確認。** デスクトップアプリで Python 側・desktop 側のトグルを
+3. **GUI の実機確認。** デスクトップアプリで Python 側・desktop 側のトグルを
    2つとも入れて、画面が出るところまで。
 
 ## 変えていない前提
