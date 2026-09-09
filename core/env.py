@@ -66,11 +66,12 @@ def _drop(lines: List[str], name: str) -> List[str]:
 
 def apply() -> Tuple[List[str], List[str]]:
     """正の .env から各役へ配る。戻り値は (報告行, 値が空のままの項目)。"""
+    # **鍵がまだ無いのは、壊れているのではなく「これから入れる」状態である。**
+    # 入れたてのプラグインには .env が無い（gitignore なので clone に含まれない）。
+    # ここで例外を投げると、利用者が最初に踏む場所で画面が落ちる。
+    # 何が足りないかを報告して、既にある値は残す。
     src = env_file()
-    if not src.is_file():
-        raise FileNotFoundError(f"{src} が無い")
-
-    source = read_env(src)
+    source = read_env(src) if src.is_file() else {}
     managed = roles.managed_env_vars()
     report: List[str] = []
     missing: List[str] = []
