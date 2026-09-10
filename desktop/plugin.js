@@ -181,6 +181,35 @@ function SecretDialog({ secret, onSave, onClose }) {
   })
 }
 
+/** 再読み込みをまたいで、直前の結果を持ち越す。
+ *
+ * **読み直さないと新しいコードは走らない**（⌘K の Reload desktop plugins は
+ * 既知のファイルを素通りする＝フォルダの増減しか見ない）。かといって黙って
+ * 読み直すと、何が起きたのかが画面から消える。**結果だけ預けて読み直す。**
+ */
+const KEPT = `${ID}.afterReload`
+
+function reloadWith(payload) {
+  try {
+    localStorage.setItem(KEPT, JSON.stringify(payload))
+  } catch {
+    // 保存できなくても読み直しは進める（結果が出ないだけ）
+  }
+  location.reload()
+}
+
+function takeKept() {
+  let out = null
+  try {
+    const raw = localStorage.getItem(KEPT)
+    if (raw) out = JSON.parse(raw)
+    localStorage.removeItem(KEPT)
+  } catch {
+    out = null
+  }
+  return out
+}
+
 function SettingsPage({ ctx }) {
   const [roles, setRoles] = useState([])
   const [secrets, setSecrets] = useState([])
@@ -208,6 +237,14 @@ function SettingsPage({ ctx }) {
     load()
   }, [load])
 
+  // 読み直す前に預けた結果を、一度だけ拾って出す
+  useEffect(() => {
+    const kept = takeKept()
+    if (!kept) return
+    if (kept.lines) setLog(kept.lines)
+    if (kept.notice) setNotice(kept.notice)
+  }, [])
+
   const saveSecret = useCallback(
     async (name, value) => {
       await call(ctx, '/secrets', { method: 'POST', body: { name, value } })
@@ -227,16 +264,16 @@ function SettingsPage({ ctx }) {
         body: { forceConfig: false },
         timeoutMs: 180000
       })
-      setLog(res.lines || [])
-      // **成否を一言で言う。** ログだけ出して黙ると、読める人しか結果が分からない。
-      setNotice(res.ok ? '反映しました。' : '一部が失敗しました。下の実行結果を確認してください。')
-      await load()
+      // **結果を預けて読み直す。** 配ったものを画面へ確実に映すため。
+      reloadWith({
+        lines: res.lines || [],
+        notice: res.ok ? '反映しました。' : '一部が失敗しました。下の実行結果を確認してください。'
+      })
     } catch (e) {
       setError(e.message)
-    } finally {
       setBusy(false)
     }
-  }, [ctx, load])
+  }, [ctx])
 
   const selfUpdate = useCallback(async () => {
     setBusy(true)
@@ -245,15 +282,11 @@ function SettingsPage({ ctx }) {
     setLog([])
     try {
       const res = await call(ctx, '/self-update', { method: 'POST', body: {}, timeoutMs: 60000 })
-      if (res.version) setVersion(res.version)
-      setNotice(
-        res.changed
-          ? '更新しました。「再読み込み」を押すと反映されます。'
-          : 'すでに最新です。'
-      )
+      // 引くものが無くても読み直す。**ディスクは CLI 側から先に新しく
+      // なっていることがあり、その差はこちらからは見えない。**
+      reloadWith({ notice: res.changed ? '更新しました。' : 'すでに最新です。' })
     } catch (e) {
       setError(e.message)
-    } finally {
       setBusy(false)
     }
   }, [ctx])
@@ -404,13 +437,7 @@ function SettingsPage({ ctx }) {
               })
             ]
           }),
-          // **⌘K は効かない。** あれが呼ぶ scanDiskPlugins は、既に知っている
-          // ファイルを `continue` で素通りする（runtime-loader.ts）。増えた／
-          // 消えたフォルダを見るだけで、**コードの読み直しではない。**
-          // 画面を作り直す唯一の手はレンダラの再読み込みで、⌘Q と違って
-          // ゲートウェイも走行中のカードも落ちない（別プロセスなので）。
-          jsx(Button, { label: '再読み込み', onClick: () => location.reload(), disabled: busy }),
-          jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy })
+          jsx(Button, { label: busy ? '更新中…' : '更新', onClick: selfUpdate, disabled: busy })
         ]
       }),
 
