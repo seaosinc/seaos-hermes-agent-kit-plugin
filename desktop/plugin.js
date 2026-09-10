@@ -242,14 +242,14 @@ function SettingsPage({ ctx }) {
     setBusy(true)
     setError('')
     setNotice('')
+    setLog([])
     try {
       const res = await call(ctx, '/self-update', { method: 'POST', body: {}, timeoutMs: 60000 })
-      setLog(res.lines || [])
       if (res.version) setVersion(res.version)
       setNotice(
         res.changed
-          ? 'プラグインを更新しました。アプリを再起動してください。'
-          : `すでに最新です（${res.version?.revision || '版が読めません'}）。`
+          ? '更新しました。アプリを再起動してください。'
+          : 'すでに最新です。'
       )
     } catch (e) {
       setError(e.message)
@@ -399,8 +399,8 @@ function SettingsPage({ ctx }) {
               jsx('div', {
                 className: 'text-xs opacity-60',
                 children: version?.revision
-                  ? `いま ${version.revision}（${version.date}）${version.subject ? ' ' + version.subject : ''}`
-                  : '新しい版を取り込みます。取り込んだあとはアプリの再起動が要ります'
+                  ? `${version.revision}（${version.date}）`
+                  : '新しい版を取り込みます'
               })
             ]
           }),

@@ -73,15 +73,15 @@ def _version() -> Dict:
 
     root = _REPO
     if not (root / ".git").is_dir():
-        return {"revision": "", "date": "", "subject": ""}
+        return {"revision": "", "date": ""}
     proc = subprocess.run(
-        ["git", "-C", str(root), "log", "-1", "--format=%h\t%cd\t%s", "--date=format:%m/%d %H:%M"],
+        ["git", "-C", str(root), "log", "-1", "--format=%h\t%cd", "--date=format:%m/%d %H:%M"],
         capture_output=True, text=True, stdin=subprocess.DEVNULL,
     )
     if proc.returncode != 0:
-        return {"revision": "", "date": "", "subject": ""}
-    parts = (proc.stdout.strip().split("\t") + ["", "", ""])[:3]
-    return {"revision": parts[0], "date": parts[1], "subject": parts[2]}
+        return {"revision": "", "date": ""}
+    parts = (proc.stdout.strip().split("\t") + ["", ""])[:2]
+    return {"revision": parts[0], "date": parts[1]}
 
 
 @router.post("/self-update")
@@ -108,7 +108,6 @@ def self_update() -> Dict:
         "ok": True,
         "changed": changed,
         "version": _version(),
-        "lines": [l for l in out.splitlines() if l.strip()][:12],
     }
 
 
