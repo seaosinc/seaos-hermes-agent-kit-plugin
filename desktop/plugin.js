@@ -189,25 +189,42 @@ function SecretDialog({ secret, onSave, onClose }) {
  */
 const KEPT = `${ID}.afterReload`
 
+// **期限を付ける。** 札が残り続けると、次からアプリを開くたびにこの画面へ
+// 飛ばしてしまう。読み直しは数秒で終わるので、それを過ぎたものは捨てる。
+const KEPT_TTL_MS = 60000
+
 function reloadWith(payload) {
   try {
-    localStorage.setItem(KEPT, JSON.stringify(payload))
+    localStorage.setItem(KEPT, JSON.stringify({ ...payload, at: Date.now() }))
   } catch {
     // 保存できなくても読み直しは進める（結果が出ないだけ）
   }
   location.reload()
 }
 
-function takeKept() {
-  let out = null
+function readKept() {
   try {
     const raw = localStorage.getItem(KEPT)
-    if (raw) out = JSON.parse(raw)
+    if (!raw) return null
+    const kept = JSON.parse(raw)
+    if (!kept?.at || Date.now() - kept.at > KEPT_TTL_MS) {
+      localStorage.removeItem(KEPT)
+      return null
+    }
+    return kept
+  } catch {
+    return null
+  }
+}
+
+function takeKept() {
+  const kept = readKept()
+  try {
     localStorage.removeItem(KEPT)
   } catch {
-    out = null
+    // 消せなくても、期限で無効になる
   }
-  return out
+  return kept
 }
 
 function SettingsPage({ ctx }) {
@@ -478,5 +495,14 @@ export default {
         }
       }
     ])
+
+    // **読み直した直後は、この画面へ戻す。**
+    // レンダラを読み直すと、ルータが /agent-kit を解決しようとする時点では
+    // まだこのプラグインが登録されていない。行き先が無いので既定の画面へ
+    // 落ち、サイドバーだけ SEAOS が選ばれた状態になる（実際にそうなった）。
+    // 登録し終えたいま、もう一度行き先を指す。
+    if (readKept()) {
+      setTimeout(() => host.navigate('/agent-kit'), 0)
+    }
   }
 }
