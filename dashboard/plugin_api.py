@@ -99,6 +99,8 @@ _PAIRS = [
      "Slack はこの2つが揃って初めて繋がります"),
     (("SLACK_BOT_TOKEN", "SLACK_ALLOWED_USERS"),
      "話せる人を挙げないと、Slack から誰も話しかけられません"),
+    (("BACKLOG_DOMAIN", "BACKLOG_API_KEY"),
+     "Backlog はこの2つが揃って初めて繋がります"),
 ]
 
 
