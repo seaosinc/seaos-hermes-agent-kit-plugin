@@ -190,6 +190,7 @@ function SettingsPage({ ctx }) {
   const [notice, setNotice] = useState('')
   const [editing, setEditing] = useState(null)
   const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
+  const [version, setVersion] = useState(null)
 
   const load = useCallback(async () => {
     setError('')
@@ -197,6 +198,7 @@ function SettingsPage({ ctx }) {
       setRoles(await call(ctx, '/roles'))
       setSecrets(await call(ctx, '/secrets'))
       setCheck(await call(ctx, '/validate'))
+      setVersion(await call(ctx, '/version'))
     } catch (e) {
       setError(e.message)
     }
@@ -243,10 +245,11 @@ function SettingsPage({ ctx }) {
     try {
       const res = await call(ctx, '/self-update', { method: 'POST', body: {}, timeoutMs: 60000 })
       setLog(res.lines || [])
+      if (res.version) setVersion(res.version)
       setNotice(
         res.changed
           ? 'プラグインを更新しました。アプリを再起動してください。'
-          : 'すでに最新です。'
+          : `すでに最新です（${res.version?.revision || '版が読めません'}）。`
       )
     } catch (e) {
       setError(e.message)
@@ -395,7 +398,9 @@ function SettingsPage({ ctx }) {
               jsx('div', { className: 'text-sm', children: 'プラグイン' }),
               jsx('div', {
                 className: 'text-xs opacity-60',
-                children: '新しい版を取り込みます。取り込んだあとはアプリの再起動が要ります'
+                children: version?.revision
+                  ? `いま ${version.revision}（${version.date}）${version.subject ? ' ' + version.subject : ''}`
+                  : '新しい版を取り込みます。取り込んだあとはアプリの再起動が要ります'
               })
             ]
           }),

@@ -65,6 +65,25 @@ def list_roles() -> List[Dict]:
     return out
 
 
+def _version() -> Dict:
+    """いま動いている版。**「すでに最新です」だけだと、本当に最新なのか
+    更新の仕組みが壊れているのか区別が付かない。** 版を添えて答える。
+    """
+    import subprocess
+
+    root = _REPO
+    if not (root / ".git").is_dir():
+        return {"revision": "", "date": "", "subject": ""}
+    proc = subprocess.run(
+        ["git", "-C", str(root), "log", "-1", "--format=%h\t%cd\t%s", "--date=format:%m/%d %H:%M"],
+        capture_output=True, text=True, stdin=subprocess.DEVNULL,
+    )
+    if proc.returncode != 0:
+        return {"revision": "", "date": "", "subject": ""}
+    parts = (proc.stdout.strip().split("\t") + ["", "", ""])[:3]
+    return {"revision": parts[0], "date": parts[1], "subject": parts[2]}
+
+
 @router.post("/self-update")
 def self_update() -> Dict:
     """**このプラグイン自身**を最新にする（git pull）。
@@ -88,6 +107,7 @@ def self_update() -> Dict:
     return {
         "ok": True,
         "changed": changed,
+        "version": _version(),
         "lines": [l for l in out.splitlines() if l.strip()][:12],
     }
 
@@ -114,6 +134,12 @@ def _disables() -> Dict[str, List[str]]:
             for var in needed:
                 out.setdefault(var, []).append(f"{name} の {server}")
     return out
+
+
+@router.get("/version")
+def version() -> Dict:
+    """いま動いている版。画面の隅に出す。"""
+    return _version()
 
 
 @router.get("/secrets")
