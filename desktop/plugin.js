@@ -246,14 +246,32 @@ function SettingsPage({ ctx }) {
     try {
       const res = await call(ctx, '/self-update', { method: 'POST', body: {}, timeoutMs: 60000 })
       if (res.version) setVersion(res.version)
-      setNotice(
-        res.changed
-          ? '更新しました。アプリを再起動してください。'
-          : 'すでに最新です。'
-      )
+
+      if (!res.changed) {
+        setNotice('すでに最新です。')
+        setBusy(false)
+        return
+      }
+
+      // **取り込んだら、アプリ自身に再起動させる。**
+      // 新しいコードを読ませる手はここしかない——Hermes はプラグインの JS を
+      // 起動時に一度だけ読み込み、⌘K の Reload desktop plugins は既知の
+      // ファイルを素通りする（フォルダの増減しか見ない）。
+      //
+      // レンダラの読み直し（location.reload）は試して捨てた。ペインの構成が
+      // 壊れ、サイドバーが幅0で残った。**こちらはアプリ公認の経路**で、
+      // ⌘Q → 開き直すのと同じことを整然とやる（バックエンドを畳んでから終了し、
+      // 同じ引数で起動し直す）。
+      const relaunch = window.hermesDesktop?.relaunchApp
+      if (typeof relaunch !== 'function') {
+        setNotice('更新しました。⌘Q で終了して開き直すと反映されます。')
+        setBusy(false)
+        return
+      }
+      setNotice('更新しました。再起動します…')
+      await relaunch()
     } catch (e) {
       setError(e.message)
-    } finally {
       setBusy(false)
     }
   }, [ctx])
