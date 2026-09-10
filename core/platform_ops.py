@@ -307,7 +307,9 @@ def link_command(log: Optional[Log] = None) -> Path:
 def unlink_command(log: Optional[Log] = None) -> bool:
     target = command_target()
     removed = False
-    for name in ("kit", "kit.cmd"):
+    # **旧名も消す。** `kit` から改名したので、前に入れた人の PATH には
+    # 古い綴りが残っている。両方畳まないと、消したはずのコマンドが動き続ける。
+    for name in (COMMAND, f"{COMMAND}.cmd", "kit", "kit.cmd"):
         path = target / name
         if path.is_symlink() or path.is_file():
             path.unlink()
