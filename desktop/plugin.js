@@ -299,13 +299,30 @@ function SettingsPage({ ctx }) {
               })
             ]
           }),
-          jsx(Button, {
-            // **必須が欠けているあいだは押させない。** 押せてしまうと、
-            // 途中まで進んで失敗した状態が残る。
-            label: busy ? '実行中…' : '反映',
-            onClick: update,
-            disabled: busy || !check.ok,
-            primary: true
+          jsxs('div', {
+            className: 'flex shrink-0 flex-col items-end gap-1',
+            children: [
+              jsxs('div', {
+                className: 'flex gap-2',
+                children: [
+                  jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy }),
+                  jsx(Button, {
+                    // **必須が欠けているあいだは押させない。** 押せてしまうと、
+                    // 途中まで進んで失敗した状態が残る。
+                    label: busy ? '実行中…' : '反映',
+                    onClick: update,
+                    disabled: busy || !check.ok,
+                    primary: true
+                  })
+                ]
+              }),
+              version?.revision
+                ? jsx('div', {
+                    className: 'text-xs opacity-60',
+                    children: `${version.revision}（${version.date}）`
+                  })
+                : null
+            ]
           })
         ]
       }),
