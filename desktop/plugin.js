@@ -181,52 +181,6 @@ function SecretDialog({ secret, onSave, onClose }) {
   })
 }
 
-/** 再読み込みをまたいで、直前の結果を持ち越す。
- *
- * **読み直さないと新しいコードは走らない**（⌘K の Reload desktop plugins は
- * 既知のファイルを素通りする＝フォルダの増減しか見ない）。かといって黙って
- * 読み直すと、何が起きたのかが画面から消える。**結果だけ預けて読み直す。**
- */
-const KEPT = `${ID}.afterReload`
-
-// **期限を付ける。** 札が残り続けると、次からアプリを開くたびにこの画面へ
-// 飛ばしてしまう。読み直しは数秒で終わるので、それを過ぎたものは捨てる。
-const KEPT_TTL_MS = 60000
-
-function reloadWith(payload) {
-  try {
-    localStorage.setItem(KEPT, JSON.stringify({ ...payload, at: Date.now() }))
-  } catch {
-    // 保存できなくても読み直しは進める（結果が出ないだけ）
-  }
-  location.reload()
-}
-
-function readKept() {
-  try {
-    const raw = localStorage.getItem(KEPT)
-    if (!raw) return null
-    const kept = JSON.parse(raw)
-    if (!kept?.at || Date.now() - kept.at > KEPT_TTL_MS) {
-      localStorage.removeItem(KEPT)
-      return null
-    }
-    return kept
-  } catch {
-    return null
-  }
-}
-
-function takeKept() {
-  const kept = readKept()
-  try {
-    localStorage.removeItem(KEPT)
-  } catch {
-    // 消せなくても、期限で無効になる
-  }
-  return kept
-}
-
 function SettingsPage({ ctx }) {
   const [roles, setRoles] = useState([])
   const [secrets, setSecrets] = useState([])
@@ -254,14 +208,6 @@ function SettingsPage({ ctx }) {
     load()
   }, [load])
 
-  // 読み直す前に預けた結果を、一度だけ拾って出す
-  useEffect(() => {
-    const kept = takeKept()
-    if (!kept) return
-    if (kept.lines) setLog(kept.lines)
-    if (kept.notice) setNotice(kept.notice)
-  }, [])
-
   const saveSecret = useCallback(
     async (name, value) => {
       await call(ctx, '/secrets', { method: 'POST', body: { name, value } })
@@ -281,16 +227,16 @@ function SettingsPage({ ctx }) {
         body: { forceConfig: false },
         timeoutMs: 180000
       })
-      // **結果を預けて読み直す。** 配ったものを画面へ確実に映すため。
-      reloadWith({
-        lines: res.lines || [],
-        notice: res.ok ? '反映しました。' : '一部が失敗しました。下の実行結果を確認してください。'
-      })
+      setLog(res.lines || [])
+      // **成否を一言で言う。** ログだけ出して黙ると、読める人しか結果が分からない。
+      setNotice(res.ok ? '反映しました。' : '一部が失敗しました。下の実行結果を確認してください。')
+      await load()
     } catch (e) {
       setError(e.message)
+    } finally {
       setBusy(false)
     }
-  }, [ctx])
+  }, [ctx, load])
 
   const selfUpdate = useCallback(async () => {
     setBusy(true)
@@ -299,11 +245,15 @@ function SettingsPage({ ctx }) {
     setLog([])
     try {
       const res = await call(ctx, '/self-update', { method: 'POST', body: {}, timeoutMs: 60000 })
-      // 引くものが無くても読み直す。**ディスクは CLI 側から先に新しく
-      // なっていることがあり、その差はこちらからは見えない。**
-      reloadWith({ notice: res.changed ? '更新しました。' : 'すでに最新です。' })
+      if (res.version) setVersion(res.version)
+      setNotice(
+        res.changed
+          ? '更新しました。⌘Q で終了して開き直すと反映されます。'
+          : 'すでに最新です。'
+      )
     } catch (e) {
       setError(e.message)
+    } finally {
       setBusy(false)
     }
   }, [ctx])
@@ -454,7 +404,7 @@ function SettingsPage({ ctx }) {
               })
             ]
           }),
-          jsx(Button, { label: busy ? '更新中…' : '更新', onClick: selfUpdate, disabled: busy })
+          jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy })
         ]
       }),
 
@@ -495,14 +445,5 @@ export default {
         }
       }
     ])
-
-    // **読み直した直後は、この画面へ戻す。**
-    // レンダラを読み直すと、ルータが /agent-kit を解決しようとする時点では
-    // まだこのプラグインが登録されていない。行き先が無いので既定の画面へ
-    // 落ち、サイドバーだけ SEAOS が選ばれた状態になる（実際にそうなった）。
-    // 登録し終えたいま、もう一度行き先を指す。
-    if (readKept()) {
-      setTimeout(() => host.navigate('/agent-kit'), 0)
-    }
   }
 }
