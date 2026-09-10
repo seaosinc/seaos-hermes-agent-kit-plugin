@@ -168,9 +168,9 @@ ROLES: dict[str, dict] = {
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
         ],
-        "desc": "リポジトリを clone して実装・検証・push・PR 作成まで担う開発役。A2A 連携そのものは扱わない。",
+        "desc": "リポジトリを clone して実装・検証・push・PR 作成、CI とレビュー指摘の解消まで担う開発役。A2A 連携そのものは扱わない。",
         "describe": ("コードを書く開発役。使い捨ての作業部屋で clone し、重い実装は "
-                     "opencode に委譲して差分を検証し、push して PR を出す。"
+                     "opencode に委譲して差分を検証し、push して PR を出す。**PR を出して終わりではなく、CI が緑になり、レビューの指摘が残っていない状態まで見届ける**（人の承認そのものは待たない）。"
                      "例:「機能を実装する」「バグを修正する」「テストが通るようにする」"
                      "「設定値を変えて反映する」。**変更の量ではなく成果条件で選ぶ**——"
                      "1行の変更でも、リポジトリへ届けて終わるならここへ。"

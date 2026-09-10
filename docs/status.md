@@ -51,9 +51,9 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
 
 | | 常駐 | コマンドの置き場 |
 |---|---|---|
-| macOS | 素のプロセス（launchd は使わない。plist が再生成され HERMES_PROFILE が消えるため） | `~/.local/bin/kit`（symlink） |
-| Windows | 素のプロセス ＋ Scheduled Task | `%LOCALAPPDATA%\Programs\hermes-kit\kit.cmd` |
-| Linux（AWS のみ） | systemd user unit ＋ linger | `~/.local/bin/kit`（symlink） |
+| macOS | 素のプロセス（launchd は使わない。plist が再生成され HERMES_PROFILE が消えるため） | `~/.local/bin/seaos-kit`（ラッパ） |
+| Windows | 素のプロセス ＋ Scheduled Task | `%LOCALAPPDATA%\Programs\seaos-kit\seaos-kit.cmd` |
+| Linux（AWS のみ） | systemd user unit ＋ linger | `~/.local/bin/seaos-kit`（ラッパ） |
 
 ## 残っている作業
 
@@ -63,6 +63,11 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
    判定できなくなっていた。ビルド時に git から採番する。
 3. **GUI の実機確認。** デスクトップアプリで Python 側・desktop 側のトグルを
    2つとも入れて、画面が出るところまで。
+4. **AWS の MCP を developer / senior-developer へ渡す。** Terraform を扱い始めると
+   要る。いまこの2役が持つのは箱（terminal / workspace）と GH_TOKEN だけで、
+   AWS の状態を読む手が無い。**渡すなら読む手から**——`terraform plan` の確認や
+   スタックの現況照会は読みで足り、`apply` まで持たせるかは別の判断になる
+   （認証情報の置き場も含めて決める）。
 
 ## 変えていない前提
 

@@ -36,6 +36,8 @@ metadata:
 | 枝を作る | `git switch -c task/$HERMES_KANBAN_TASK` |
 | 送る | `git push -u origin task/$HERMES_KANBAN_TASK` |
 | PR にする | `gh pr create --fill --base <ベース>` |
+| **CI を見届ける** | `gh pr checks <番号> --watch`（緑になるまで。落ちたら直して push し直す） |
+| **指摘を確かめる** | `gh pr view <番号> --comments` / `gh pr diff <番号>` |
 | 見せたいものを出す | `cp <ファイル> "$HERMES_KANBAN_WORKSPACE/"` → 完了時に `artifacts` で絶対パスを宣言 |
 
 `$HERMES_KANBAN_WORKSPACE` は**部屋の中でもそのまま使える**——同じ場所が同じ絶対パスで
