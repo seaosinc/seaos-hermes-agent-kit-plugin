@@ -161,6 +161,22 @@ def test_manifest_declares_env_and_ownership():
     assert not (OUT / "operator/.env").exists()
 
 
+def test_only_truly_required_keys_are_required():
+    """**必須は「無いとキット自体が成り立たない」ものだけ。**
+
+    欠けても道具が1つ使えなくなるだけの鍵まで必須にすると、設定画面が
+    止まって誰も先へ進めない。Hermes のゲートウェイは認証情報が無くても
+    落ちず、板と cron は動き続ける（gateway/run_startup.py の
+    "degrade gracefully and allow cron jobs to run"）。
+
+    いま必須なのは OPENROUTER_API_KEY だけ——全役の全モデル呼び出しが通る。
+    """
+    specs = {**bd.ROLES, **bd.worker_roles(ROOT)}
+    required = {entry[0] for spec in specs.values()
+                for entry in (spec.get("env") or []) if entry[2]}
+    assert required == {"OPENROUTER_API_KEY"}, required
+
+
 def test_mcp_without_keys_ships_disabled():
     """**鍵が来ないサーバは、既定で無効で配ること。**
 
@@ -636,6 +652,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("必須は本当に必須なものだけ", test_only_truly_required_keys_are_required)
     check("鍵が来ない MCP は無効で配る", test_mcp_without_keys_ships_disabled)
     check("秘密が混ざっていない", test_secrets_are_not_shipped)
     check("消した役の配布物が消える", test_stale_role_is_removed)

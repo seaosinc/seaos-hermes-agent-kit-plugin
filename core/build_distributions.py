@@ -95,9 +95,9 @@ ROLES: dict[str, dict] = {
         "cron": ["booking-sync", "runtime-guard", "spin-guard", "container-guard",
                  "kit-sync", "kit-maintain"],
         "env": [
-            ("SLACK_BOT_TOKEN", "Slack の Bot トークン（gateway が使う）", True),
-            ("SLACK_APP_TOKEN", "Slack の App トークン（Socket Mode）", True),
-            ("SLACK_ALLOWED_USERS", "常に話せる Slack ユーザー ID（カンマ区切り）", True),
+            ("SLACK_BOT_TOKEN", "Slack の Bot トークン。無いと Slack から話しかけられない（板と cron は動く）", False),
+            ("SLACK_APP_TOKEN", "Slack の App トークン（Socket Mode）。BOT トークンとセットで要る", False),
+            ("SLACK_ALLOWED_USERS", "常に話せる Slack ユーザー ID（カンマ区切り）。Slack を使うなら要る——空だと誰も話せない", False),
             ("SLACK_OWNER_ID", "判断を仰ぐ相手の Slack ユーザー ID", False),
             ("SLACK_HOME_CHANNEL", "既定の投稿先チャンネル", False),
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
@@ -166,7 +166,7 @@ ROLES: dict[str, dict] = {
         "mcp_shared": ["context7"],
         "env": [
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
-            ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）", True),
+            ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
         ],
         "desc": "リポジトリを clone して実装・検証・push・PR 作成まで担う開発役。A2A 連携そのものは扱わない。",
         "describe": ("コードを書く開発役。使い捨ての作業部屋で clone し、重い実装は "
@@ -199,7 +199,7 @@ ROLES: dict[str, dict] = {
         "mcp_shared": ["context7"],
         "env": [
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
-            ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）", True),
+            ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
         ],
         "desc": "developer の上位版。実装に加えてセキュリティとコード品質まで見る。設計判断を伴うもの、developer が詰まったものを引き取る。A2A 連携そのものは扱わない。",
         "describe": ("developer と同じ開発役で、実装に加えて**セキュリティとコード品質まで見る**版。"
@@ -253,7 +253,7 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             "desc": " ".join((prof.get("description") or "").split()),
             "describe": " ".join((prof.get("description") or "").split()),
             "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)]
-                   + ([("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）", True)]
+                   + ([("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False)]
                       if (prof.get("workspace", d.name != "recruiter")
                           and prof.get("shell", True)) else [])
                    # **MCP を足した役は、たいてい鍵も要る。** profile.yaml で宣言させ、

@@ -71,26 +71,50 @@ function Button({ label, onClick, disabled, primary }) {
  * **普段は入力欄を出さない。** 設定済みの鍵に空欄が並ぶのは、何を求められて
  * いるのか分からない。行は状態だけを見せ、変更したいときにダイアログを開く。 */
 function SecretRow({ secret, onEdit }) {
+  // **必須は名前の脇に `*`。** 無いとキット自体が成り立たないものだけに付く。
+  // 任意の鍵は、空でも動く代わりに何が使えなくなるかを書く。
+  const missing = !secret.configured
+  const note = secret.configured
+    ? ''
+    : secret.disables?.length
+      ? `未設定のあいだ ${secret.disables.join('、')} を無効にします`
+      : secret.description || ''
+
   return jsxs('div', {
-    className: 'flex items-center gap-3 py-2',
+    className: 'flex items-start gap-3 py-2',
     style: { borderBottom: BORDER },
     children: [
-      jsx('span', { className: 'flex-1 truncate text-sm', children: secret.name }),
+      jsxs('div', {
+        className: 'min-w-0 flex-1',
+        children: [
+          jsxs('div', {
+            className: 'text-sm',
+            children: [
+              secret.name,
+              secret.required
+                ? jsx('span', { style: { color: DANGER }, className: 'ml-1', children: '*' })
+                : null
+            ]
+          }),
+          note ? jsx('div', { className: 'text-xs opacity-60', children: note }) : null
+        ]
+      }),
       jsx('span', {
-        className: 'text-xs ' + (secret.configured || !secret.required ? MUTED : ''),
-        style: secret.configured || !secret.required ? null : { color: WARN },
-        children: secret.configured ? '設定済み' : secret.required ? '未設定' : '任意・未設定'
+        className: 'shrink-0 text-xs ' + (secret.configured || !secret.required ? MUTED : ''),
+        style: secret.configured || !secret.required ? null : { color: DANGER },
+        children: secret.configured ? '設定済み' : secret.required ? '必須・未設定' : '未設定'
       }),
       jsx('button', {
         type: 'button',
         onClick: () => onEdit(secret),
-        className: 'text-xs hover:underline',
+        className: 'shrink-0 text-xs hover:underline',
         style: { color: ACCENT },
         children: secret.configured ? '変更' : '設定'
       })
     ]
   })
 }
+
 
 /** 値を入れるダイアログ。**入力はここだけ。** */
 function SecretDialog({ secret, onSave, onClose }) {
@@ -165,12 +189,14 @@ function SettingsPage({ ctx }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [editing, setEditing] = useState(null)
+  const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
 
   const load = useCallback(async () => {
     setError('')
     try {
       setRoles(await call(ctx, '/roles'))
       setSecrets(await call(ctx, '/secrets'))
+      setCheck(await call(ctx, '/validate'))
     } catch (e) {
       setError(e.message)
     }
@@ -229,7 +255,6 @@ function SettingsPage({ ctx }) {
     }
   }, [ctx])
 
-  const missing = secrets.filter((s) => s.required && !s.configured)
   const installed = roles.filter((r) => r.installed).length
 
   return jsxs('div', {
@@ -254,9 +279,11 @@ function SettingsPage({ ctx }) {
             ]
           }),
           jsx(Button, {
+            // **必須が欠けているあいだは押させない。** 押せてしまうと、
+            // 途中まで進んで失敗した状態が残る。
             label: busy ? '実行中…' : '反映',
             onClick: update,
-            disabled: busy,
+            disabled: busy || !check.ok,
             primary: true
           })
         ]
@@ -278,13 +305,21 @@ function SettingsPage({ ctx }) {
           })
         : null,
 
-      missing.length
+      check.blocking.length
         ? jsx('div', {
             className: 'rounded px-3 py-2 text-xs',
-            style: { border: `1px solid ${WARN}`, color: WARN },
-            children: `${missing.map((s) => s.name).join(', ')} が未設定です。設定してから更新してください。`
+            style: { border: `1px solid ${DANGER}`, color: DANGER },
+            children: `${check.blocking.join('、')} を設定してください。これが無いと動きません。`
           })
         : null,
+
+      ...check.warnings.map((w, i) =>
+        jsx('div', {
+          className: 'rounded px-3 py-2 text-xs',
+          style: { border: `1px solid ${WARN}`, color: WARN },
+          children: w
+        }, `warn${i}`)
+      ),
 
       // エージェント
       jsxs('section', {

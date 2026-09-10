@@ -29,7 +29,7 @@ sys.path.insert(0, str(_REPO / "core"))
 import env as env_mod  # noqa: E402
 import kit  # noqa: E402
 import roles  # noqa: E402
-from paths import env_file, os_kind, profile_dir  # noqa: E402
+from paths import env_file, kit_root, os_kind, profile_dir  # noqa: E402
 
 router = APIRouter()
 
@@ -92,21 +92,69 @@ def self_update() -> Dict:
     }
 
 
+# 鍵どうしの依存。**片方だけ入れても働かない組**を、画面で言えるようにする。
+# 「無いと何も動かない」ではないので必須にはしないが、黙って半端に動くのは避ける。
+_PAIRS = [
+    (("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"),
+     "Slack はこの2つが揃って初めて繋がります"),
+    (("SLACK_BOT_TOKEN", "SLACK_ALLOWED_USERS"),
+     "話せる人を挙げないと、Slack から誰も話しかけられません"),
+]
+
+
+def _disables() -> Dict[str, List[str]]:
+    """鍵ごとに、空だと無効になる MCP（変数名 -> 「役の道具」の一覧）。"""
+    import build_distributions as gen
+
+    out: Dict[str, List[str]] = {}
+    for name in roles.names():
+        for server, needed in gen.mcp_env_vars(kit_root(), name).items():
+            for var in needed:
+                out.setdefault(var, []).append(f"{name} の {server}")
+    return out
+
+
 @router.get("/secrets")
 def list_secrets() -> List[Dict]:
-    """鍵の**名前と充足状況だけ**。値は返さない。"""
+    """鍵の**名前と充足状況だけ**。値は返さない。
+
+    `required` は「**無いとキット自体が成り立たない**」ものだけに付ける
+    （いまは OPENROUTER_API_KEY ひとつ）。それ以外は空でも動くので任意にし、
+    代わりに `disables` で「入れないと何が使えなくなるか」を返す。
+    """
     source = env_mod.read_env(env_file())
+    disables = _disables()
     seen: Dict[str, Dict] = {}
     for name in roles.names():
         for var, required, desc in roles.env_requirements(name):
             entry = seen.setdefault(
-                var, {"name": var, "description": desc, "required": False, "usedBy": []}
+                var, {"name": var, "description": desc, "required": False,
+                      "usedBy": [], "disables": disables.get(var, [])}
             )
             entry["required"] = entry["required"] or required
             entry["usedBy"].append(name)
     for var, entry in seen.items():
         entry["configured"] = bool(source.get(var))
     return sorted(seen.values(), key=lambda e: (not e["required"], e["name"]))
+
+
+@router.get("/validate")
+def validate() -> Dict:
+    """反映してよい状態か。**必須が欠けていれば止める。**
+
+    `blocking` は必須の未設定。`warnings` は片方だけ入っている組など、
+    動くけれど期待どおりにならないもの。
+    """
+    source = env_mod.read_env(env_file())
+    blocking = [s["name"] for s in list_secrets()
+                if s["required"] and not source.get(s["name"])]
+    warnings: List[str] = []
+    for group, message in _PAIRS:
+        filled = [v for v in group if source.get(v)]
+        if filled and len(filled) != len(group):
+            missing = [v for v in group if not source.get(v)]
+            warnings.append(f"{', '.join(missing)} が空です。{message}")
+    return {"ok": not blocking, "blocking": blocking, "warnings": warnings}
 
 
 @router.get("/status")

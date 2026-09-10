@@ -42,13 +42,13 @@ extra: ""
 env_requires:
 - name: NOTION_TOKEN
   description: "Notion の内部インテグレーションのトークン（ntn_…）。MCP がホストで使う"
-  required: true
+  required: false
 - name: GH_TOKEN
   description: "GitHub Personal Access Token。handler の GitHub 読み取りと、issue の状態変更・コメント追記に使う"
-  required: true
+  required: false
 - name: BACKLOG_DOMAIN
   description: "Backlog のスペース（例: seaos2.backlog.com）。MCP がホストで使う"
-  required: true
+  required: false
 - name: BACKLOG_API_KEY
   description: "Backlog の API キー。handler の課題読み取りと、状態変更・コメント追記・起票に使う"
-  required: true
+  required: false
