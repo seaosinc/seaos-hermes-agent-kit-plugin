@@ -135,6 +135,23 @@ def _disables() -> Dict[str, List[str]]:
     return out
 
 
+@router.get("/ui.js")
+def ui_source() -> Dict:
+    """画面の中身（desktop/ui.js）を、**その場でディスクから読んで**返す。
+
+    Hermes はプラグインの JS を起動時に一度だけ読み込み、⌘K の Reload desktop
+    plugins は既知のファイルを素通りする。**編集を反映する手がホストに無い。**
+    そこで薄い皮だけを常駐させ、中身はここから取り直す。
+
+    毎回読み直すのが肝で、キャッシュしない——`hermes plugins update` で
+    ファイルが入れ替わった直後に、そのまま新しいものが出る。
+    """
+    path = _REPO / "desktop" / "ui.js"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="desktop/ui.js が見当たりません")
+    return {"source": path.read_text(encoding="utf-8")}
+
+
 @router.get("/version")
 def version() -> Dict:
     """いま動いている版。画面の隅に出す。"""
