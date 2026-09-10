@@ -277,13 +277,30 @@ export default function create(deps) {
                 })
               ]
             }),
-            jsx(Button, {
-              // **必須が欠けているあいだは押させない。** 押せてしまうと、
-              // 途中まで進んで失敗した状態が残る。
-              label: busy ? '実行中…' : '反映',
-              onClick: update,
-              disabled: busy || !check.ok,
-              primary: true
+            jsxs('div', {
+              className: 'flex shrink-0 flex-col items-end gap-1',
+              children: [
+                jsxs('div', {
+                  className: 'flex gap-2',
+                  children: [
+                    jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy }),
+                    jsx(Button, {
+                      // **必須が欠けているあいだは押させない。** 押せてしまうと、
+                      // 途中まで進んで失敗した状態が残る。
+                      label: busy ? '実行中…' : '反映',
+                      onClick: update,
+                      disabled: busy || !check.ok,
+                      primary: true
+                    })
+                  ]
+                }),
+                version?.revision
+                  ? jsx('div', {
+                      className: 'text-xs opacity-60',
+                      children: `${version.revision}（${version.date}）`
+                    })
+                  : null
+              ]
             })
           ]
         }),
@@ -383,26 +400,6 @@ export default function create(deps) {
               ]
             })
           : null,
-
-        jsxs('section', {
-          className: 'mt-auto flex items-center gap-3 pt-4',
-          style: { borderTop: BORDER },
-          children: [
-            jsxs('div', {
-              className: 'min-w-0 flex-1',
-              children: [
-                jsx('div', { className: 'text-sm', children: 'プラグイン' }),
-                jsx('div', {
-                  className: 'text-xs opacity-60',
-                  children: version?.revision
-                    ? `${version.revision}（${version.date}）`
-                    : '新しい版を取り込みます'
-                })
-              ]
-            }),
-            jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy })
-          ]
-        }),
 
         editing
           ? jsx(SecretDialog, {
