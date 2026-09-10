@@ -7,11 +7,12 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from paths import hermes_bin
+from paths import hermes_bin, hermes_home
 
 
 class HermesMissing(RuntimeError):
@@ -31,11 +32,18 @@ def run(args: List[str], *, stdin_empty: bool = True) -> Tuple[int, str]:
     **stdin は既定で閉じる。** 対話プロンプトが出る操作を無人で回すと、
     応答待ちのまま固まる（zsh 版が `</dev/null` を付けていたのと同じ理由）。
     """
+    # **HERMES_HOME を明示する。** Hermes は cwd からも HOME を推測し、
+    # `profiles/<役>/` の下から呼ぶとその役自身を HOME だと解釈する
+    # （hermes_constants.py の named_profile_home）。定期実行のスクリプトは
+    # まさにその位置（プロファイル配下の scripts/）で走るので、放っておくと
+    # 「説明文を設定できず」が全役ぶん出る（実際に出た）。
     proc = subprocess.run(
         [_bin(), *args],
         capture_output=True,
         text=True,
         stdin=subprocess.DEVNULL if stdin_empty else None,
+        cwd=str(Path.home()),
+        env={**os.environ, "HERMES_HOME": str(hermes_home())},
     )
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
