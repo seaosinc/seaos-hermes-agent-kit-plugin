@@ -525,8 +525,8 @@ CRON_JOBS = {
     # **毎分。** 親が SIGKILL されると作業部屋は running のまま残り、
     # Hermes の回収係（status=exited しか見ない）は一生届かない。1つ 4GB。
     "container-guard": ("* * * * *",  "container_guard.py"),
-    "kit-sync":      ("*/10 * * * *", "kit_sync.sh"),
-    "kit-maintain":  ("30 4 * * *",   "kit_maintain.sh"),
+    "kit-sync":      ("*/10 * * * *", "kit_sync.py"),
+    "kit-maintain":  ("30 4 * * *",   "kit_maintain.py"),
 }
 
 
@@ -568,7 +568,6 @@ def copy_runtime(kit: Path, d: Path, spec: dict) -> list[str]:
         # （cron/scheduler.py:3966）。
         (d / "scripts").mkdir(exist_ok=True)
         for src in [*(kit / "templates/booking-gate/sync").glob("*.py"),
-                    *(kit / "templates/cron").glob("*.sh"),
                     *(kit / "templates/cron").glob("*.py")]:
             shutil.copy2(src, d / "scripts" / src.name)
         owned.append("scripts/")

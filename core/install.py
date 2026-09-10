@@ -9,6 +9,7 @@ OS で違うところは platform_ops に閉じてある。
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
@@ -33,6 +34,50 @@ class Result:
         return self.failures == 0
 
 
+def register_cron(*, log: Optional[Log] = None) -> Result:
+    """定期実行を登録する。**冪等**——無いものだけ作る。
+
+    **配布物には載せない。** 載せると `profile update` のたびにスケジューラが
+    持っている状態（次の実行時刻など）が骨だけの版で上書きされ、ジョブが死ぬ
+    （実際に死んだ）。登録は公式の `hermes cron create` に任せ、ここは
+    「無ければ作る」だけにする。スクリプトの実体は配布物が運ぶ。
+    """
+    import build_distributions as gen
+
+    res = Result()
+    say: Log = log or (lambda _l: None)
+    profile = booking.gate_profile()
+
+    code, listing = hermes.run(["-p", profile, "cron", "list"])
+    if code != 0:
+        res.failures += 1
+        say(f"✗ 登録済みの定期実行を読めなかった（{profile}）")
+        return res
+
+    roles_spec = {**gen.ROLES, **gen.worker_roles(kit_root())}
+    for role, spec in roles_spec.items():
+        if role != profile:
+            continue
+        for name in spec.get("cron", []):
+            expr, script = gen.CRON_JOBS[name]
+            if re.search(rf"Name:\s*{re.escape(name)}\b", listing):
+                say(f"= {name}（登録済み）")
+                continue
+            if not (profile_dir(role) / "scripts" / script).is_file():
+                res.failures += 1
+                say(f"✗ {name}: {script} が配布されていない（先に update）")
+                continue
+            code, _out = hermes.run(
+                ["-p", profile, "cron", "create", expr,
+                 "--name", name, "--script", script, "--no-agent"])
+            if code == 0:
+                say(f"+ {name}（{expr}）")
+            else:
+                res.failures += 1
+                say(f"✗ {name} の登録に失敗")
+    return res
+
+
 def install(*, log: Optional[Log] = None) -> Result:
     """全役を導入し、配布物に載らないものを揃える。**冪等。**
 
@@ -55,11 +100,14 @@ def install(*, log: Optional[Log] = None) -> Result:
         res.failures += 1
         say(f"✗ コマンドを置けなかった: {exc}")
 
-    say("=== 3. 共有記憶（mem0） ===")
+    say("=== 3. 定期実行（Hermes の cron） ===")
+    res.failures += register_cron(log=say).failures
+
+    say("=== 4. 共有記憶（mem0） ===")
     if not mem0.up(log=say):
         res.failures += 1
 
-    say("=== 4. 常駐 ===")
+    say("=== 5. 常駐 ===")
     say(platform_ops.autostart_hint())
 
     return res
