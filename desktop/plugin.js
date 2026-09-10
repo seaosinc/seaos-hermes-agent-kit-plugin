@@ -248,7 +248,7 @@ function SettingsPage({ ctx }) {
       if (res.version) setVersion(res.version)
       setNotice(
         res.changed
-          ? '更新しました。アプリを再起動してください。'
+          ? '更新しました。「再読み込み」を押すと反映されます。'
           : 'すでに最新です。'
       )
     } catch (e) {
@@ -404,6 +404,12 @@ function SettingsPage({ ctx }) {
               })
             ]
           }),
+          // **⌘K は効かない。** あれが呼ぶ scanDiskPlugins は、既に知っている
+          // ファイルを `continue` で素通りする（runtime-loader.ts）。増えた／
+          // 消えたフォルダを見るだけで、**コードの読み直しではない。**
+          // 画面を作り直す唯一の手はレンダラの再読み込みで、⌘Q と違って
+          // ゲートウェイも走行中のカードも落ちない（別プロセスなので）。
+          jsx(Button, { label: '再読み込み', onClick: () => location.reload(), disabled: busy }),
           jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy })
         ]
       }),
