@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform_ops
 import sqlite3
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -137,7 +138,8 @@ def check(log: Optional[Log] = None) -> bool:
     if ev.is_file():
         try:
             pid = int(json.loads(ev.read_text(encoding="utf-8"))["pid"])
-            os.kill(pid, 0)
+            if not platform_ops.pid_alive(pid):
+                raise ProcessLookupError(pid)
             say(f"✓ ゲートが動いている（pid {pid}）")
         except Exception:  # noqa: BLE001
             say("✗ ゲートが動いていない → gateway restart")

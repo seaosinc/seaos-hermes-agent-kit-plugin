@@ -80,7 +80,9 @@ def test_gate_lands_complete():
     assert (d / "plugins/booking-gate/__init__.py").exists(), "プラグインが無い"
     assert (d / "hooks/mem0-up/handler.py").exists(), "フックが無い"
     assert (d / "scripts/booking_sync.py").exists(), "ポーラーが無い"
-    assert (d / "scripts/kit_sync.sh").exists(), "定期実行のスクリプトが無い"
+    assert (d / "scripts/kit_sync.py").exists(), "定期実行のスクリプトが無い"
+    # **シェルは配らない。** Windows に bash が無いので、定期実行が片肺になる。
+    assert not list((d / "scripts").glob("*.sh")), "シェルスクリプトが配られている"
     # cron のジョブは配らない（update のたびにスケジューラの状態を壊すため）。
     # 登録は hermes-kit install が公式コマンドでやる
     assert not (d / "cron/jobs.json").exists(), "cron のジョブを配ってはいけない"

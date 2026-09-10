@@ -54,6 +54,27 @@ def running_cards() -> int:
     return total
 
 
+def pid_alive(pid: int) -> bool:
+    """その PID が生きているか。
+
+    **`os.kill(pid, 0)` を使わない。** POSIX では生存確認だが、**Windows では
+    TerminateProcess になる**——CPython の os.kill は CTRL_C_EVENT 以外を
+    受け取ると、その値を終了コードにしてプロセスを終わらせる。
+    生存を確かめたつもりでゲートウェイを殺す。
+    """
+    if os_kind() == "win32":
+        proc = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+        return str(pid) in proc.stdout
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
 def gateway_pid(profile: str) -> Optional[int]:
     """素のプロセスとして走っているゲートウェイの PID。"""
     pattern = f"hermes --profile {profile} gateway run"
