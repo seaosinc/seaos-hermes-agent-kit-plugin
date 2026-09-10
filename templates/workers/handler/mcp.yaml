@@ -156,6 +156,12 @@ servers:
     connect_timeout: 60
     enabled: true
   slack:
+    # **既定は無効。** Slack の鍵は operator にしか配らない決めがあるので
+    # （ワーカーが持つと gateway 以外からも喋れる。以前そうなっていた）、
+    # この役に SLACK_BOT_TOKEN は来ない。空トークンでもサーバは繋がって
+    # 道具を出し、呼んだときだけ 400 を返す——**繋がるが呼べない状態を
+    # 既定にしない。** 鍵が配られれば `env apply` が自動で有効に戻す。
+    #
     # **読むだけ。** SLACK_MCP_ENABLED_TOOLS で履歴とチャンネル一覧に限っている。
     # 投稿しないのは能力の問題ではなく分担で、**ユーザーと話す窓口は operator ただ一つ**
     # という決めがある（operator の describe）。ここから投げると、ユーザーから見て
@@ -171,4 +177,4 @@ servers:
       SLACK_MCP_ENABLED_TOOLS: conversations_history,conversations_replies,channels_list
     timeout: 60
     connect_timeout: 60
-    enabled: true
+    enabled: false

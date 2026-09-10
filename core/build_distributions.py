@@ -23,6 +23,7 @@ Hermes には「プロファイルを git で配って更新する」公式の�
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -577,6 +578,41 @@ def copy_runtime(kit: Path, d: Path, spec: dict) -> list[str]:
         shutil.copytree(kit / "templates/workspace", d / "workspace", ignore=IGNORE)
         owned.append("workspace/")
     return owned
+
+
+_PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def mcp_env_vars(kit: Path, role: str) -> dict[str, list[str]]:
+    """その役の MCP サーバが参照している環境変数（サーバ名 -> 変数名）。
+
+    **宣言（env_requires）と突き合わせるために要る。** MCP が使う鍵を宣言し
+    忘れると、`env apply` はその鍵を配らないのに、サーバは `enabled: true` の
+    まま繋がって道具まで出す——**呼んだときだけ 400** になる。
+    handler の Slack で実際に起きた（SLACK_BOT_TOKEN の宣言漏れ）。
+    """
+    roles = {**ROLES, **worker_roles(kit)}
+    spec = roles.get(role) or {}
+    servers: dict = {}
+    for name in spec.get("mcp_shared") or []:
+        f = kit / "templates/shared/mcp" / f"{name}.yaml"
+        if f.exists():
+            servers.update(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
+    path = spec.get("mcp")
+    if path and Path(path).exists():
+        mcp = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        servers.update(mcp.get("servers", mcp) if isinstance(mcp, dict) else {})
+
+    out: dict[str, list[str]] = {}
+    for server, body in servers.items():
+        found: list[str] = []
+        for braced, bare in _PLACEHOLDER.findall(yaml.safe_dump(body, allow_unicode=True)):
+            name = braced or bare
+            if name not in found:
+                found.append(name)
+        if found:
+            out[server] = found
+    return out
 
 
 def build_manifest(name: str, spec: dict, owned: list[str]) -> dict:

@@ -161,6 +161,31 @@ def test_manifest_declares_env_and_ownership():
     assert not (OUT / "operator/.env").exists()
 
 
+def test_mcp_without_keys_ships_disabled():
+    """**鍵が来ないサーバは、既定で無効で配ること。**
+
+    空トークンでもサーバは繋がって道具の一覧まで出し、**呼んだときだけ 400**
+    を返す。役から見ると「手はあるのに毎回失敗する」状態になる。
+
+    宣言（env_requires）に無い変数を参照しているなら、その鍵は配られない。
+    そのときは `enabled: false` で出すこと——handler の Slack が該当する
+    （Slack の鍵は operator だけ、という決めがあるため配られない）。
+    鍵が配られれば `env apply` が自動で有効に戻す。
+    """
+    specs = {**bd.ROLES, **bd.worker_roles(ROOT)}
+    for role, spec in specs.items():
+        declared = {entry[0] for entry in (spec.get("env") or [])}
+        servers = ((yaml.safe_load((OUT / role / "config.yaml").read_text(encoding="utf-8"))
+                    or {}).get("mcp_servers") or {})
+        for server, needed in bd.mcp_env_vars(ROOT, role).items():
+            missing = [v for v in needed if v not in declared]
+            if not missing:
+                continue
+            state = (servers.get(server) or {}).get("enabled", True)
+            assert state is False, (
+                f"{role}/{server} は {', '.join(missing)} が配られないのに有効で出ている")
+
+
 def test_secrets_are_not_shipped():
     """生成物に秘密が紛れていないか。"""
     for path in OUT.rglob("*"):
@@ -611,6 +636,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("鍵が来ない MCP は無効で配る", test_mcp_without_keys_ships_disabled)
     check("秘密が混ざっていない", test_secrets_are_not_shipped)
     check("消した役の配布物が消える", test_stale_role_is_removed)
     check("作業部屋の役に terminal が載る", test_workspace_roles_get_terminal_block)

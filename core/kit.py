@@ -189,6 +189,14 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     result.lines.append("── 鍵を配る ──")
     result.lines.extend(applied.lines)
 
+    # **鍵の有無で MCP の有効・無効を決める。** 空トークンでもサーバは繋がり、
+    # 道具の一覧まで出す（呼んだときだけ 400）。役から見て「その手が無い」と
+    # 分かる形にする。鍵が入ったら戻す——片道にしない。
+    flipped, _disabled = env_mod.sync_mcp_enabled()
+    if flipped:
+        result.lines.append("── 使えない MCP を隠す ──")
+        result.lines.extend(flipped)
+
     if log:
         for line in result.lines:
             log(line)

@@ -107,6 +107,51 @@ def test_live_role_is_not_reported():
     assert not any("developer" in n for n in rep.notes), rep.notes
 
 
+def test_mcp_follows_the_key():
+    """**鍵が空なら無効、入れば有効。片道にしない。**
+
+    空トークンでもサーバは繋がって道具の一覧まで出し、呼んだときだけ 400 を
+    返す。役から見て「その手が無い」と分かる形にする（Notion で実際に起きた）。
+    """
+    import importlib
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        os.environ["HERMES_HOME"] = str(home)
+        d = home / "profiles" / "probe"
+        d.mkdir(parents=True)
+        (d / "config.yaml").write_text(
+            "model:\n  default: x\n"
+            "mcp_servers:\n"
+            "  thing:\n"
+            "    url: https://example.test/\n"
+            "    headers:\n"
+            "      Authorization: Bearer ${PROBE_TOKEN}\n"
+            "    enabled: true\n"
+            "# 末尾のコメントは残ること\n",
+            encoding="utf-8")
+        (d / ".env").write_text("PROBE_TOKEN=\n", encoding="utf-8")
+
+        import paths
+        import roles
+        import env as env_mod
+        importlib.reload(paths)
+        importlib.reload(roles)
+        importlib.reload(env_mod)
+        roles.names = lambda: ["probe"]
+
+        env_mod.sync_mcp_enabled()
+        body = (d / "config.yaml").read_text(encoding="utf-8")
+        assert "enabled: false" in body, "鍵が空なのに無効にならない"
+        assert "末尾のコメントは残ること" in body, "コメントが消えた"
+
+        (d / ".env").write_text("PROBE_TOKEN=abc123\n", encoding="utf-8")
+        env_mod.sync_mcp_enabled()
+        body = (d / "config.yaml").read_text(encoding="utf-8")
+        assert "enabled: true" in body, "鍵が入ったのに有効へ戻らない"
+
+
 if __name__ == "__main__":
     check("実在しないコマンドを検知する", test_missing_command_is_caught)
     check("実在するコマンドは咎めない", test_existing_command_is_not_flagged)
@@ -114,6 +159,7 @@ if __name__ == "__main__":
     check("隣の行とつなげて読まない", test_adjacent_lines_are_not_joined)
     check("現役に無い名前を挙げる", test_unknown_name_is_reported)
     check("現役の役は挙げない", test_live_role_is_not_reported)
+    check("MCP が鍵に従う", test_mcp_follows_the_key)
     print()
     if failures:
         print(f"★ {len(failures)} 件失敗")

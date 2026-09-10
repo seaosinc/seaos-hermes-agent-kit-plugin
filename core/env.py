@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import re
 import stat
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -135,3 +136,110 @@ def set_value(name: str, value: str, desc: str = "") -> None:
     lines = _upsert(lines, name, value, desc or f"{name}")
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
     _secure(path)
+
+
+# ── MCP の有効・無効を鍵に従わせる ───────────────────────────────────────
+
+# `mcp_servers:` の下は「2字下げがサーバ名」「4字下げがその設定」という形。
+_MCP_HEAD = re.compile(r"^mcp_servers:\s*$")
+_SERVER = re.compile(r"^  ([A-Za-z0-9_.-]+):\s*$")
+_ENABLED = re.compile(r"^(\s*)enabled:\s*\S+\s*$")
+_PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _referenced(block: List[str]) -> List[str]:
+    """そのサーバが参照している環境変数。`${VAR}` と `$VAR` の両方を拾う。"""
+    names: List[str] = []
+    for line in block:
+        for braced, bare in _PLACEHOLDER.findall(line):
+            name = braced or bare
+            if name not in names:
+                names.append(name)
+    return names
+
+
+def sync_mcp_enabled() -> Tuple[List[str], List[str]]:
+    """**鍵が空の MCP を `enabled: false` にする。**
+
+    空トークンでもサーバは起動して接続に成功し、道具の一覧まで出す。**呼んだ
+    ときだけ 400 を返す**ので、役から見ると「手はあるのに毎回失敗する」状態に
+    なる（Notion で実際に起きた）。使えない道具は見せないほうが正しい——
+    役から見て**その手が無い**と分かる形にする。
+
+    鍵が入ったら戻す。**片道にしない。**
+
+    返すのは (変えた行の説明, いま無効なもの)。
+    """
+    changed: List[str] = []
+    disabled: List[str] = []
+
+    for name in roles.names():
+        cfg = profile_dir(name) / "config.yaml"
+        if not cfg.is_file():
+            continue
+        env = read_env(profile_dir(name) / ".env")
+        lines = cfg.read_text(encoding="utf-8").splitlines()
+
+        # サーバごとの行の範囲を採る
+        blocks: List[Tuple[str, int, int]] = []
+        inside = False
+        server = None
+        start = 0
+        for index, line in enumerate(lines):
+            if _MCP_HEAD.match(line):
+                inside = True
+                continue
+            if not inside:
+                continue
+            # 字下げが戻ったら mcp_servers の外
+            if line.strip() and not line.startswith("  "):
+                if server:
+                    blocks.append((server, start, index))
+                    server = None
+                inside = False
+                continue
+            match = _SERVER.match(line)
+            if match:
+                if server:
+                    blocks.append((server, start, index))
+                server, start = match.group(1), index + 1
+        if server:
+            blocks.append((server, start, len(lines)))
+
+        edited = False
+        for server_name, begin, end in reversed(blocks):
+            block = lines[begin:end]
+            missing = [v for v in _referenced(block) if not env.get(v)]
+            want = not missing
+            where = next((i for i, l in enumerate(block) if _ENABLED.match(l)), None)
+
+            if where is None:
+                # 宣言が無いサーバ。**無効にするときだけ書き足す**
+                # （既定は有効なので、有効化のために書く必要は無い）。
+                if want:
+                    continue
+                indent = next((l[:len(l) - len(l.lstrip())] for l in block if l.strip()), "    ")
+                lines.insert(end, f"{indent}enabled: false")
+                edited = True
+                changed.append(f"{name}/{server_name} を無効にした（{', '.join(missing)} が空）")
+                disabled.append(f"{name}/{server_name}")
+                continue
+
+            now = "true" in block[where]
+            if now == want:
+                if not want:
+                    disabled.append(f"{name}/{server_name}")
+                continue
+            indent = _ENABLED.match(block[where]).group(1)
+            lines[begin + where] = f"{indent}enabled: {'true' if want else 'false'}"
+            edited = True
+            if want:
+                changed.append(f"{name}/{server_name} を有効にした（鍵が入った）")
+            else:
+                changed.append(f"{name}/{server_name} を無効にした（{', '.join(missing)} が空）")
+                disabled.append(f"{name}/{server_name}")
+
+        if edited:
+            cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    return changed, disabled
