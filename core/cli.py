@@ -86,6 +86,9 @@ def main(argv: list[str] | None = None) -> int:
                       help="外すスキル（繰り返し可）")
     wshow = wsub.add_parser("show", help="1体の詳細")
     wshow.add_argument("name")
+    wsh = wsub.add_parser("share", help="この環境で作った役を、キットへ取り込む PR にする")
+    wsh.add_argument("name")
+
     wrm = wsub.add_parser("rm", help="削除")
     wrm.add_argument("name")
     wrm.add_argument("--keep-profile", action="store_true", help="プロファイルは残す")
@@ -205,6 +208,10 @@ def main(argv: list[str] | None = None) -> int:
             if changed:
                 _print("反映するには update を実行する")
             return 0
+
+        if args.wcmd == "share":
+            out = worker_mod.share(args.name, log=_print)
+            return 0 if out.get("url") else 1
 
         if args.wcmd == "show":
             for key, value in worker_mod.show(args.name).items():

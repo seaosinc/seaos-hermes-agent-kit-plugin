@@ -46,6 +46,8 @@ def list_roles() -> List[Dict]:
                 "name": name,
                 "installed": profile_dir(name).is_dir(),
                 "summary": roles.summary(name),
+                # 配られてきた役か、この環境で作った役か。後者は git に入らない
+                "origin": roles.origin(name),
             }
         )
     return out
@@ -222,6 +224,28 @@ def set_secret(body: SecretIn) -> Dict:
 
 class UpdateIn(BaseModel):
     forceConfig: bool = False
+
+
+class ShareIn(BaseModel):
+    name: str
+
+
+@router.post("/share")
+def share_role(body: ShareIn) -> Dict:
+    """この環境で作った役を、キットへ取り込む PR にする。
+
+    **プラグインのフォルダではコミットしない**（`plugins update` は `--ff-only` なので、
+    ローカルのコミットが1つでもあると更新そのものが止まる）。一時的に clone する。
+    """
+    import worker as worker_mod
+
+    if roles.origin(body.name) != "local":
+        raise HTTPException(status_code=400, detail="配布物として入っている役は共有済みです")
+    try:
+        out = worker_mod.share(body.name)
+    except Exception as exc:  # noqa: BLE001  （原因をそのまま画面へ出す）
+        raise HTTPException(status_code=500, detail=str(exc))
+    return out
 
 
 @router.post("/update")

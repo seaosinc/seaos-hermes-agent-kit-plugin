@@ -235,7 +235,31 @@ export default function create(deps) {
       }
     }, [ctx, load])
 
-    const selfUpdate = useCallback(async () => {
+    // **キットへ取り込む PR を出す。** この環境で作った役は git に入らないので、
+  // 共有しないと機械が飛べば消える。取り込まれたらこの環境のコピーは消すこと
+  // ——残すと配布物より優先され続け、以後の更新が効かない。
+  const shareRole = useCallback(
+    async (name) => {
+      setBusy(true)
+      setError('')
+      setNotice('')
+      try {
+        const res = await call(ctx, '/share', { method: 'POST', body: { name }, timeoutMs: 120000 })
+        setNotice(
+          res.url
+            ? `${name} の取り込みを依頼しました: ${res.url}`
+            : `${name} の取り込みを依頼しました。`
+        )
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [ctx]
+  )
+
+  const selfUpdate = useCallback(async () => {
       setBusy(true)
       setError('')
       setNotice('')
@@ -353,13 +377,38 @@ export default function create(deps) {
                   jsxs('div', {
                     className: 'min-w-0 flex-1',
                     children: [
-                      jsx('div', { className: 'text-sm', children: r.name }),
+                      jsxs('div', {
+                        className: 'flex items-center gap-2 text-sm',
+                        children: [
+                          r.name,
+                          // **この環境で作った役は、git に入らない。** 機械が飛べば
+                          // 消えるので、見て分かるようにしておく。
+                          r.origin === 'local'
+                            ? jsx('span', {
+                                className: 'shrink-0 rounded px-1.5 py-0.5 text-[0.625rem]',
+                                style: { border: BORDER, opacity: 0.7 },
+                                children: 'この環境'
+                              })
+                            : null
+                        ]
+                      }),
                       jsx('div', {
                         className: 'truncate text-xs opacity-60',
                         children: r.summary || ''
                       })
                     ]
                   }),
+                  // **共有はこの環境の役だけ。** 配布物は既に入っている。
+                  r.origin === 'local'
+                    ? jsx('button', {
+                        type: 'button',
+                        disabled: busy,
+                        onClick: () => shareRole(r.name),
+                        className: 'shrink-0 text-xs hover:underline disabled:opacity-40',
+                        style: { color: ACCENT },
+                        children: '共有'
+                      })
+                    : null,
                   jsx('span', {
                     className: 'shrink-0 text-xs ' + (r.installed ? MUTED : ''),
                     style: r.installed ? null : { color: WARN },

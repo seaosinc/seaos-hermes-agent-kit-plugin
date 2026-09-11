@@ -59,6 +59,14 @@ def summary(name: str) -> str:
     return (head + "。") if head and len(head) < len(described) else described[:40]
 
 
+def origin(name: str) -> str:
+    """その役の出自。`"shipped"`（配られてきた）か `"local"`（この環境で作った）。
+
+    固定役は配布物の一部なので常に shipped。
+    """
+    return str((all_specs().get(name) or {}).get("origin") or "shipped")
+
+
 def env_requirements(name: str) -> List[Tuple[str, bool, str]]:
     """その役が宣言した (変数名, 必須か, 説明)。"""
     spec = all_specs().get(name) or {}

@@ -14,10 +14,12 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import tempfile
+import subprocess
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import yaml
 
@@ -360,6 +362,90 @@ def update_worker(
     if not changed:
         raise WorkerError("変更するものが無い（desc / model / extra / soul / skill / mcp / env）")
     return changed
+
+
+def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
+    """この環境で作った役を、キットへ取り込む PR にする。
+
+    **プラグインのフォルダではコミットしない。** `hermes plugins update` は
+    `git pull --ff-only` なので、ローカルのコミットが1つでもあると**更新そのものが
+    止まる**。一時的に clone して、そこで枝を切る。
+
+    PR が通ったら、この環境のコピーは消すこと（`worker rm --keep-profile`）。
+    残しておくと配布物より優先され続け、以後の更新が効かなくなる。
+    """
+    say = log or (lambda _l: None)
+    d = workers_root() / name
+    if not d.is_dir():
+        shipped = shipped_root() / name
+        if shipped.is_dir():
+            raise WorkerError(f"{name} は配布物として入っている（共有済み）")
+        raise WorkerError(f"この環境に無い: {name}")
+
+    for tool in ("git", "gh"):
+        if not shutil.which(tool):
+            raise WorkerError(f"{tool} が見つからない（PR を出すのに要る）")
+
+    code, origin = hermes.run(["--version"])  # noqa: F841  （hermes の有無は無関係）
+    proc = subprocess.run(["git", "-C", str(kit_root()), "remote", "get-url", "origin"],
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    if proc.returncode != 0 or not proc.stdout.strip():
+        raise WorkerError("キットのリモートが分からない（git から入れていない）")
+    url = proc.stdout.strip()
+
+    branch = f"worker/{name}"
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp) / "kit"
+        say(f"取ってくる: {url}")
+        if subprocess.run(["git", "clone", "--depth", "1", url, str(work)],
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL).returncode != 0:
+            raise WorkerError("clone できなかった")
+
+        dest = work / "templates" / "workers" / name
+        if dest.exists():
+            raise WorkerError(f"{name} は既にキットにある（`worker set` で直すこと）")
+        shutil.copytree(d, dest, ignore=shutil.ignore_patterns("__pycache__"))
+
+        def git(*args: str) -> subprocess.CompletedProcess:
+            return subprocess.run(["git", "-C", str(work), *args],
+                                  capture_output=True, text=True, stdin=subprocess.DEVNULL)
+
+        git("switch", "-c", branch)
+        git("add", "-A")
+        summary = ""
+        prof = dest / "profile.yaml"
+        if prof.is_file():
+            summary = str((yaml.safe_load(prof.read_text(encoding="utf-8")) or {}).get("summary") or "")
+        title = f"役を足す: {name}"
+        body = (f"`{name}` をこの環境で作って動かしている。キットへ取り込みたい。\n\n"
+                f"{summary}\n\n"
+                "---\n"
+                "`seaos-kit worker share` が出した PR。**取り込んだら、作った環境側の\n"
+                "コピーを消すこと**（`seaos-kit worker rm <役> --keep-profile`）——\n"
+                "残すと配布物より優先され続け、以後の更新が効かない。\n")
+        if git("commit", "-m", f"{title}\n\n{summary}").returncode != 0:
+            raise WorkerError("コミットできなかった")
+        if git("push", "-u", "origin", branch).returncode != 0:
+            raise WorkerError(f"push できなかった（枝 {branch} が既にあるかもしれない）")
+
+        pr = subprocess.run(["gh", "pr", "create", "--title", title, "--body", body,
+                             "--head", branch, "--repo", _repo_slug(url)],
+                            cwd=str(work), capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if pr.returncode != 0:
+            raise WorkerError(f"PR を作れなかった: {(pr.stdout + pr.stderr).strip()[:200]}")
+        link = pr.stdout.strip().splitlines()[-1] if pr.stdout.strip() else ""
+
+    say(f"PR を出した: {link}")
+    say("取り込まれたら、この環境のコピーを消すこと（worker rm --keep-profile）")
+    return {"name": name, "branch": branch, "url": link}
+
+
+def _repo_slug(url: str) -> str:
+    """`git@github.com:owner/repo.git` / `https://github.com/owner/repo` -> `owner/repo`"""
+    text = url.strip().removesuffix(".git")
+    if text.startswith("git@"):
+        return text.split(":", 1)[-1]
+    return "/".join(text.split("/")[-2:])
 
 
 def busy_cards(name: str) -> int:

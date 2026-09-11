@@ -294,6 +294,9 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             # **フォルダの場所を持ち回る。** 配られてきた役はキットの中、
             # ここで作った役はキットの外にあるので、名前からは導けない。
             "dir": d,
+            # **配られてきたのか、この環境で作ったのか。** 触る前に区別が要る
+            # ——前者は更新で上書きされ、後者は git に入らないので機械が飛べば消える。
+            "origin": "shipped" if d.parent == (kit / "templates" / "workers") else "local",
             "own_skills": d / "skills",
             "worker": True,
             "no_delegation": True,
