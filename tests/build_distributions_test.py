@@ -14,6 +14,7 @@ enabled になっていなかった、役を消しても配布物が残った。
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -159,6 +160,48 @@ def test_manifest_declares_env_and_ownership():
         assert f"skills/{name}" in owned, (name, owned)
     # .env は配布物に含めない（公式が除外するが、こちらでも作らない）
     assert not (OUT / "operator/.env").exists()
+
+
+def test_local_roles_live_outside_the_kit():
+    """**この環境で作った役は、キットの外に置く。**
+
+    キットの中（`templates/workers/`）に作ると配布のたびに危うい——
+    `hermes plugins update` は untracked も stash して戻すので、同じパスに
+    配布物が来れば衝突して stash に取り残される。`plugins install --force` なら
+    フォルダごと置き換わって消える。
+
+    生成器は両方を見て、同じ名前ならローカルを採る（配布物で黙って上書きすると、
+    この環境で育てた役が理由も分からず別物に入れ替わる）。
+    """
+    import sys as _sys
+    import tempfile
+
+    _sys.path.insert(0, str(ROOT / "core"))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        old = os.environ.get("HERMES_HOME")
+        os.environ["HERMES_HOME"] = str(home)
+        try:
+            local = home / "seaos-kit" / "workers" / "probe-x"
+            local.mkdir(parents=True)
+            (local / "profile.yaml").write_text(
+                "name: probe-x\ndescription: 確認用\nsummary: 確認用の役\n", encoding="utf-8")
+            (local / "SOUL.md").write_text(
+                "あなたの名前は **{{NAME}}** である。\n\n{{WORKER_BASE}}\n\n{{EXTRA}}\n",
+                encoding="utf-8")
+
+            dirs = [d.name for d in bd.worker_dirs(ROOT)]
+            assert "probe-x" in dirs, dirs
+            roles = bd.worker_roles(ROOT)
+            assert roles["probe-x"]["dir"] == local, roles["probe-x"].get("dir")
+            # キットの中には作られていないこと
+            assert not (ROOT / "templates" / "workers" / "probe-x").exists()
+        finally:
+            if old is None:
+                os.environ.pop("HERMES_HOME", None)
+            else:
+                os.environ["HERMES_HOME"] = old
 
 
 def test_worker_keys_are_optional_by_default():
@@ -711,6 +754,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("この環境の役はキットの外に置かれる", test_local_roles_live_outside_the_kit)
     check("ワーカーの鍵は既定で任意", test_worker_keys_are_optional_by_default)
     check("全役に人が読む一行がある", test_every_role_has_a_human_summary)
     check("版が git から採られている", test_version_is_derived_from_git)

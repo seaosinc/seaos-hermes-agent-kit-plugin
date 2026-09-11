@@ -22,6 +22,20 @@ def hermes_home() -> Path:
     return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
 
 
+def local_workers_dir() -> Path:
+    """**この環境で作った役の置き場。** キットの外に出してある。
+
+    recruiter が作る役をキットの中（`templates/workers/`）に置くと、配布の
+    たびに危うい。`hermes plugins update` は untracked も stash して戻すので
+    （`stash push --include-untracked`）、同じパスに配布物が来れば衝突して
+    stash に取り残される。`hermes plugins install --force` ならフォルダごと
+    置き換わって消える。
+
+    **配られてくる役と、ここで作った役を、物理的に分ける。**
+    """
+    return hermes_home() / "seaos-kit" / "workers"
+
+
 def profiles_dir() -> Path:
     return hermes_home() / "profiles"
 

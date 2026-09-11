@@ -170,10 +170,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "worker":
         if args.wcmd == "list":
-            print(f"{'NAME':<20} {'MODEL':<24} {'DEPLOYED':<10} DESCRIPTION")
+            print(f"{'NAME':<20} {'ORIGIN':<9} {'MODEL':<24} {'DEPLOYED':<10} DESCRIPTION")
             for r in worker_mod.listing():
                 mark = "yes" if r["deployed"] else "-"
-                print(f"{r['name']:<20} {r['model']:<24} {mark:<10} {r['description'][:44]}")
+                origin = "この環境" if r["origin"] == "local" else "配布"
+                print(f"{r['name']:<20} {origin:<9} {r['model']:<24} {mark:<10} {r['description'][:36]}")
             return 0
         if args.wcmd in ("new", "set"):
             def _pairs(items):

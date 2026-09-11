@@ -250,14 +250,37 @@ ROLES: dict[str, dict] = {
 }
 
 
+def local_workers_root() -> Path:
+    """この環境で作った役の置き場。**キットの外。**（core/paths.py と同じ規則）"""
+    home = os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes")
+    return Path(home) / "seaos-kit" / "workers"
+
+
+def worker_dirs(kit: Path) -> list[Path]:
+    """業務別ワーカーのフォルダ。**配られてきたものと、ここで作ったものの両方。**
+
+    `_` で始まるものは雛形なので配らない。「何でもやる役」は役割の不在で、
+    不在だとモデルも道具も作業環境も選べない——本番に置くと構成が全部曖昧になる。
+
+    **同じ名前があればローカルを採る。** 配布物で黙って上書きすると、この環境で
+    育てた役が理由も分からず別物に入れ替わる。どちらを使っているかは doctor が言う。
+    """
+    seen: dict[str, Path] = {}
+    for root in (kit / "templates" / "workers", local_workers_root()):
+        if not root.is_dir():
+            continue
+        for d in sorted(p for p in root.glob("*") if p.is_dir() and not p.name.startswith("_")):
+            seen[d.name] = d          # 後に見たほう（ローカル）が勝つ
+    return [seen[k] for k in sorted(seen)]
+
+
 def worker_roles(kit: Path) -> dict[str, dict]:
     """業務別ワーカーは templates/workers/ から拾う。"""
     out = {}
     # **`_` で始まるものは雛形。** 役として配らない。
     # 「何でもやる役」は役割の不在で、不在だとモデルも道具も作業環境も選べない
     # ——本番に置くと構成が全部曖昧になる。雛形としてだけ残す。
-    for d in sorted(p for p in (kit / "templates/workers").glob("*")
-                    if p.is_dir() and not p.name.startswith("_")):
+    for d in worker_dirs(kit):
         prof = yaml.safe_load((d / "profile.yaml").read_text(encoding="utf-8")) or {}
         out[d.name] = {
             "model": prof.get("model") or FAST,
@@ -268,6 +291,9 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             "skills": (["kanban-collaboration", "delegate-to-cli-agents",
                         "workspace-workflow"]
                        if prof.get("implements", True) else ["kanban-collaboration"]),
+            # **フォルダの場所を持ち回る。** 配られてきた役はキットの中、
+            # ここで作った役はキットの外にあるので、名前からは導けない。
+            "dir": d,
             "own_skills": d / "skills",
             "worker": True,
             "no_delegation": True,
@@ -307,8 +333,10 @@ def worker_roles(kit: Path) -> dict[str, dict]:
 def build_soul(kit: Path, name: str, spec: dict) -> str:
     """役の SOUL に共通ブロックを差し込む。"""
     if spec.get("worker"):
-        src = kit / "templates/workers" / name / "SOUL.md"
+        src = Path(spec.get("dir") or (kit / "templates/workers" / name)) / "SOUL.md"
+
         def _block(fname: str) -> str:
+            # 共通ブロックは**配布側にしか無い**（雛形なので配られてくる）
             text = (kit / "templates/workers" / fname).read_text(encoding="utf-8")
             # コメント行（雛形の説明）は配布物には要らない
             return text.split("-->", 1)[-1].strip()

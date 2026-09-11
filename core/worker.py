@@ -22,7 +22,7 @@ from typing import Dict, List, Optional
 import yaml
 
 import hermes
-from paths import hermes_home, kit_root, profile_dir
+from paths import hermes_home, kit_root, local_workers_dir, profile_dir
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 
@@ -32,11 +32,27 @@ class WorkerError(RuntimeError):
 
 
 def workers_root() -> Path:
+    """**新しい役を作る場所。** キットの外に置く。
+
+    キットの中（`templates/workers/`）に作ると、配布のたびに危うい——更新は
+    untracked も stash して戻すので衝突すれば取り残され、`install --force` なら
+    フォルダごと消える。**配られてくる役と、ここで作った役を分ける。**
+    """
+    return local_workers_dir()
+
+
+def shipped_root() -> Path:
+    """配布物として配られてくる役。**ここは触らない**（更新で上書きされる）。"""
     return kit_root() / "templates" / "workers"
 
 
 def worker_dir(name: str) -> Path:
-    return workers_root() / name
+    """その役のフォルダ。**ローカルを先に見る**（同名なら生成器もローカルを採る）。"""
+    local = workers_root() / name
+    if local.is_dir():
+        return local
+    shipped = shipped_root() / name
+    return shipped if shipped.is_dir() else local
 
 
 # ── SOUL の検査 ───────────────────────────────────────────────────────────
@@ -184,14 +200,18 @@ def new(
     if not desc:
         raise WorkerError("--desc が要る。decomposer はこれを読んで担当を決めるので、空だと仕事が来ない")
 
-    src, dst = worker_dir(source), worker_dir(name)
+    # **雛形は配布側から取り、作る先はローカル。** 下敷きに既存の役を指したときも
+    # worker_dir が両方を見るので、配られた役からも複製できる。
+    src, dst = worker_dir(source), workers_root() / name
+    if not src.is_dir() and source == "_template":
+        src = shipped_root() / "_template"
     if not src.is_dir():
         raise WorkerError(f"雛形が無い: {src}")
     if dst.exists():
         raise WorkerError(f"既に存在する: {name}（変更は worker set、削除は worker rm）")
 
     # **検証はディレクトリを作る前に済ませる。** 途中で失敗すると中途半端な
-    # ワーカーが templates/ に残り、update がそれを配ってしまう。
+    # ワーカーが残り、update がそれを配ってしまう。
     if soul is not None:
         check_soul(soul)
     for sk in skills or []:
@@ -233,17 +253,24 @@ def new(
 
 
 def listing() -> List[Dict]:
+    """業務別ワーカーの一覧。**配られてきたものと、ここで作ったものの両方。**"""
     rows: List[Dict] = []
-    root = workers_root()
-    if not root.is_dir():
-        return rows
-    for d in sorted(p for p in root.glob("*") if p.is_dir()):
+    seen: Dict[str, Path] = {}
+    for root in (shipped_root(), workers_root()):
+        if not root.is_dir():
+            continue
+        for d in sorted(p for p in root.glob("*") if p.is_dir() and not p.name.startswith("_")):
+            seen[d.name] = d
+    for d in [seen[k] for k in sorted(seen)]:
         prof: Dict = {}
         pf = d / "profile.yaml"
         if pf.is_file():
             prof = yaml.safe_load(pf.read_text(encoding="utf-8")) or {}
         rows.append(
             {
+                # **どちらの出自か。** 配られてくるものは更新で上書きされ、
+                # ここで作ったものは残る。触る前に区別が要る。
+                "origin": "local" if d.parent == workers_root() else "shipped",
                 "name": d.name,
                 "model": prof.get("model") or "",
                 "deployed": profile_dir(d.name).is_dir(),
