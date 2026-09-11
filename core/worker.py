@@ -371,6 +371,14 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
     `git pull --ff-only` なので、ローカルのコミットが1つでもあると**更新そのものが
     止まる**。一時的に clone して、そこで枝を切る。
 
+    **worktree ではなく clone。** プラグインのチェックアウトは shallow で
+    （`hermes plugins install` が浅く取る。実測でコミット3つ）、worktree は
+    そのリポジトリを共有するので**浅いまま push することになる**——拒まれるか、
+    通っても履歴の欠けた状態を押し込む。加えて worktree は生きているリポジトリの
+    `.git` に枝と登録を足す。ここは `--ff-only` で更新が通る前提の場所なので、
+    触らずに済ませる。代償はネットワークと数百 KB（`.git` は 544K）で、
+    共有は稀な操作なので釣り合う。
+
     PR が通ったら、この環境のコピーは消すこと（`worker rm --keep-profile`）。
     残しておくと配布物より優先され続け、以後の更新が効かなくなる。
     """
