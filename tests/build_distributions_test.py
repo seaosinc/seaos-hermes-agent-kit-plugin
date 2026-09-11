@@ -161,6 +161,26 @@ def test_manifest_declares_env_and_ownership():
     assert not (OUT / "operator/.env").exists()
 
 
+def test_every_role_has_a_human_summary():
+    """**設定画面に出る一行は、役が自分で名乗る。**
+
+    以前は API 側にベタ書きの表があり、**新しい役はそこに載っていない**ので
+    describe（decomposer 向けの長文）を40字で切って出していた——文の途中で
+    切れて読めなかった。表を配置表へ移し、ワーカーは profile.yaml に書く。
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(ROOT / "core"))
+    import roles as roles_mod
+
+    specs = {**bd.ROLES, **bd.worker_roles(ROOT)}
+    for role in specs:
+        text = (specs[role].get("summary") or "").strip()
+        assert text, f"{role} に summary が無い"
+        assert len(text) <= 40, f"{role} の summary が長い（{len(text)}字）: {text}"
+        # 途中で切れていないこと
+        assert not text.endswith("…"), role
+
+
 def test_version_is_derived_from_git():
     """**版は固定値にしない。** 固定だと「更新が届いたのか」を判定できない。
 
@@ -669,6 +689,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("全役に人が読む一行がある", test_every_role_has_a_human_summary)
     check("版が git から採られている", test_version_is_derived_from_git)
     check("必須は本当に必須なものだけ", test_only_truly_required_keys_are_required)
     check("鍵が来ない MCP は無効で配る", test_mcp_without_keys_ships_disabled)

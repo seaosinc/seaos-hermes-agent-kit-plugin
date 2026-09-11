@@ -164,6 +164,7 @@ def new(
     name: str,
     *,
     desc: str,
+    summary: str = "",
     model: str = "",
     extra: str = "",
     soul: Optional[Path] = None,
@@ -204,6 +205,8 @@ def new(
     profile = dst / "profile.yaml"
     _set_scalar(profile, "name", name)
     _set_description(profile, desc)
+    if summary:
+        _set_scalar(profile, "summary", summary)
     if model:
         _set_scalar(profile, "model", model)
     if extra:
@@ -269,6 +272,7 @@ def update_worker(
     name: str,
     *,
     desc: Optional[str] = None,
+    summary: Optional[str] = None,
     model: Optional[str] = None,
     extra: Optional[str] = None,
     soul: Optional[Path] = None,
@@ -286,6 +290,9 @@ def update_worker(
     if desc is not None:
         _set_description(profile, desc)
         changed.append("description")
+    if summary is not None:
+        _set_scalar(profile, "summary", summary)
+        changed.append("summary")
     if model is not None:
         _set_scalar(profile, "model", model)
         changed.append("model")

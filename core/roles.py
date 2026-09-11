@@ -42,6 +42,23 @@ def describe(name: str) -> str:
     return " ".join(str(spec.get("describe") or spec.get("desc") or "").split())
 
 
+def summary(name: str) -> str:
+    """人が読む一行。**設定画面の一覧に出る。**
+
+    `describe` は decomposer 向けの長文なので、そのまま出すと切れて読めない。
+    役が自分で名乗るのが筋なので、配置表と profile.yaml の `summary` を正とする。
+    無ければ `describe` の最初の一文で代用する——**新しい役が無名のまま
+    並ぶよりはましだが、書いてあるに越したことはない。**
+    """
+    spec = all_specs().get(name) or {}
+    text = str(spec.get("summary") or "").strip()
+    if text:
+        return text
+    described = describe(name)
+    head = described.split("。")[0]
+    return (head + "。") if head and len(head) < len(described) else described[:40]
+
+
 def env_requirements(name: str) -> List[Tuple[str, bool, str]]:
     """その役が宣言した (変数名, 必須か, 説明)。"""
     spec = all_specs().get(name) or {}

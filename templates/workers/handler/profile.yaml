@@ -14,6 +14,9 @@ name: handler
 description: >-
   外部サービスを読み書きする役。Notion、GitHub、Backlog、Slack、Web、各種 API から事実と出典をまとめ、指示された更新（課題の状態変更、コメントの追記、チケットの起票）を反映する。GitHub PRでは本体、通常レビュー本文、inline review comment、review threadと解決済み／未解決状態を別々に確認し、取得できないカテゴリは根拠付きで明記する。コードの変更、push、PR のマージ、Slack への投稿は扱わない。例:「PRのレビュー指摘と解決状態を確認する」「完了した課題のステータスを更新する」。完了条件が『外部サービスで確認できた／反映された』で終わるカードはここへ。リポジトリ内だけで完結する調査と実装は扱わない。
 
+# **人が読む一行。** 設定画面の一覧に出る（description は decomposer 向けの長文）。
+summary: "外部サービスの読み書き（GitHub / Backlog ほか）"
+
 # 出典を突き合わせて要約する仕事なので、速さより読解を採る。
 model: "openai/gpt-5.6-sol"
 

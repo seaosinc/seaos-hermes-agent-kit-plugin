@@ -36,20 +36,6 @@ router = APIRouter()
 
 # ── 読み取り ──────────────────────────────────────────────────────────────
 
-# 役の一行説明。**describe は decomposer 向けの長文**なので画面には出さない
-# （「〜してはならない」のような機械向けの指示が混ざる）。人が読む用に短く持つ。
-_SUMMARY = {
-    "operator": "ユーザーとの窓口。依頼を受けて結果を報告する",
-    "fixer": "詰まりを解決し、完了を判定する",
-    "broker": "外部エージェントとの連携",
-    "avatar": "画面を操作する（人が呼んだときだけ動く）",
-    "developer": "実装・検証・PR 作成",
-    "senior-developer": "難度の高い実装。セキュリティと品質も見る",
-    "handler": "外部サービスの読み書き（GitHub / Backlog / Notion / Slack）",
-    "recruiter": "エージェントそのものを新設・改修する",
-}
-
-
 @router.get("/roles")
 def list_roles() -> List[Dict]:
     """役の一覧。導入済みかどうかと、人が読む一行説明を返す。"""
@@ -59,7 +45,7 @@ def list_roles() -> List[Dict]:
             {
                 "name": name,
                 "installed": profile_dir(name).is_dir(),
-                "summary": _SUMMARY.get(name, roles.describe(name)[:40]),
+                "summary": roles.summary(name),
             }
         )
     return out

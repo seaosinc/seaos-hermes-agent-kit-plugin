@@ -65,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("name")
         sp.add_argument("--desc", required=required_desc,
                         help="decomposer が読む説明。**担当の割り振りはこれで決まる**")
+        sp.add_argument("--summary", help="人が読む一行。**設定画面の一覧に出る**")
         sp.add_argument("--model", help="使うモデル")
         sp.add_argument("--extra", help="profile.yaml に足す YAML 片")
         sp.add_argument("--soul", type=Path, help="SOUL.md のもと")
@@ -186,7 +187,8 @@ def main(argv: list[str] | None = None) -> int:
 
             if args.wcmd == "new":
                 res = worker_mod.new(
-                    args.name, desc=args.desc, model=args.model or "", extra=args.extra or "",
+                    args.name, desc=args.desc, summary=args.summary or "",
+                    model=args.model or "", extra=args.extra or "",
                     soul=args.soul, source=args.source, skills=args.skill,
                     mcps=_pairs(args.mcp), envs=_pairs(args.env))
                 _print(f"{args.name} を作った: {res.path}")
@@ -194,7 +196,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
 
             changed = worker_mod.update_worker(
-                args.name, desc=args.desc, model=args.model, extra=args.extra,
+                args.name, desc=args.desc, summary=args.summary, model=args.model,
+                extra=args.extra,
                 soul=args.soul, add_skills=args.skill, rm_skills=args.rm_skill,
                 mcps=_pairs(args.mcp), envs=_pairs(args.env))
             _print(f"{args.name}: {', '.join(changed) if changed else '変更なし'}")

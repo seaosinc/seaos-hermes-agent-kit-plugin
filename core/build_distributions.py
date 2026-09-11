@@ -132,6 +132,7 @@ ROLES: dict[str, dict] = {
             ("SLACK_HOME_CHANNEL", "既定の投稿先チャンネル", False),
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
         ],
+        "summary": "ユーザーとの窓口。依頼を受けて結果を報告する",
         "desc": "ユーザーと話す唯一の窓口。依頼をカードにして triage に置き、結果をユーザーが判断できる形で報告する。長い複数テーマの報告は意味のまとまりを保った連続投稿に分け、短文や単一テーマは分割しない。",
         "describe": ("ユーザーとの対話専用の窓口。Slack で依頼を受けてカードを作り、"
                      "結果をユーザーが判断できる形で報告する。長い複数テーマの報告は意味のまとまりを保った"
@@ -147,6 +148,7 @@ ROLES: dict[str, dict] = {
         # 決める責任が、引く役と同じところにある必要がある。
         "memory": True,
         "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "summary": "詰まりを解決し、完了を判定する",
         "desc": "止まったカードを動かして去る。依存の整理、詰まりの解決、完了判定。",
         "describe": ("止まったカードを動かす役。依存を整理し、詰まりを解き、"
                      "終わったものの完了を判定する。道具が足りずに止まっているなら、"
@@ -160,6 +162,7 @@ ROLES: dict[str, dict] = {
         "no_delegation": True,
         "plugins": ["a2a-platform"],
         "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "summary": "外部エージェントとの連携",
         "desc": "A2A を通じて他のエージェントと連携し、依頼と成果を伝達する役。実装は developer に任せる。",
         "describe": "A2A でエージェントを発見・呼び出し、成果を検証してカードに記録する。リポジトリの実装は developer が担当する。",
     },
@@ -179,6 +182,7 @@ ROLES: dict[str, dict] = {
         "workspace": False,
         "skills": [],
         "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "summary": "画面を操作する（人が呼んだときだけ動く）",
         "desc": "人間が明示的に呼んだときだけ動く、GUI 操作専用の実行役。CLI や API では代替できない画面操作だけを担当する。",
         "describe": ("人間の分身として画面を操作する役。クリック・キー入力・スクリーンショット。"
                      "**kanban の自動振り分け先に選んではならない**——このプロファイルに"
@@ -198,6 +202,7 @@ ROLES: dict[str, dict] = {
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
         ],
+        "summary": "実装・検証・PR 作成。CI とレビュー指摘の解消まで",
         "desc": "リポジトリを clone して実装・検証・push・PR 作成、CI とレビュー指摘の解消まで担う開発役。A2A 連携そのものは扱わない。",
         "describe": ("コードを書く開発役。使い捨ての作業部屋で clone し、重い実装は "
                      "opencode に委譲して差分を検証し、push して PR を出す。**PR を出して終わりではなく、CI が緑になり、レビューの指摘が残っていない状態まで見届ける**（人の承認そのものは待たない）。"
@@ -231,6 +236,7 @@ ROLES: dict[str, dict] = {
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
         ],
+        "summary": "難度の高い実装。セキュリティと品質も見る",
         "desc": "developer の上位版。実装に加えてセキュリティとコード品質まで見る。設計判断を伴うもの、developer が詰まったものを引き取る。A2A 連携そのものは扱わない。",
         "describe": ("developer と同じ開発役で、実装に加えて**セキュリティとコード品質まで見る**版。"
                      "**難度ではなく根拠で選ぶ**——「難しそう」では選ばない（単価が高い）。"
@@ -280,6 +286,9 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             # コマンドを打つ経路そのものを持たないほうが堅い。
             "shell": prof.get("shell", True),
             "extra": prof.get("extra", ""),
+            # **人が読む一行。** 設定画面の一覧に出る。無ければ description の
+            # 最初の一文で代用する——decomposer 向けの長文をそのまま出すと切れる。
+            "summary": " ".join((prof.get("summary") or "").split()),
             "desc": " ".join((prof.get("description") or "").split()),
             "describe": " ".join((prof.get("description") or "").split()),
             "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)]
