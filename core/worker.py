@@ -371,13 +371,14 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
     `git pull --ff-only` なので、ローカルのコミットが1つでもあると**更新そのものが
     止まる**。一時的に clone して、そこで枝を切る。
 
-    **worktree ではなく clone。** プラグインのチェックアウトは shallow で
-    （`hermes plugins install` が浅く取る。実測でコミット3つ）、worktree は
-    そのリポジトリを共有するので**浅いまま push することになる**——拒まれるか、
-    通っても履歴の欠けた状態を押し込む。加えて worktree は生きているリポジトリの
-    `.git` に枝と登録を足す。ここは `--ff-only` で更新が通る前提の場所なので、
-    触らずに済ませる。代償はネットワークと数百 KB（`.git` は 544K）で、
-    共有は稀な操作なので釣り合う。
+    **worktree を使う。** 取ってくる必要がなく、オフラインでも通る。
+
+    HEAD は動かないので `--ff-only` の更新は止まらない。**必ず後片付けする**
+    ——残すと `.git` にワークツリーの登録が居座る。
+
+    （浅いクローンからは push できないと考えて clone にしていたが、実測すると
+    通った。新しいコミットの**親をリモートが既に持っている**ので、浅さは
+    関係ない。）
 
     PR が通ったら、この環境のコピーは消すこと（`worker rm --keep-profile`）。
     残しておくと配布物より優先され続け、以後の更新が効かなくなる。
@@ -402,12 +403,20 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
     url = proc.stdout.strip()
 
     branch = f"worker/{name}"
+    root = kit_root()
+
+    def kit_git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(root), *args],
+                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
+
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp) / "kit"
-        say(f"取ってくる: {url}")
-        if subprocess.run(["git", "clone", "--depth", "1", url, str(work)],
-                          capture_output=True, text=True, stdin=subprocess.DEVNULL).returncode != 0:
-            raise WorkerError("clone できなかった")
+        say(f"作業用の枝を切る: {branch}")
+        made = kit_git("worktree", "add", "-b", branch, str(work), "HEAD")
+        if made.returncode != 0:
+            raise WorkerError(
+                f"作業用の枝を作れなかった（{branch} が既にあるかもしれない）: "
+                f"{(made.stdout + made.stderr).strip()[:160]}")
 
         dest = work / "templates" / "workers" / name
         if dest.exists():
@@ -436,12 +445,20 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
         if git("push", "-u", "origin", branch).returncode != 0:
             raise WorkerError(f"push できなかった（枝 {branch} が既にあるかもしれない）")
 
-        pr = subprocess.run(["gh", "pr", "create", "--title", title, "--body", body,
-                             "--head", branch, "--repo", _repo_slug(url)],
-                            cwd=str(work), capture_output=True, text=True, stdin=subprocess.DEVNULL)
-        if pr.returncode != 0:
-            raise WorkerError(f"PR を作れなかった: {(pr.stdout + pr.stderr).strip()[:200]}")
-        link = pr.stdout.strip().splitlines()[-1] if pr.stdout.strip() else ""
+        try:
+            pr = subprocess.run(["gh", "pr", "create", "--title", title, "--body", body,
+                                 "--head", branch, "--repo", _repo_slug(url)],
+                                cwd=str(work), capture_output=True, text=True,
+                                stdin=subprocess.DEVNULL)
+            if pr.returncode != 0:
+                raise WorkerError(f"PR を作れなかった: {(pr.stdout + pr.stderr).strip()[:200]}")
+            link = pr.stdout.strip().splitlines()[-1] if pr.stdout.strip() else ""
+        finally:
+            # **必ず畳む。** 残すと `.git` にワークツリーの登録が居座り、
+            # 次の共有で「枝が既にある」と言われる。
+            kit_git("worktree", "remove", "--force", str(work))
+            kit_git("worktree", "prune")
+            kit_git("branch", "-D", branch)
 
     say(f"PR を出した: {link}")
     say("取り込まれたら、この環境のコピーを消すこと（worker rm --keep-profile）")
