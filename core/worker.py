@@ -65,23 +65,29 @@ def check_soul(path: Path) -> None:
 
 # ── profile.yaml / mcp.yaml への書き込み ─────────────────────────────────
 
-def add_env(dst: Path, name: str, desc: str) -> None:
+def add_env(dst: Path, name: str, desc: str, *, required: bool = False) -> None:
     """`env_requires` へ1件足す。
 
     **MCP を足すと、たいてい鍵も要る。** 宣言しないと env apply が配らず、
     サーバは起動しても認証されないまま「有効」に見える（実際に踏んだ）。
+
+    **既定は任意である。** `required` は「**無いとキット自体が成り立たない**」
+    という意味で、いまそれに当たるのはモデルの鍵だけ。ワーカーの鍵を必須に
+    すると、役を1つ足しただけで設定画面の「反映」が全体で押せなくなる
+    （実際にそうなっていた）。欠けても困るのはその役の道具であって、
+    チーム全体ではない——空なら該当の MCP を無効にして先へ進む。
     """
     path = dst / "profile.yaml"
     text = path.read_text(encoding="utf-8")
     doc = yaml.safe_load(text) or {}
     reqs = [r for r in (doc.get("env_requires") or []) if r.get("name") != name]
-    reqs.append({"name": name, "description": desc, "required": True})
+    reqs.append({"name": name, "description": desc, "required": required})
     # **説明は JSON で書く。** yaml.safe_dump は長い文字列を折り返して `...`
     # （ドキュメント終端）を足すことがあり、埋めると YAML が壊れる。
     block = "env_requires:\n" + "".join(
         f"- name: {r['name']}\n"
         f"  description: {json.dumps(r.get('description', ''), ensure_ascii=False)}\n"
-        f"  required: {str(bool(r.get('required', True))).lower()}\n"
+        f"  required: {str(bool(r.get('required', False))).lower()}\n"
         for r in reqs
     )
     pat = re.compile(r"^env_requires:\n(?:[ -].*\n?)*", re.M)
@@ -363,7 +369,9 @@ def remove(name: str, *, keep_profile: bool = False) -> Dict:
     shutil.rmtree(d)
     removed_profile = False
     if not keep_profile and profile_dir(name).is_dir():
-        hermes.run(["profile", "delete", name], stdin_empty=True)
+        # **`-y` が要る。** 無いと対話の確認待ちになり、stdin を閉じているので
+        # 黙って終わる——「削除した」と報告しながらプロファイルが残っていた。
+        hermes.run(["profile", "delete", name, "-y"], stdin_empty=True)
         # **成否は戻り値ではなくディレクトリの有無で見る。**
         # profile delete は対話確認を求めるため、失敗しても静かに終わることがある。
         removed_profile = not profile_dir(name).is_dir()

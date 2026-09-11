@@ -161,6 +161,28 @@ def test_manifest_declares_env_and_ownership():
     assert not (OUT / "operator/.env").exists()
 
 
+def test_worker_keys_are_optional_by_default():
+    """**役を1つ足しただけで設定画面が止まらないこと。**
+
+    `required` は「無いとキット自体が成り立たない」という意味で、いまそれに
+    当たるのはモデルの鍵だけ。ワーカーの鍵を必須にすると `/validate` が塞がり、
+    **全役の「反映」が押せなくなる**（実際にそうなっていた）。
+    欠けても困るのはその役の道具であって、チーム全体ではない。
+    """
+    import sys as _sys
+    import tempfile
+
+    _sys.path.insert(0, str(ROOT / "core"))
+    import worker as worker_mod
+
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        (d / "profile.yaml").write_text("name: probe\n", encoding="utf-8")
+        worker_mod.add_env(d, "PROBE_TOKEN", "確認用")
+        body = (d / "profile.yaml").read_text(encoding="utf-8")
+        assert "required: false" in body, body
+
+
 def test_every_role_has_a_human_summary():
     """**設定画面に出る一行は、役が自分で名乗る。**
 
@@ -689,6 +711,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("ワーカーの鍵は既定で任意", test_worker_keys_are_optional_by_default)
     check("全役に人が読む一行がある", test_every_role_has_a_human_summary)
     check("版が git から採られている", test_version_is_derived_from_git)
     check("必須は本当に必須なものだけ", test_only_truly_required_keys_are_required)
