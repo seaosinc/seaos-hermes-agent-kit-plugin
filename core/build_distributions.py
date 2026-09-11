@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,7 +37,36 @@ SMART = os.environ.get("MODEL_SMART", "openai/gpt-6-astra")
 # ROLES で明示的に指定した役だけが引く（いまは senior-developer のみ）。
 SENIOR = os.environ.get("MODEL_SENIOR", "anthropic/claude-opus-5")
 INTERVAL = int(os.environ.get("DISPATCH_INTERVAL", "15"))
-VERSION = os.environ.get("KIT_VERSION", "0.1.0")
+def _version() -> str:
+    """配布物の版。**git から採る。**
+
+    固定値だと「更新が届いたのか」を判定する手段が無い。実際、旧キットは全役が
+    `0.1.0` のまま動かず、実機を見ても新しいのか古いのか分からなかった。
+
+    形は `0.1.<コミット数>+<短縮 sha>`。**コミット数は単調に増える**ので大小を
+    比べられ、sha はどの木から出たかを正確に指す。Hermes 側は `-` `+` 以降を
+    剥がして major.minor.patch だけ見るので（profile_distribution の
+    `_parse_semver`）、この形で壊れない。
+
+    git が無い／git 管理外なら既定値に落ちる——**配布物が作れないほうが困る。**
+    """
+    override = os.environ.get("KIT_VERSION")
+    if override:
+        return override
+    root = Path(__file__).resolve().parent.parent
+    try:
+        count = subprocess.run(["git", "-C", str(root), "rev-list", "--count", "HEAD"],
+                               capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        sha = subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        if count.returncode == 0 and sha.returncode == 0:
+            return f"0.1.{count.stdout.strip()}+{sha.stdout.strip()}"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return "0.1.0"
+
+
+VERSION = _version()
 
 # 作業部屋（DESIGN.md の「作業部屋」）。**イメージ名は差し替えられるようにしておく。**
 # 薄いイメージを自前で持つのが既定だが、全部入り（ghcr.io/openai/codex-universal 等）へ

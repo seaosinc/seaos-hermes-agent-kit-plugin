@@ -59,11 +59,9 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
 
 1. **Windows の実機確認。** 実装は入れたが、動かしていない
    （`gateway_pid` の PowerShell 経由の検出、`kit.cmd` のラッパ、Scheduled Task）。
-2. **採番。** いま `0.0.0` 固定。旧キットは全役 `0.1.0` のまま動かず、更新が届いたか
-   判定できなくなっていた。ビルド時に git から採番する。
-3. **GUI の実機確認。** デスクトップアプリで Python 側・desktop 側のトグルを
+2. **GUI の実機確認。** デスクトップアプリで Python 側・desktop 側のトグルを
    2つとも入れて、画面が出るところまで。
-4. **AWS を developer / senior-developer に触らせる。** Terraform を扱い始めると要る。
+3. **AWS を developer / senior-developer に触らせる。** Terraform を扱い始めると要る。
    いまこの2役が持つのは箱（terminal / workspace）と GH_TOKEN だけで、AWS の状態を
    読む手が無い。作業部屋にも `aws` は入っていない（git / gh / mise / opencode /
    jq / rg / curl のみ）。
@@ -84,7 +82,7 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
    ホスト側 MCP で原則を守れるが、Terraform を回すなら箱に入れるしかない。
    **渡すなら読む手から**始め、`apply` まで持たせるかは別に決める。
 
-5. **`gateway: true` の役ごとに、窓口の設定を分けられるようにする。**
+4. **`gateway: true` の役ごとに、窓口の設定を分けられるようにする。**
    いまは窓口が operator ひとつなので露呈していないが、プロジェクト専用のボット
    （別の Slack App を持ち、そいつ宛の話はそいつが返す役）を足すと詰まる。
    **塞がっているのは2箇所ある。**
@@ -110,7 +108,7 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
    板の配車係は `~/.hermes/kanban/.dispatcher.lock` で全体に1つなので、
    ゲートウェイを増やしても二重に配られることはない。
 
-6. **Slack App の作成を recruiter に持たせる。** 調べた結果、**人の操作は2回で済む。**
+5. **Slack App の作成を recruiter に持たせる。** 調べた結果、**人の操作は2回で済む。**
 
    - `apps.manifest.create` でアプリを作成。スコープ・イベント購読・Socket Mode の
      有効化までマニフェストに書ける。応答に `app_id`、資格情報、そして
@@ -122,7 +120,7 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
 
    ComputerUse で押しに行くより、この2回を人に任せるほうが確実である。
 
-7. **秘密は当面「設定画面に入れる」ままにする。**（1Password 版は保留）
+6. **秘密は当面「設定画面に入れる」ままにする。**（1Password 版は保留）
 
    **いまの形で要件は満たせている。** 値は手元の `.env` にしか書かれず、
    API は値を返さない（書き込み専用。テストで保証）。**Slack にも AI にも

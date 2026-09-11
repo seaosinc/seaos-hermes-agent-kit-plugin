@@ -94,7 +94,10 @@ def test_profiles_are_listed():
     assert r.returncode == 0, r.stderr
     for role in ROLES:
         assert role in r.stdout, f"{role} が一覧に出ない\n{r.stdout}"
-    assert "@0.1.0" in r.stdout, "版が出ていない（配布物として認識されていない）"
+    # **固定の版を期待しない。** 版は git から採るので、コミットのたびに変わる。
+    # 見たいのは「配布物として認識され、版が付いている」ことだけ。
+    import re
+    assert re.search(r"@0\.1\.\d+", r.stdout), f"版が出ていない（配布物として認識されていない）\n{r.stdout}"
 
 
 def test_update_is_idempotent():

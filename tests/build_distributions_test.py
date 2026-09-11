@@ -161,6 +161,23 @@ def test_manifest_declares_env_and_ownership():
     assert not (OUT / "operator/.env").exists()
 
 
+def test_version_is_derived_from_git():
+    """**版は固定値にしない。** 固定だと「更新が届いたのか」を判定できない。
+
+    旧キットは全役が `0.1.0` のまま動かず、実機を見ても新旧が分からなかった。
+    コミット数は単調に増えるので大小を比べられ、sha はどの木から出たかを指す。
+    Hermes 側は `+` 以降を剥がすので（profile_distribution の `_parse_semver`）、
+    この形で壊れない。
+    """
+    import re
+
+    version = manifest("operator")["version"]
+    assert re.fullmatch(r"0\.1\.\d+\+[0-9a-f]{7,}", version), version
+    # 全役で揃っていること（役ごとにずれると比較の意味が無くなる）
+    for role in ("fixer", "handler", "recruiter"):
+        assert manifest(role)["version"] == version, role
+
+
 def test_only_truly_required_keys_are_required():
     """**必須は「無いとキット自体が成り立たない」ものだけ。**
 
@@ -652,6 +669,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("版が git から採られている", test_version_is_derived_from_git)
     check("必須は本当に必須なものだけ", test_only_truly_required_keys_are_required)
     check("鍵が来ない MCP は無効で配る", test_mcp_without_keys_ships_disabled)
     check("秘密が混ざっていない", test_secrets_are_not_shipped)
