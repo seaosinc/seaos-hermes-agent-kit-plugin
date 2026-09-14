@@ -162,6 +162,28 @@ def test_manifest_declares_env_and_ownership():
     assert not (OUT / "operator/.env").exists()
 
 
+def test_gateway_keys_are_per_role():
+    """**窓口ごとに鍵を分ける。共有の値へは落ちない。**
+
+    同じ Slack トークンで2つのゲートウェイを繋ぐと、**両方が同じ発言を拾って
+    二重に返事をする。** 共有へ落ちる実装だと、窓口を足した瞬間にそうなる
+    （実際に踏んだ）。役つきの名前（`OPERATOR__SLACK_BOT_TOKEN`）だけを見る。
+    """
+    import sys as _sys
+
+    _sys.path.insert(0, str(ROOT / "core"))
+    import roles as roles_mod
+
+    own = roles_mod.own_env_vars("operator")
+    assert "SLACK_BOT_TOKEN" in own, own
+    assert roles_mod.env_key("project-operator", "SLACK_BOT_TOKEN") == \
+        "PROJECT_OPERATOR__SLACK_BOT_TOKEN"
+    # 管理対象は役つきの名前だけ（共有の名前は残さない）
+    managed = roles_mod.managed_env_vars()
+    assert "SLACK_BOT_TOKEN" not in managed, managed
+    assert "OPERATOR__SLACK_BOT_TOKEN" in managed, managed
+
+
 def test_local_roles_live_outside_the_kit():
     """**この環境で作った役は、キットの外に置く。**
 
@@ -754,6 +776,7 @@ if __name__ == "__main__":
     check("HOTL は recruiter だけ", test_hotl_only_for_agent_creator)
     check("ワーカーは子を作れない", test_delegation_closed_for_workers)
     check("マニフェストが環境変数と所有を宣言", test_manifest_declares_env_and_ownership)
+    check("窓口の鍵は役ごとに分かれる", test_gateway_keys_are_per_role)
     check("この環境の役はキットの外に置かれる", test_local_roles_live_outside_the_kit)
     check("ワーカーの鍵は既定で任意", test_worker_keys_are_optional_by_default)
     check("全役に人が読む一行がある", test_every_role_has_a_human_summary)

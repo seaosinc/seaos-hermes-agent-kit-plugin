@@ -119,6 +119,12 @@ ROLES: dict[str, dict] = {
         "model": FAST,
         # 窓口。Slack の振る舞いはこの役の config で決まる。
         "gateway": True,
+        # **Slack の鍵は役ごとに分ける。** 窓口を増やしたとき、同じトークンで
+        # 2つのゲートウェイを繋ぐと**両方が同じ発言を拾って二重に返事をする。**
+        # 共有の値へ落ちないよう、`OPERATOR__SLACK_BOT_TOKEN` のように
+        # 役つきの名前だけを見る（roles.own_env_vars）。
+        "env_own": ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_ALLOWED_USERS",
+                    "SLACK_OWNER_ID", "SLACK_HOME_CHANNEL"],
         "skills": ["kanban-collaboration", "guest-access"],
         "plugins": ["booking-gate"],
         "hooks": ["mem0-up"],
@@ -333,6 +339,13 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             # コマンドを打つ経路そのものを持たないほうが堅い。
             "shell": prof.get("shell", True),
             "extra": prof.get("extra", ""),
+            # **窓口にもできる。** プロジェクト専用のボットのように、この役あての
+            # 話をこの役が返す形。鍵は必ず自分専用にすること——共有すると
+            # 2つのゲートウェイが同じ発言を拾い、両方が返事をする。
+            "gateway": prof.get("gateway", False),
+            "env_own": prof.get("env_own", []),
+            "slack_extra": prof.get("slack_extra", {}),
+            "slack_config": prof.get("slack_config", {}),
             # **人が読む一行。** 設定画面の一覧に出る。無ければ description の
             # 最初の一文で代用する——decomposer 向けの長文をそのまま出すと切れる。
             "summary": " ".join((prof.get("summary") or "").split()),
@@ -493,8 +506,10 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         # 他の会話に割り込む。`reply_in_thread` は DM とチャンネルを区別しない
         # 1つのスイッチなので（Hermes の `_resolve_thread_ts` は文脈を見ない）、
         # 人がいる側に合わせる。
-        cfg["platforms"] = {
-            "slack": {
+        # **役ごとに上書きできる。** 窓口が複数あるとき、振る舞いは同じとは限らない
+        # （専用ボットは特定のチャンネルだけ見る、など）。既定は下のとおりで、
+        # `slack_extra` / `slack_config` に書いた分が勝つ。
+        slack: dict = {
                 "reply_to_mode": "first",
                 "extra": {
                     "require_mention": True,
@@ -508,8 +523,10 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
                     "reactions": True,
                     "reaction_triggers": True,
                 },
-            }
         }
+        slack["extra"].update(spec.get("slack_extra") or {})
+        slack.update(spec.get("slack_config") or {})
+        cfg["platforms"] = {"slack": slack}
 
     if spec.get("hotl"):
         # 承認プロンプトを出さない（HOTL: Human Out The Loop）。

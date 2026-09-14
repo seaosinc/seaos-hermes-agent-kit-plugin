@@ -65,6 +65,37 @@ def _drop(lines: List[str], name: str) -> List[str]:
     return out
 
 
+def _adopt_shared_into_own(source: Dict[str, str]) -> None:
+    """共有の名前で入っていた値を、**最初にそれを要る役へ一度だけ移す。**
+
+    役ごとに鍵を分ける前は `SLACK_BOT_TOKEN` のような名前1つで持っていた。
+    そのまま残すと、**後から足した窓口がその値を引き取ってしまい**、同じ
+    トークンで2つのゲートウェイが繋がって両方が同じ発言に返事をする
+    （実際に踏んだ）。移したら**共有の名前は消す**——残す限り同じ事故が起きる。
+    """
+    for name in roles.names():
+        for var in roles.own_env_vars(name):
+            shared = source.get(var)
+            if not shared:
+                continue
+            key = roles.env_key(name, var)
+            if not source.get(key):
+                set_value(key, shared, f"{name} の {var}")
+                source[key] = shared
+            drop_value(var)
+            source.pop(var, None)
+
+
+def drop_value(name: str) -> None:
+    """正の .env からその行を落とす。"""
+    path = env_file()
+    if not path.is_file():
+        return
+    lines = path.read_text(encoding="utf-8").splitlines()
+    path.write_text("\n".join(_drop(lines, name)).strip() + "\n", encoding="utf-8")
+    _secure(path)
+
+
 def apply() -> Tuple[List[str], List[str]]:
     """正の .env から各役へ配る。戻り値は (報告行, 値が空のままの項目)。"""
     # **鍵がまだ無いのは、壊れているのではなく「これから入れる」状態である。**
@@ -73,6 +104,7 @@ def apply() -> Tuple[List[str], List[str]]:
     # 何が足りないかを報告して、既にある値は残す。
     src = env_file()
     source = read_env(src) if src.is_file() else {}
+    _adopt_shared_into_own(source)
     managed = roles.managed_env_vars()
     report: List[str] = []
     missing: List[str] = []
@@ -94,9 +126,14 @@ def apply() -> Tuple[List[str], List[str]]:
 
         declared: List[str] = []
         wrote = 0
+        own = set(roles.own_env_vars(name))
         for var, required, desc in roles.env_requirements(name):
             declared.append(var)
-            value = source.get(var, "")
+            # **その役だけの値を見る。共有へは落ちない。** 落とすと、窓口を
+            # 増やしたときに同じ Slack トークンで2つのゲートウェイが繋がり、
+            # 両方が同じ発言に返事をする（実際に踏んだ）。
+            value = source.get(roles.env_key(name, var), "") if var in own \
+                else source.get(var, "")
             if not value and existing.get(var):
                 # **既にある値を空で潰さない。** 正に無いのは「まだ入れていない」
                 # だけかもしれず、消すと動いている役の鍵が飛ぶ。

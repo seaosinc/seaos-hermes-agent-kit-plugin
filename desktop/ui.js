@@ -87,7 +87,7 @@ export default function create(deps) {
             jsxs('div', {
               className: 'text-sm',
               children: [
-                secret.name,
+                secret.label || secret.name,
                 secret.required
                   ? jsx('span', { style: { color: DANGER }, className: 'ml-1', children: '*' })
                   : null

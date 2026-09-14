@@ -77,13 +77,36 @@ def env_requirements(name: str) -> List[Tuple[str, bool, str]]:
     return out
 
 
+def env_key(role: str, var: str) -> str:
+    """その役だけの値を入れる名前。`<役>__<変数>`（役名は大文字・`-` は `_`）。
+
+    例: `PROJECT_OPERATOR__SLACK_BOT_TOKEN`
+    """
+    return f"{role.upper().replace('-', '_')}__{var}"
+
+
+def own_env_vars(name: str) -> List[str]:
+    """**その役が自分専用の値を要る変数。**
+
+    窓口が複数あるとき、Slack のトークンを共有してはいけない——**同じトークンで
+    2つのゲートウェイを繋ぐと、両方が同じ発言を拾って二重に返事をする。**
+    共有の値に落ちないよう、ここに挙げた変数は `<役>__<変数>` だけを見る。
+    """
+    spec = all_specs().get(name) or {}
+    declared = {var for var, _req, _desc in env_requirements(name)}
+    return [v for v in (spec.get("env_own") or []) if v in declared]
+
+
 def managed_env_vars() -> List[str]:
     """キットが管理している変数の全体。**知らない変数には触らないため**に使う。"""
     seen: List[str] = []
     for name in names():
+        own = set(own_env_vars(name))
         for var, _req, _desc in env_requirements(name):
-            if var not in seen:
-                seen.append(var)
+            # 自分専用の値を要る変数は、役つきの名前だけを管理する
+            key = env_key(name, var) if var in own else var
+            if key not in seen:
+                seen.append(key)
     return seen
 
 

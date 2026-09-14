@@ -128,6 +128,8 @@ def self_update() -> Dict:
 
 # 鍵どうしの依存。**片方だけ入れても働かない組**を、画面で言えるようにする。
 # 「無いと何も動かない」ではないので必須にはしないが、黙って半端に動くのは避ける。
+# **役つきの名前にも効かせる。** 窓口ごとに鍵が分かれるので、組の判定も
+# 役ごとに行う（`OPERATOR__SLACK_BOT_TOKEN` と `OPERATOR__SLACK_APP_TOKEN`）。
 _PAIRS = [
     (("SLACK_BOT_TOKEN", "SLACK_APP_TOKEN"),
      "Slack はこの2つが揃って初めて繋がります"),
@@ -185,9 +187,14 @@ def list_secrets() -> List[Dict]:
     disables = _disables()
     seen: Dict[str, Dict] = {}
     for name in roles.names():
+        own = set(roles.own_env_vars(name))
         for var, required, desc in roles.env_requirements(name):
+            # **役ごとに持つ鍵は、行を分ける。** 窓口が複数あるとき、同じ値を
+            # 共有すると両方が同じ発言に返事をするので、共有させない。
+            key = roles.env_key(name, var) if var in own else var
             entry = seen.setdefault(
-                var, {"name": var, "description": desc, "required": False,
+                key, {"name": key, "label": f"{name} の {var}" if var in own else var,
+                      "description": desc, "required": False,
                       "usedBy": [], "disables": disables.get(var, [])}
             )
             entry["required"] = entry["required"] or required
@@ -209,10 +216,17 @@ def validate() -> Dict:
                 if s["required"] and not source.get(s["name"])]
     warnings: List[str] = []
     for group, message in _PAIRS:
-        filled = [v for v in group if source.get(v)]
-        if filled and len(filled) != len(group):
-            missing = [v for v in group if not source.get(v)]
-            warnings.append(f"{', '.join(missing)} が空です。{message}")
+        # 共有の名前と、役つきの名前の両方で見る
+        candidates = [group]
+        for role in roles.names():
+            own = set(roles.own_env_vars(role))
+            if all(v in own for v in group):
+                candidates.append(tuple(roles.env_key(role, v) for v in group))
+        for names_ in candidates:
+            filled = [v for v in names_ if source.get(v)]
+            if filled and len(filled) != len(names_):
+                missing = [v for v in names_ if not source.get(v)]
+                warnings.append(f"{', '.join(missing)} が空です。{message}")
     return {"ok": not blocking, "blocking": blocking, "warnings": warnings}
 
 
