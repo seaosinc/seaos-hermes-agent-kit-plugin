@@ -12,3 +12,4 @@ __pycache__/
 
 # 旧キットから持ち込んだ作業用（新リポジトリでは配らない）
 tests/__pycache__/
+.workspace-ca.pem

@@ -103,6 +103,25 @@ def install(*, log: Optional[Log] = None) -> Result:
     say("定期実行を登録します")
     res.failures += register_cron(log=say).failures
 
+    # **作業部屋のイメージ。** これが無いと、箱を持つ役（developer /
+    # senior-developer）は最初のカードで失敗する。入れたばかりの環境には
+    # 当然無いので、ここで作る。
+    #
+    # **失敗しても止めない。** Docker が無い環境（サーバの一部、審査中の端末）でも
+    # 他の役は動くし、後から `seaos-kit workspace build` で作れる。
+    say("作業部屋を用意します")
+    try:
+        import workspace as ws
+
+        if not shutil.which(ws._docker_bin()):
+            say("Docker が無いので飛ばします（後で seaos-kit workspace build）")
+        elif ws.build(log=say):
+            say("作業部屋のイメージを作りました")
+        else:
+            say("✗ 作業部屋のイメージを作れませんでした（seaos-kit workspace build で再試行）")
+    except OSError as exc:
+        say(f"✗ 作業部屋を用意できませんでした: {exc}")
+
     say("共有記憶を用意します")
     if not mem0.up(log=say):
         res.failures += 1
