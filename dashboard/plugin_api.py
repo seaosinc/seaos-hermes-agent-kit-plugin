@@ -248,6 +248,52 @@ def share_role(body: ShareIn) -> Dict:
     return out
 
 
+@router.get("/roles/{name}/removal")
+def removal_impact(name: str) -> Dict:
+    """消す前に、何が起きるかを返す。**押す前に見せるため。**
+
+    プロファイルごと消すと**記憶とセッションが失われ、戻せない**。
+    進行中のカードがあれば、そもそも消せない。
+    """
+    import worker as worker_mod
+
+    if roles.origin(name) != "local":
+        raise HTTPException(status_code=400, detail="配布物の役はここからは消せません")
+    pdir = profile_dir(name)
+    memories = len(list((pdir / "memories").glob("*"))) if (pdir / "memories").is_dir() else 0
+    sessions = len(list((pdir / "sessions").glob("*"))) if (pdir / "sessions").is_dir() else 0
+    return {
+        "name": name,
+        "busy": worker_mod.busy_cards(name),
+        "installed": pdir.is_dir(),
+        "memories": memories,
+        "sessions": sessions,
+    }
+
+
+class RemoveIn(BaseModel):
+    name: str
+    # **既定は残す。** 記憶とセッションは戻せないので、消すほうを明示させる。
+    keepProfile: bool = True
+
+
+@router.post("/roles/remove")
+def remove_role(body: RemoveIn) -> Dict:
+    """この環境で作った役を消す。
+
+    **配布物は消せない。** 消してもキットから配り直されるだけで、
+    実態は「古い版に戻す」でしかない。
+    """
+    import worker as worker_mod
+
+    if roles.origin(body.name) != "local":
+        raise HTTPException(status_code=400, detail="配布物の役はここからは消せません")
+    try:
+        return worker_mod.remove(body.name, keep_profile=body.keepProfile)
+    except Exception as exc:  # noqa: BLE001  （進行中のカードなど、理由をそのまま画面へ）
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 @router.post("/update")
 def run_update(body: Optional[UpdateIn] = None) -> Dict:
     """生成 → 全役へ反映 → 説明文 → 鍵。画面の「更新」が呼ぶ唯一の実行口。

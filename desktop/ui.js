@@ -178,6 +178,80 @@ export default function create(deps) {
     })
   }
 
+
+  /** 消す前に、何が起きるかを見せる。
+   *
+   * **記憶とセッションは戻せない。** 既定は残す側にして、消すほうを明示させる。
+   */
+  function RemoveDialog({ role, impact, onRemove, onClose }) {
+    const [alsoProfile, setAlsoProfile] = useState(false)
+    const [working, setWorking] = useState(false)
+    const blocked = (impact?.busy || 0) > 0
+
+    return jsx('div', {
+      className: 'fixed inset-0 z-50 flex items-center justify-center bg-black/40',
+      onClick: onClose,
+      children: jsxs('div', {
+        className: 'w-[30rem] max-w-[90vw] rounded-lg p-5 shadow-xl',
+        style: { border: BORDER, background: SURFACE },
+        onClick: (e) => e.stopPropagation(),
+        children: [
+          jsx('div', { className: 'text-sm font-medium', children: `${role} を消す` }),
+          blocked
+            ? jsx('div', {
+                className: 'mt-3 rounded px-3 py-2 text-xs',
+                style: { border: `1px solid ${WARN}`, color: WARN },
+                children: `進行中のカードを ${impact.busy} 件抱えています。先に片付けてください。`
+              })
+            : jsx('div', {
+                className: 'mt-2 text-xs opacity-70',
+                children: '役の定義を消します。板の過去のカードは残ります。'
+              }),
+          !blocked && impact?.installed
+            ? jsxs('label', {
+                className: 'mt-4 flex items-start gap-2 text-xs',
+                children: [
+                  jsx('input', {
+                    type: 'checkbox',
+                    checked: alsoProfile,
+                    onChange: (e) => setAlsoProfile(e.target.checked),
+                    className: 'mt-0.5'
+                  }),
+                  jsxs('span', {
+                    children: [
+                      jsx('span', { style: { color: DANGER }, children: '記憶とセッションも消す' }),
+                      jsx('span', {
+                        className: 'block opacity-70',
+                        children: `記憶 ${impact.memories} 件 / セッション ${impact.sessions} 件。戻せません。`
+                      })
+                    ]
+                  })
+                ]
+              })
+            : null,
+          jsxs('div', {
+            className: 'mt-5 flex justify-end gap-2',
+            children: [
+              jsx(Button, { label: 'やめる', onClick: onClose, disabled: working }),
+              jsx(Button, {
+                label: working ? '消しています…' : '消す',
+                disabled: working || blocked,
+                onClick: async () => {
+                  setWorking(true)
+                  try {
+                    await onRemove(role, !alsoProfile)
+                  } finally {
+                    setWorking(false)
+                  }
+                }
+              })
+            ]
+          })
+        ]
+      })
+    })
+  }
+
   function SettingsPage({ ctx }) {
     const [roles, setRoles] = useState([])
     const [secrets, setSecrets] = useState([])
@@ -186,6 +260,7 @@ export default function create(deps) {
     const [error, setError] = useState('')
     const [notice, setNotice] = useState('')
     const [editing, setEditing] = useState(null)
+    const [removing, setRemoving] = useState(null)
     const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
     const [version, setVersion] = useState(null)
 
@@ -234,6 +309,38 @@ export default function create(deps) {
         setBusy(false)
       }
     }, [ctx, load])
+
+    // 消す前に、何が起きるかを取りに行く（進行中のカード、記憶とセッションの数）
+    const askRemove = useCallback(
+      async (name) => {
+        setError('')
+        try {
+          setRemoving({ name, impact: await call(ctx, `/roles/${name}/removal`) })
+        } catch (e) {
+          setError(e.message)
+        }
+      },
+      [ctx]
+    )
+
+    const doRemove = useCallback(
+      async (name, keepProfile) => {
+        setError('')
+        try {
+          await call(ctx, '/roles/remove', { method: 'POST', body: { name, keepProfile } })
+          setRemoving(null)
+          setNotice(
+            keepProfile
+              ? `${name} を消しました（記憶とセッションは残しています）。`
+              : `${name} を消しました。`
+          )
+          await load()
+        } catch (e) {
+          setError(e.message)
+        }
+      },
+      [ctx, load]
+    )
 
     // **キットへ取り込む PR を出す。** この環境で作った役は git に入らないので、
   // 共有しないと機械が飛べば消える。取り込まれたらこの環境のコピーは消すこと
@@ -409,6 +516,15 @@ export default function create(deps) {
                         children: '共有'
                       })
                     : null,
+                  r.origin === 'local'
+                    ? jsx('button', {
+                        type: 'button',
+                        disabled: busy,
+                        onClick: () => askRemove(r.name),
+                        className: 'shrink-0 text-xs hover:underline disabled:opacity-40 ' + MUTED,
+                        children: '消す'
+                      })
+                    : null,
                   jsx('span', {
                     className: 'shrink-0 text-xs ' + (r.installed ? MUTED : ''),
                     style: r.installed ? null : { color: WARN },
@@ -447,6 +563,15 @@ export default function create(deps) {
                   children: log.join('\n')
                 })
               ]
+            })
+          : null,
+
+        removing
+          ? jsx(RemoveDialog, {
+              role: removing.name,
+              impact: removing.impact,
+              onRemove: doRemove,
+              onClose: () => setRemoving(null)
             })
           : null,
 
