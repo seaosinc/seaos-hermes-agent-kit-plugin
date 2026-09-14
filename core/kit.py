@@ -75,10 +75,10 @@ def sync_descriptions(log: Optional[Log] = None) -> Result:
             continue
         code, _out = hermes.set_description(name, text)
         if code == 0:
-            result.lines.append(f"{name} の説明文を合わせた")
+            result.lines.append(f"{name} の説明文をそろえました")
         else:
             result.failures += 1
-            result.lines.append(f"✗ {name}（説明文を設定できず）")
+            result.lines.append(f"✗ {name} の説明文を設定できませんでした")
     if log:
         log(f"説明文を {len(result.lines) - result.failures} 役ぶん合わせた（decomposer が読む）")
     return result
@@ -90,7 +90,7 @@ def apply_env(log: Optional[Log] = None) -> Result:
     report, missing = env_mod.apply()
     result.lines.extend(report)
     for item in missing:
-        result.lines.append(f"値が空のまま: {item}")
+        result.lines.append(f"{item} が空のままです")
     if log:
         for line in result.lines:
             log(line)
@@ -126,7 +126,7 @@ def prune_skills(log: Optional[Log] = None) -> Result:
             if not skill.is_dir() or skill.name in declared or skill.name not in ours:
                 continue
             shutil.rmtree(skill, ignore_errors=True)
-            result.lines.append(f"{name} から {skill.name} を外した（配置表から外れた）")
+            result.lines.append(f"{name} から {skill.name} を外しました（配られなくなったため）")
     if log:
         for line in result.lines:
             log(line)
@@ -138,64 +138,70 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
 
     **config.yaml は既定で保持される**（Hermes の仕様）。モデルやトポロジ、
     mcp_servers を変えたのに反映されないときは、たいてい force_config を忘れている。
+
+    **報告は畳む。** 毎回8行の「○○ を更新した」が並んでも読まれない。
+    件数で言い、**いつもと違うこと（新設・移行・失敗）だけ名前を出す。**
     """
     result = Result()
     out = build(log=log)
 
-    result.lines.append("── エージェントを配る ──")
+    updated = 0
+    notable: List[str] = []
     for name in roles.names():
         dist = out / name
         if not dist.is_dir():
             continue
         if not hermes.profile_exists(name):
             code, _ = hermes.install(dist)
-            result.lines.append(f"{name} を新しく導入した" if code == 0 else f"{name} の導入に失敗")
+            notable.append(f"{name} を新しく導入しました" if code == 0
+                           else f"{name} を導入できませんでした")
             result.failures += 0 if code == 0 else 1
             continue
         if not hermes.is_distribution(name):
             # 旧方式で作られたプロファイル。一度だけ配布物として入れ直す
             code, _ = hermes.install(dist, force=True)
-            result.lines.append(f"{name} を配布物として入れ直した" if code == 0 else f"{name} の移行に失敗")
+            notable.append(f"{name} を配布物として入れ直しました" if code == 0
+                           else f"{name} を入れ直せませんでした")
             result.failures += 0 if code == 0 else 1
             continue
         code, _ = hermes.update(name, force_config=force_config)
-        result.lines.append(f"{name} を更新した" if code == 0 else f"{name} の更新に失敗")
-        result.failures += 0 if code == 0 else 1
+        if code == 0:
+            updated += 1
+        else:
+            notable.append(f"{name} を更新できませんでした")
+            result.failures += 1
+
+    if updated:
+        result.lines.append(f"エージェント {updated} 件を更新しました")
+    result.lines.extend(notable)
 
     # **コマンドの置き場も反映のうち。** 規約は seaos-kit を叩けと書いてあるので、
     # 入口が無いとエージェントはその手順を実行できない（実際そうなっていた）。
     import platform_ops
     try:
-        result.lines.append("── コマンドを置く ──")
-        result.lines.append(f"{platform_ops.link_command()}")
+        platform_ops.link_command()
     except OSError as exc:
         result.failures += 1
-        result.lines.append(f"コマンドを置けなかった: {exc}")
+        result.lines.append(f"コマンドを配置できませんでした: {exc}")
 
     pruned = prune_skills()
-    if pruned.lines:
-        result.lines.append("── 載らなくなったスキルを外す ──")
-        result.lines.extend(pruned.lines)
+    result.lines.extend(pruned.lines)
 
     described = sync_descriptions(log=log)
-    # 役ごとの1行は畳む。**成否だけが要る情報で、8行並べても読む人は居ない。**
     ok = len(described.lines) - described.failures
-    result.lines.append("── 説明文を合わせる（担当の振り分けに使われる）──")
-    result.lines.append(f"{ok} 役ぶん合わせた")
+    if ok:
+        result.lines.append(f"説明文を {ok} 件そろえました")
     result.lines.extend(l for l in described.lines if l.startswith("✗"))
     result.failures += described.failures
 
     applied = apply_env()
-    result.lines.append("── 鍵を配る ──")
     result.lines.extend(applied.lines)
 
     # **鍵の有無で MCP の有効・無効を決める。** 空トークンでもサーバは繋がり、
     # 道具の一覧まで出す（呼んだときだけ 400）。役から見て「その手が無い」と
     # 分かる形にする。鍵が入ったら戻す——片道にしない。
     flipped, _disabled = env_mod.sync_mcp_enabled()
-    if flipped:
-        result.lines.append("── 使えない MCP を隠す ──")
-        result.lines.extend(flipped)
+    result.lines.extend(flipped)
 
     if log:
         for line in result.lines:

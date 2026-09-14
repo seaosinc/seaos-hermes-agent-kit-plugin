@@ -40,8 +40,8 @@ export default function create(deps) {
       const detail = error?.detail || error?.message || String(error)
       if (/404|not found|ECONNREFUSED|failed to fetch/i.test(detail)) {
         throw new Error(
-          `バックエンドに繋がりません（${detail}）。設定 → プラグインで Python 側を有効にし、` +
-            'それでも直らなければゲートウェイを再起動してください。'
+          `バックエンドに接続できません（${detail}）。` +
+            'スキルとツール → プラグインで Python 側を有効にしてください。'
         )
       }
       throw new Error(detail)
@@ -74,7 +74,7 @@ export default function create(deps) {
     const note = secret.configured
       ? ''
       : secret.disables?.length
-        ? `未設定のあいだ ${secret.disables.join('、')} を無効にします`
+        ? `未設定の間は ${secret.disables.join('、')} を無効にします`
         : secret.description || ''
 
     return jsxs('div', {
@@ -153,7 +153,7 @@ export default function create(deps) {
             type: 'password',
             autoComplete: 'off',
             spellCheck: false,
-            placeholder: '値を貼り付け',
+            placeholder: '値を貼り付けてください',
             className:
               'mt-4 w-full rounded px-2 py-1.5 text-sm focus:outline-none',
           style: { border: BORDER, background: SURFACE_2, color: 'inherit' },
@@ -164,7 +164,7 @@ export default function create(deps) {
           }),
           jsx('div', {
             className: 'mt-2 text-xs opacity-60',
-            children: '保存後は表示できません。変更するときは入れ直してください。'
+            children: '保存後は表示されません。変更する場合は入力し直してください。'
           }),
           jsxs('div', {
             className: 'mt-4 flex justify-end gap-2',
@@ -201,11 +201,11 @@ export default function create(deps) {
             ? jsx('div', {
                 className: 'mt-3 rounded px-3 py-2 text-xs',
                 style: { border: `1px solid ${WARN}`, color: WARN },
-                children: `進行中のカードを ${impact.busy} 件抱えています。先に片付けてください。`
+                children: `進行中のカードが ${impact.busy} 件あります。先に片付けてください。`
               })
             : jsx('div', {
                 className: 'mt-2 text-xs opacity-70',
-                children: '役の定義を削除します。板の過去のカードは残ります。'
+                children: 'エージェントの定義を削除します。ボードの過去のカードは残ります。'
               }),
           !blocked && impact?.installed
             ? jsxs('label', {
@@ -222,7 +222,7 @@ export default function create(deps) {
                       jsx('span', { style: { color: DANGER }, children: '記憶とセッションも削除する' }),
                       jsx('span', {
                         className: 'block opacity-70',
-                        children: `記憶 ${impact.memories} 件 / セッション ${impact.sessions} 件。戻せません。`
+                        children: `記憶 ${impact.memories} 件、セッション ${impact.sessions} 件。元に戻せません。`
                       })
                     ]
                   })
@@ -232,7 +232,7 @@ export default function create(deps) {
           jsxs('div', {
             className: 'mt-5 flex justify-end gap-2',
             children: [
-              jsx(Button, { label: 'やめる', onClick: onClose, disabled: working }),
+              jsx(Button, { label: 'キャンセル', onClick: onClose, disabled: working }),
               jsx(Button, {
                 label: working ? '削除しています…' : '削除',
                 disabled: working || blocked,
@@ -301,7 +301,7 @@ export default function create(deps) {
         })
         setLog(res.lines || [])
         // **成否を一言で言う。** ログだけ出して黙ると、読める人しか結果が分からない。
-        setNotice(res.ok ? '反映しました。' : '一部が失敗しました。下の実行結果を確認してください。')
+        setNotice(res.ok ? '反映しました' : '一部に失敗しました。実行結果をご確認ください。')
         await load()
       } catch (e) {
         setError(e.message)
@@ -331,8 +331,8 @@ export default function create(deps) {
           setRemoving(null)
           setNotice(
             keepProfile
-              ? `${name} を削除しました（記憶とセッションは残しています）。`
-              : `${name} を削除しました。`
+              ? `${name} を削除しました（記憶とセッションは残しています）`
+              : `${name} を削除しました`
           )
           await load()
         } catch (e) {
@@ -354,8 +354,8 @@ export default function create(deps) {
         const res = await call(ctx, '/share', { method: 'POST', body: { name }, timeoutMs: 120000 })
         setNotice(
           res.url
-            ? `${name} の取り込みを依頼しました: ${res.url}`
-            : `${name} の取り込みを依頼しました。`
+            ? `${name} の取り込みを依頼しました（${res.url}）`
+            : `${name} の取り込みを依頼しました`
         )
       } catch (e) {
         setError(e.message)
@@ -377,7 +377,7 @@ export default function create(deps) {
         // **取り込んだら、その場で画面を作り直す。** アプリの再起動も、
         // レンダラの読み直し（ペインの構成が壊れる）も要らない。
         if (res.changed) await reloadUi()
-        setNotice(res.changed ? '更新しました。' : 'すでに最新です。')
+        setNotice(res.changed ? '最新にしました' : 'すでに最新です')
       } catch (e) {
         setError(e.message)
       } finally {
@@ -460,7 +460,7 @@ export default function create(deps) {
             children: [
               jsx('span', {
                 className: 'flex-1',
-                children: 'この画面は古いまま動いています。再起動すると新しくなります。'
+                children: 'この画面は古い状態で動作しています。再起動すると最新になります。'
               }),
               jsx(Button, {
                 label: '再起動',
@@ -474,7 +474,7 @@ export default function create(deps) {
           ? jsx('div', {
               className: 'rounded px-3 py-2 text-xs',
               style: { border: `1px solid ${DANGER}`, color: DANGER },
-              children: `${check.blocking.join('、')} を設定してください。これが無いと動きません。`
+              children: `${check.blocking.join('、')} が未設定です。これが無いと動作しません。`
             })
           : null,
 

@@ -43,14 +43,13 @@ function Host({ ctx }) {
       res = await ctx.rest('/ui.js')
     } catch {
       setError(
-        '画面を読み込めません。設定 → プラグインで、この拡張の Python 側を有効にしてください。' +
-          '有効なのに出ないときは、ゲートウェイを再起動してください。'
+        '画面を読み込めません。スキルとツール → プラグインで Python 側を有効にしてください。'
       )
       return
     }
     const source = res?.source
     if (!source) {
-      setError('画面のコードが空でした。')
+      setError('画面の内容が空でした')
       return
     }
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))
@@ -63,7 +62,7 @@ function Host({ ctx }) {
       const built = mod.default({ ...DEPS, ctx, reloadUi: fetchUi })
       setPage(() => built)
     } catch (e) {
-      setError(`画面のコードを読み込めません: ${e?.message || e}`)
+      setError(`画面を読み込めません（${e?.message || e}）`)
     } finally {
       URL.revokeObjectURL(url)
     }
@@ -88,7 +87,7 @@ function Host({ ctx }) {
           onClick: fetchUi,
           className: 'self-start rounded px-3 py-1.5 text-xs',
           style: { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` },
-          children: 'もう一度読み込む'
+          children: '再読み込み'
         })
       ]
     })

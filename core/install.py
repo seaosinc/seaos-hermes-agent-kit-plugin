@@ -51,7 +51,7 @@ def register_cron(*, log: Optional[Log] = None) -> Result:
     code, listing = hermes.run(["-p", profile, "cron", "list"])
     if code != 0:
         res.failures += 1
-        say(f"✗ 登録済みの定期実行を読めなかった（{profile}）")
+        say(f"✗ {profile} の定期実行を読み取れませんでした")
         return res
 
     roles_spec = {**gen.ROLES, **gen.worker_roles(kit_root())}
@@ -61,20 +61,20 @@ def register_cron(*, log: Optional[Log] = None) -> Result:
         for name in spec.get("cron", []):
             expr, script = gen.CRON_JOBS[name]
             if re.search(rf"Name:\s*{re.escape(name)}\b", listing):
-                say(f"= {name}（登録済み）")
+                say(f"{name} は登録済みです")
                 continue
             if not (profile_dir(role) / "scripts" / script).is_file():
                 res.failures += 1
-                say(f"✗ {name}: {script} が配布されていない（先に update）")
+                say(f"✗ {name}: {script} が未配布です（先に反映してください）")
                 continue
             code, _out = hermes.run(
                 ["-p", profile, "cron", "create", expr,
                  "--name", name, "--script", script, "--no-agent"])
             if code == 0:
-                say(f"+ {name}（{expr}）")
+                say(f"{name} を登録しました（{expr}）")
             else:
                 res.failures += 1
-                say(f"✗ {name} の登録に失敗")
+                say(f"✗ {name} を登録できませんでした")
     return res
 
 
@@ -86,28 +86,28 @@ def install(*, log: Optional[Log] = None) -> Result:
     res = Result()
     say: Log = log or (lambda _l: None)
 
-    say("=== 1. 配布物を生成して全役を導入 ===")
+    say("エージェントを配ります")
     result = kit.update()
     res.lines.extend(result.lines)
     res.failures += result.failures
     for line in result.lines:
         say(line)
 
-    say("=== 2. コマンドの置き場 ===")
+    say("コマンドを配置します")
     try:
         platform_ops.link_command(log=say)
     except OSError as exc:
         res.failures += 1
-        say(f"✗ コマンドを置けなかった: {exc}")
+        say(f"✗ コマンドを配置できませんでした: {exc}")
 
-    say("=== 3. 定期実行（Hermes の cron） ===")
+    say("定期実行を登録します")
     res.failures += register_cron(log=say).failures
 
-    say("=== 4. 共有記憶（mem0） ===")
+    say("共有記憶を用意します")
     if not mem0.up(log=say):
         res.failures += 1
 
-    say("=== 5. 常駐 ===")
+    say("常駐の設定")
     say(platform_ops.autostart_hint())
 
     return res
@@ -122,33 +122,33 @@ def uninstall(*, remove_profiles: bool = False, log: Optional[Log] = None) -> Re
     res = Result()
     say: Log = log or (lambda _l: None)
 
-    say("=== 1. コマンドの置き場 ===")
+    say("コマンドを外します")
     if platform_ops.unlink_command(log=say):
         pass
     else:
-        say("= 置いていなかった")
+        say("置かれていませんでした")
 
-    say("=== 2. 共有記憶（mem0） ===")
+    say("共有記憶を止めます")
     mem0.down(log=say)
 
-    say("=== 3. アクセスゲートの承認 ===")
+    say("アクセス許可を外します")
     removed = booking.revoke_all(log=say)
-    say(f"= このゲート由来の承認を {removed} 箇所から削除" if removed else "= 消すものは無かった")
+    say(f"このゲート由来の承認を {removed} 箇所から削除しました" if removed else "削除するものはありませんでした")
 
     if not remove_profiles:
         say("")
-        say("役のプロファイルは残した（記憶とセッションを抱えているため）。")
-        say("消すなら remove_profiles を渡すこと。")
+        say("エージェントのプロファイルは残しました（記憶とセッションがあるため）。")
+        say("削除する場合は remove_profiles を指定してください。")
         return res
 
-    say("=== 4. 役のプロファイル ===")
+    say("エージェントのプロファイルを削除します")
     for name in roles.names():
         if not profile_dir(name).is_dir():
             continue
         code, _out = hermes.run(["profile", "delete", name])
         if profile_dir(name).is_dir():
             res.failures += 1
-            say(f"✗ {name} を消せなかった（手で消すこと）")
+            say(f"✗ {name} を削除できませんでした（手で削除してください）")
         else:
             say(f"- {name}")
     return res

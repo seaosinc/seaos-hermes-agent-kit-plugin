@@ -110,7 +110,7 @@ def self_update() -> Dict:
 
     root = _REPO
     if not (root / ".git").is_dir():
-        raise HTTPException(status_code=400, detail="git から入れていないので更新できません")
+        raise HTTPException(status_code=400, detail="git から導入していないため、更新できません")
     proc = subprocess.run(
         ["git", "-C", str(root), "pull", "--ff-only"],
         capture_output=True, text=True, stdin=subprocess.DEVNULL,
@@ -243,7 +243,7 @@ def set_secret(body: SecretIn) -> Dict:
     任意のキーを書き込める口にしないため。
     """
     if body.name not in roles.managed_env_vars():
-        raise HTTPException(status_code=400, detail=f"知らない変数: {body.name}")
+        raise HTTPException(status_code=400, detail=f"{body.name} は管理対象外の項目です")
 
     env_mod.set_value(body.name, body.value, f"{body.name}（GUI から設定）")
     return {"name": body.name, "configured": bool(body.value)}
@@ -267,7 +267,7 @@ def share_role(body: ShareIn) -> Dict:
     import worker as worker_mod
 
     if roles.origin(body.name) != "local":
-        raise HTTPException(status_code=400, detail="配布物として入っている役は共有済みです")
+        raise HTTPException(status_code=400, detail="このエージェントは配布済みです")
     try:
         out = worker_mod.share(body.name)
     except Exception as exc:  # noqa: BLE001  （原因をそのまま画面へ出す）
@@ -285,7 +285,7 @@ def removal_impact(name: str) -> Dict:
     import worker as worker_mod
 
     if roles.origin(name) != "local":
-        raise HTTPException(status_code=400, detail="配布物の役はここからは消せません")
+        raise HTTPException(status_code=400, detail="配布されたエージェントはここから削除できません")
     pdir = profile_dir(name)
     memories = len(list((pdir / "memories").glob("*"))) if (pdir / "memories").is_dir() else 0
     sessions = len(list((pdir / "sessions").glob("*"))) if (pdir / "sessions").is_dir() else 0
@@ -314,7 +314,7 @@ def remove_role(body: RemoveIn) -> Dict:
     import worker as worker_mod
 
     if roles.origin(body.name) != "local":
-        raise HTTPException(status_code=400, detail="配布物の役はここからは消せません")
+        raise HTTPException(status_code=400, detail="配布されたエージェントはここから削除できません")
     try:
         return worker_mod.remove(body.name, keep_profile=body.keepProfile)
     except Exception as exc:  # noqa: BLE001  （進行中のカードなど、理由をそのまま画面へ）

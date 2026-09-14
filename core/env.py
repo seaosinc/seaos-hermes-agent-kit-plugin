@@ -76,6 +76,8 @@ def apply() -> Tuple[List[str], List[str]]:
     managed = roles.managed_env_vars()
     report: List[str] = []
     missing: List[str] = []
+    # **役ごとの1行は畳む。** 毎回8行並んでも読まれない。
+    total_wrote = total_pruned = touched = 0
 
     for name in roles.names():
         pdir = profile_dir(name)
@@ -101,10 +103,10 @@ def apply() -> Tuple[List[str], List[str]]:
                 # 配布物として入れ直した直後の .env は空なので、ここを踏むと
                 # 8役ぶんの鍵が同時に消える（実際に踏みかけた）。
                 if required:
-                    missing.append(f"{name}:{var}（正に無いので既存値を残した）")
+                    missing.append(f"{name} の {var}（元に無いので、いまの値を残しました）")
                 continue
             if required and not value:
-                missing.append(f"{name}:{var}")
+                missing.append(f"{name} の {var}")
             lines = _upsert(lines, var, value, desc)
             wrote += 1
 
@@ -118,10 +120,15 @@ def apply() -> Tuple[List[str], List[str]]:
 
         dst.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
         _secure(dst)
-        report.append(
-            f"{name} に鍵を {wrote} 件" + (f"（不要な {pruned} 件を引き上げた）" if pruned else "")
-        )
+        total_wrote += wrote
+        total_pruned += pruned
+        touched += 1
 
+    if touched:
+        report.append(
+            f"接続情報を {touched} 件のエージェントに配りました"
+            + (f"（不要な {total_pruned} 件を引き上げました）" if total_pruned else "")
+        )
     return report, missing
 
 
@@ -221,7 +228,7 @@ def sync_mcp_enabled() -> Tuple[List[str], List[str]]:
                 indent = next((l[:len(l) - len(l.lstrip())] for l in block if l.strip()), "    ")
                 lines.insert(end, f"{indent}enabled: false")
                 edited = True
-                changed.append(f"{name}/{server_name} を無効にした（{', '.join(missing)} が空）")
+                changed.append(f"{name} の {server_name} を無効にしました（{', '.join(missing)} が空のため）")
                 disabled.append(f"{name}/{server_name}")
                 continue
 
@@ -234,9 +241,9 @@ def sync_mcp_enabled() -> Tuple[List[str], List[str]]:
             lines[begin + where] = f"{indent}enabled: {'true' if want else 'false'}"
             edited = True
             if want:
-                changed.append(f"{name}/{server_name} を有効にした（鍵が入った）")
+                changed.append(f"{name} の {server_name} を有効にしました")
             else:
-                changed.append(f"{name}/{server_name} を無効にした（{', '.join(missing)} が空）")
+                changed.append(f"{name} の {server_name} を無効にしました（{', '.join(missing)} が空のため）")
                 disabled.append(f"{name}/{server_name}")
 
         if edited:
