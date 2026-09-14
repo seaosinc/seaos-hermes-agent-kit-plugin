@@ -414,11 +414,11 @@ export default function create(deps) {
                 jsxs('div', {
                   className: 'flex gap-2',
                   children: [
-                    jsx(Button, { label: '更新', onClick: selfUpdate, disabled: busy }),
+                    jsx(Button, { label: 'プラグインを最新化', onClick: selfUpdate, disabled: busy }),
                     jsx(Button, {
                       // **必須が欠けているあいだは押させない。** 押せてしまうと、
                       // 途中まで進んで失敗した状態が残る。
-                      label: busy ? '実行中…' : '反映',
+                      label: busy ? '実行中…' : 'エージェントを反映',
                       onClick: update,
                       disabled: busy || !check.ok,
                       primary: true
