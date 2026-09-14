@@ -76,6 +76,25 @@ def _orphan_profiles(rep: Report) -> None:
         rep.ok("実機の役は配置表と一致している")
 
 
+def _orphan_secrets(rep: Report) -> None:
+    """**役が消えたのに残っている鍵を掃除する。**
+
+    役つきの名前（`PROJECT_BOT__SLACK_BOT_TOKEN`）は、その役が居なくなると
+    管理対象から外れ、**値が入ったまま正の `.env` に取り残される**（実際に残った）。
+    使われないだけでなく、同じ名前の役を作り直したときに古い値が蘇る。
+    """
+    import env as env_mod
+
+    source = env_mod.read_env(env_mod.env_file())
+    managed = set(roles.managed_env_vars())
+    orphans = [k for k in source if "__" in k and k not in managed]
+    if not orphans:
+        return
+    for key in orphans:
+        env_mod.drop_value(key)
+    rep.note(f"役が消えたのに残っていた鍵を外した: {' '.join(orphans)}")
+
+
 def _stale_tombstones(rep: Report) -> None:
     """**実在しない役の「削除済み」の印を掃除する。**
 
@@ -223,6 +242,7 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
 
     _orphan_profiles(rep)
     _stale_tombstones(rep)
+    _orphan_secrets(rep)
     _profiles(rep)
     _env_hint(rep)
     _assignees(rep)

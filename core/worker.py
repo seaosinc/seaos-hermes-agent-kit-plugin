@@ -24,6 +24,7 @@ from typing import Callable, Dict, List, Optional
 import yaml
 
 import hermes
+import roles
 from paths import hermes_home, kit_root, local_workers_dir, profile_dir
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -504,7 +505,21 @@ def remove(name: str, *, keep_profile: bool = False) -> Dict:
     if busy > 0:
         raise WorkerError(f"{name} は進行中のカードを {busy} 件抱えている。先に片付けること")
 
+    # **その役だけの鍵も落とす。** 役が消えれば管理対象から外れるので、
+    # 正の `.env` に値が入ったまま取り残される（実際に残った）。
+    # 定義を消す前に、何を持っていたかを読む。
+    own_keys = [roles.env_key(name, var) for var in roles.own_env_vars(name)]
+
     shutil.rmtree(d)
+
+    import env as env_mod
+
+    dropped = []
+    for key in own_keys:
+        if env_mod.read_env(env_mod.env_file()).get(key) is not None:
+            env_mod.drop_value(key)
+            dropped.append(key)
+
     removed_profile = False
     if not keep_profile and profile_dir(name).is_dir():
         # **`-y` が要る。** 無いと対話の確認待ちになり、stdin を閉じているので
@@ -513,4 +528,5 @@ def remove(name: str, *, keep_profile: bool = False) -> Dict:
         # **成否は戻り値ではなくディレクトリの有無で見る。**
         # profile delete は対話確認を求めるため、失敗しても静かに終わることがある。
         removed_profile = not profile_dir(name).is_dir()
-    return {"name": name, "template_removed": True, "profile_removed": removed_profile}
+    return {"name": name, "template_removed": True,
+            "profile_removed": removed_profile, "secrets_removed": dropped}

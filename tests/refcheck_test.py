@@ -152,6 +152,41 @@ def test_mcp_follows_the_key():
         assert "enabled: true" in body, "鍵が入ったのに有効へ戻らない"
 
 
+def test_role_secrets_are_dropped_with_the_role():
+    """**役を消したら、その役だけの鍵も落とす。**
+
+    役つきの名前（`PROJECT_BOT__SLACK_BOT_TOKEN`）は、役が居なくなると管理対象から
+    外れ、**値が入ったまま正の `.env` に取り残される**（実際に残った）。使われない
+    だけでなく、同じ名前の役を作り直したときに古い値が蘇る。
+    """
+    import importlib
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        home = Path(tmp)
+        old = os.environ.get("HERMES_HOME")
+        os.environ["HERMES_HOME"] = str(home)
+        try:
+            import paths
+            importlib.reload(paths)
+            import env as env_mod
+            import roles as roles_mod
+            importlib.reload(env_mod)
+            importlib.reload(roles_mod)
+
+            key = roles_mod.env_key("probe", "SLACK_BOT_TOKEN")
+            env_mod.set_value(key, "xoxb-dummy", "確認用")
+            assert env_mod.read_env(env_mod.env_file()).get(key) == "xoxb-dummy"
+
+            env_mod.drop_value(key)
+            assert not env_mod.read_env(env_mod.env_file()).get(key)
+        finally:
+            if old is None:
+                os.environ.pop("HERMES_HOME", None)
+            else:
+                os.environ["HERMES_HOME"] = old
+
+
 if __name__ == "__main__":
     check("実在しないコマンドを検知する", test_missing_command_is_caught)
     check("実在するコマンドは咎めない", test_existing_command_is_not_flagged)
@@ -160,6 +195,7 @@ if __name__ == "__main__":
     check("現役に無い名前を挙げる", test_unknown_name_is_reported)
     check("現役の役は挙げない", test_live_role_is_not_reported)
     check("MCP が鍵に従う", test_mcp_follows_the_key)
+    check("役と一緒に鍵も落ちる", test_role_secrets_are_dropped_with_the_role)
     print()
     if failures:
         print(f"★ {len(failures)} 件失敗")
