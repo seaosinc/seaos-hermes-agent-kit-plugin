@@ -252,6 +252,39 @@ export default function create(deps) {
     })
   }
 
+
+  /** その役だけの鍵。**共通の一覧に混ぜない。**
+   *
+   * 窓口ごとに Slack のトークンが要るので、混ぜると役の数だけ行が増えて読めなくなる。
+   * ダイアログが役に属するので、中では変数名だけでよい（役名が文脈になる）。
+   */
+  function OwnSecretsDialog({ role, secrets, onEdit, onClose }) {
+    return jsx('div', {
+      className: 'fixed inset-0 z-40 flex items-center justify-center bg-black/40',
+      onClick: onClose,
+      children: jsxs('div', {
+        className: 'w-[32rem] max-w-[90vw] rounded-lg p-5 shadow-xl',
+        style: { border: BORDER, background: SURFACE },
+        onClick: (e) => e.stopPropagation(),
+        children: [
+          jsx('div', { className: 'text-sm font-medium', children: `${role} の接続情報` }),
+          jsx('div', {
+            className: 'mt-1 text-xs opacity-60',
+            children: 'この窓口だけが使います。他の窓口とは共有されません。'
+          }),
+          jsx('div', {
+            className: 'mt-3',
+            children: secrets.map((x) => jsx(SecretRow, { secret: x, onEdit }, x.name))
+          }),
+          jsx('div', {
+            className: 'mt-4 flex justify-end',
+            children: jsx(Button, { label: '閉じる', onClick: onClose })
+          })
+        ]
+      })
+    })
+  }
+
   function SettingsPage({ ctx }) {
     const [roles, setRoles] = useState([])
     const [secrets, setSecrets] = useState([])
@@ -261,6 +294,7 @@ export default function create(deps) {
     const [notice, setNotice] = useState('')
     const [editing, setEditing] = useState(null)
     const [removing, setRemoving] = useState(null)
+    const [ownOf, setOwnOf] = useState(null)
     const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
     const [version, setVersion] = useState(null)
 
@@ -524,6 +558,20 @@ export default function create(deps) {
                     ]
                   }),
                   // **共有はこの環境の役だけ。** 配布物は既に入っている。
+                  r.ownSecrets?.length
+                    ? jsxs('button', {
+                        type: 'button',
+                        onClick: () => setOwnOf(r),
+                        className: 'shrink-0 text-xs hover:underline',
+                        style: { color: ACCENT },
+                        children: [
+                          '設定',
+                          r.ownSecrets.every((x) => x.configured)
+                            ? null
+                            : jsx('span', { style: { color: WARN }, className: 'ml-1', children: '●' })
+                        ]
+                      })
+                    : null,
                   r.origin === 'local'
                     ? jsx('button', {
                         type: 'button',
@@ -582,6 +630,15 @@ export default function create(deps) {
                   children: log.join('\n')
                 })
               ]
+            })
+          : null,
+
+        ownOf
+          ? jsx(OwnSecretsDialog, {
+              role: ownOf.name,
+              secrets: (roles.find((x) => x.name === ownOf.name) || ownOf).ownSecrets || [],
+              onEdit: setEditing,
+              onClose: () => setOwnOf(null)
             })
           : null,
 

@@ -36,6 +36,11 @@ router = APIRouter()
 
 # ── 読み取り ──────────────────────────────────────────────────────────────
 
+def _source() -> Dict[str, str]:
+    """いま入っている値。**値そのものは画面へ返さない**——有無だけを見る。"""
+    return env_mod.read_env(env_file())
+
+
 @router.get("/roles")
 def list_roles() -> List[Dict]:
     """役の一覧。導入済みかどうかと、人が読む一行説明を返す。"""
@@ -46,6 +51,18 @@ def list_roles() -> List[Dict]:
                 "name": name,
                 "installed": profile_dir(name).is_dir(),
                 "summary": roles.summary(name),
+                # **その役だけの鍵。** 共通の一覧に混ぜると、窓口の数だけ行が増えて
+                # 読めなくなる（実際にそうなった）。役の行から開く。
+                "ownSecrets": [
+                    {
+                        "name": roles.env_key(name, var),
+                        "label": var,
+                        "description": desc,
+                        "configured": bool(_source().get(roles.env_key(name, var))),
+                    }
+                    for var, _req, desc in roles.env_requirements(name)
+                    if var in set(roles.own_env_vars(name))
+                ],
                 # 配られてきた役か、この環境で作った役か。後者は git に入らない
                 "origin": roles.origin(name),
             }
@@ -191,9 +208,11 @@ def list_secrets() -> List[Dict]:
         for var, required, desc in roles.env_requirements(name):
             # **役ごとに持つ鍵は、行を分ける。** 窓口が複数あるとき、同じ値を
             # 共有すると両方が同じ発言に返事をするので、共有させない。
-            key = roles.env_key(name, var) if var in own else var
+            if var in own:
+                # 役ごとの鍵は、その役の行から設定する（/roles が返す）
+                continue
             entry = seen.setdefault(
-                key, {"name": key, "label": f"{name} の {var}" if var in own else var,
+                var, {"name": var, "label": var,
                       "description": desc, "required": False,
                       "usedBy": [], "disables": disables.get(var, [])}
             )
