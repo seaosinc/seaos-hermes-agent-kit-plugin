@@ -11,7 +11,7 @@ metadata:
 # エージェントを1体つくる
 
 依頼は「請求書のチェックだけやる子が欲しい」のような**役割の話**でカードに書かれて来る。
-あなたがやるのは、それを **`templates/workers/<name>/` の一式**に翻訳し、
+あなたがやるのは、それを **役の一式（SOUL・説明文・MCP・スキル）**に翻訳し、
 反映し、**ゲートウェイを再起動して実際に配られる状態にする**ところまでである。
 起草だけで渡さない。再起動まで済んでいないものは、できていないのと同じである。
 
@@ -22,7 +22,12 @@ metadata:
 | `skills/<name>/SKILL.md` | 手順（任意） | 毎回やり方を思い出せない |
 | `mcp.yaml` | 外部サービスへの口（任意） | その仕事ができない |
 
-**編集するのは常に `templates/workers/` 側である。** `~/.hermes/profiles/` は生成物なので直接触らない。
+**編集するのは常に役の定義の側である**（`seaos-kit worker` が置き場を面倒みる）。
+`~/.hermes/profiles/` は生成物なので直接触らない。
+
+**新しく作った役は `~/.hermes/seaos-kit/workers/` に置かれる**——キットの中ではない。
+配布のたびに消えないようにするため。配られてきた役（`handler` など）はキットの中にあり、
+更新で上書きされる。どちらかは `seaos-kit worker list` の ORIGIN 欄で分かる。
 反映は `seaos-kit update` が行う。
 
 ## 0. まず「作らない」を検討する
@@ -60,7 +65,7 @@ metadata:
 `--skill` は**同名があれば中身ごと差し替える**ので、既存スキルの修正もこれで行う。
 直す前に `seaos-kit worker show <役>` で、いま何が載っているかを読む。
 
-**直せるのは業務別ワーカー（`templates/workers/<役>/`）だけである。**
+**直せるのは業務別ワーカーだけである。**
 固定役の規約（`templates/profiles/`）、全役に差し込まれる共通ブロック
 （`_worker-base.md` / `_worker-impl.md`）、全役が使う共通スキル（`templates/skills/`）は
 対象外——**1つ直すと全員の振る舞いが変わる**ので、そこは人が判断する。
@@ -127,7 +132,7 @@ decomposer が読むのは**この文だけ**である。SOUL もスキルも読
 雛形を出発点にする。**ゼロから書かない。**
 
     mkdir -p /tmp/recruiter/<name>
-    cp <KIT>/templates/workers/_template/SOUL.md /tmp/recruiter/<name>/SOUL.md
+    cp <KIT>/templates/workers/_template/SOUL.md /tmp/recruiter/<name>/SOUL.md   # 雛形はキットの中
 
 **プレースホルダを3つとも残すこと。** 消すと `seaos-kit worker new --soul` が受け付けない:
 
@@ -201,7 +206,9 @@ frontmatter は他のスキルに揃える（`name` / `description` / `version` 
   「no cached tokens found」で落ちる、という形になる（実際に起きた）。
   **トークンで動く stdio 版があるなら、そちらを使う。**
 - **鍵は `${VAR}` で参照する。** テンプレートは git に入るので、値を書くとリポジトリへ漏れる
-- **使う変数は `--env` で宣言する。** 宣言しないと `env apply` が配らず、
+- **使う変数は `--env` で宣言する。** 既定では**任意**として登録される
+  （必須にすると、その役を足しただけで設定画面の「反映」が全体で止まる）。
+  宣言しないと `env apply` が配らず、
   サーバは起動しても認証されないまま「有効」に見える
 
       seaos-kit worker set <役> --env FOO_TOKEN="何のトークンか。どこで取るか"
@@ -320,6 +327,19 @@ doctor が通っただけでは「配られる」ことの証明にならない�
 `seaos-kit update` からやり直す。
 
 確認が済んだらテストカードは片付ける（`hermes kanban archive <ID>`）。
+
+## 8.5 共有する（他の環境でも使うなら）
+
+**作った役は git に入らない。** この環境にしか無いので、機械が飛べば消える。
+他でも使う役なら、キットへ取り込んでもらう。
+
+    seaos-kit worker share <役>
+
+キットへ取り込む PR が出る。**取り込まれたら、この環境のコピーを削除すること**
+（`seaos-kit worker rm <役> --keep-profile`）——残すと配布物より優先され続け、
+以後の更新が効かない。
+
+その環境限りの役なら、共有しなくてよい。
 
 ## 9. 失敗したら戻す
 
