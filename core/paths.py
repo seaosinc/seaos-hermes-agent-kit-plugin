@@ -45,8 +45,28 @@ def profile_dir(name: str) -> Path:
 
 
 def env_file() -> Path:
-    """秘密の正。**ここ1箇所だけ。** git には入らない。"""
-    return kit_root() / ".env"
+    """秘密の正。**ここ1箇所だけ。** git には入らない。
+
+    **キットの外に置く。** 中（`<キット>/.env`）に置くと
+    `hermes plugins install --force` で消える——あれはフォルダごと置き換えるので、
+    git に入らないものは引き継がれない。**実際に全部の鍵が飛んだ。**
+
+    キットの中に旧い `.env` が残っていれば、**一度だけ引き取る**。
+    移行で鍵が消えないように。
+    """
+    new_path = hermes_home() / "seaos-kit" / ".env"
+    if new_path.is_file():
+        return new_path
+
+    legacy = kit_root() / ".env"
+    if legacy.is_file():
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(legacy, new_path)
+        os.chmod(new_path, 0o600)
+        # **旧いほうは消す。** 残すと、どちらが正か分からなくなる
+        # （消える側を編集し続ける事故が起きる）。
+        legacy.unlink()
+    return new_path
 
 
 def hermes_bin() -> str | None:
