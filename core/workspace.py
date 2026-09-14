@@ -263,6 +263,22 @@ def clean(*, confirm: bool = False, log: Optional[Log] = None) -> bool:
     return code == 0
 
 
+def shell() -> int:
+    """作業部屋のイメージに入る。**手で確かめるため。**
+
+    エージェントが「その道具が無い」と言ったとき、本当に無いのかを見る唯一の手段。
+    キャッシュも同じように繋ぐので、担当が見ているのと同じ状態になる。
+
+    **端末をそのまま渡す**（capture しない）。対話で使うものなので、
+    出力を捕まえると入力が効かない。
+    """
+    cfg = settings()
+    return subprocess.run(
+        [_docker_bin(), "run", "--rm", "-it",
+         "-v", f"{cfg['cache']}:/cache", "-w", "/workspace", cfg["image"], "bash", "-l"]
+    ).returncode
+
+
 def gc(log: Optional[Log] = None) -> Dict[str, str]:
     """溜まったゴミを落とす。**守るものを明示して、それ以外だけ落とす。**
 

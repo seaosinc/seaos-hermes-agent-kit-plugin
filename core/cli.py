@@ -100,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     wpb.add_argument("--no-warm", action="store_true", help="キャッシュを温めない")
     wpsub.add_parser("ca", help="組織の TLS 傍受プロキシの CA を取り出す")
     wpsub.add_parser("gc", help="匿名ボリュームと dangling イメージだけ落とす")
+    wpsub.add_parser("shell", help="作業部屋に入る（手で確かめるため）")
 
     m0 = sub.add_parser("mem0", help="共有記憶")
     m0sub = m0.add_subparsers(dest="mcmd", required=True)
@@ -231,6 +232,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.wpcmd == "ca":
             ws.extract_ca(log=_print)
             return 0
+        if args.wpcmd == "shell":
+            return ws.shell()
+
         if args.wpcmd == "gc":
             ws.gc(log=_print)
             return 0
