@@ -79,8 +79,6 @@ def sync_descriptions(log: Optional[Log] = None) -> Result:
         else:
             result.failures += 1
             result.lines.append(f"✗ {name} の説明文を設定できませんでした")
-    if log:
-        log(f"説明文を {len(result.lines) - result.failures} 役ぶん合わせた（decomposer が読む）")
     return result
 
 
@@ -186,6 +184,14 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
 
     pruned = prune_skills()
     result.lines.extend(pruned.lines)
+
+    # **この PC の事実を書き直す。** config.yaml ごと入れ替わると消えるので、
+    # 反映のたびに置く（実際に全役から消えていた）。
+    import envhint
+
+    measured = envhint.apply()
+    result.lines.extend(measured.lines)
+    result.failures += measured.failures
 
     described = sync_descriptions(log=log)
     ok = len(described.lines) - described.failures
