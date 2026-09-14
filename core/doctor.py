@@ -76,6 +76,27 @@ def _orphan_profiles(rep: Report) -> None:
         rep.ok("実機の役は配置表と一致している")
 
 
+def _stale_tombstones(rep: Report) -> None:
+    """**実在しない役の「削除済み」の印を掃除する。**
+
+    `hermes profile delete` が置く印は、入れ直しても消えない。同じ名前で作り直すと
+    フォルダが実在しても「存在しない」と扱われ、`hermes -p <役>` も `profile list` も
+    見つけられなくなる。**実際に8役ぶん踏んだ。**
+
+    フォルダが無いなら印は用済みなので、ここで外す。
+    """
+    marker_dir = profiles_dir() / ".deleted"
+    if not marker_dir.is_dir():
+        return
+    cleared = []
+    for marker in sorted(marker_dir.glob("*")):
+        if marker.is_file() and not (profiles_dir() / marker.name).is_dir():
+            marker.unlink()
+            cleared.append(marker.name)
+    if cleared:
+        rep.note(f"使われていない削除済みの印を外した: {' '.join(cleared)}")
+
+
 def _profiles(rep: Report) -> None:
     rep.section("各役")
     specs = roles.all_specs()
@@ -201,6 +222,7 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     rep = Report()
 
     _orphan_profiles(rep)
+    _stale_tombstones(rep)
     _profiles(rep)
     _env_hint(rep)
     _assignees(rep)

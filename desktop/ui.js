@@ -179,7 +179,7 @@ export default function create(deps) {
   }
 
 
-  /** 消す前に、何が起きるかを見せる。
+  /** 削除する前に、何が起きるかを見せる。
    *
    * **記憶とセッションは戻せない。** 既定は残す側にして、消すほうを明示させる。
    */
@@ -196,7 +196,7 @@ export default function create(deps) {
         style: { border: BORDER, background: SURFACE },
         onClick: (e) => e.stopPropagation(),
         children: [
-          jsx('div', { className: 'text-sm font-medium', children: `${role} を消す` }),
+          jsx('div', { className: 'text-sm font-medium', children: `${role} を削除する` }),
           blocked
             ? jsx('div', {
                 className: 'mt-3 rounded px-3 py-2 text-xs',
@@ -205,7 +205,7 @@ export default function create(deps) {
               })
             : jsx('div', {
                 className: 'mt-2 text-xs opacity-70',
-                children: '役の定義を消します。板の過去のカードは残ります。'
+                children: '役の定義を削除します。板の過去のカードは残ります。'
               }),
           !blocked && impact?.installed
             ? jsxs('label', {
@@ -219,7 +219,7 @@ export default function create(deps) {
                   }),
                   jsxs('span', {
                     children: [
-                      jsx('span', { style: { color: DANGER }, children: '記憶とセッションも消す' }),
+                      jsx('span', { style: { color: DANGER }, children: '記憶とセッションも削除する' }),
                       jsx('span', {
                         className: 'block opacity-70',
                         children: `記憶 ${impact.memories} 件 / セッション ${impact.sessions} 件。戻せません。`
@@ -234,7 +234,7 @@ export default function create(deps) {
             children: [
               jsx(Button, { label: 'やめる', onClick: onClose, disabled: working }),
               jsx(Button, {
-                label: working ? '消しています…' : '消す',
+                label: working ? '削除しています…' : '削除',
                 disabled: working || blocked,
                 onClick: async () => {
                   setWorking(true)
@@ -310,7 +310,7 @@ export default function create(deps) {
       }
     }, [ctx, load])
 
-    // 消す前に、何が起きるかを取りに行く（進行中のカード、記憶とセッションの数）
+    // 削除する前に、何が起きるかを取りに行く（進行中のカード、記憶とセッションの数）
     const askRemove = useCallback(
       async (name) => {
         setError('')
@@ -331,8 +331,8 @@ export default function create(deps) {
           setRemoving(null)
           setNotice(
             keepProfile
-              ? `${name} を消しました（記憶とセッションは残しています）。`
-              : `${name} を消しました。`
+              ? `${name} を削除しました（記憶とセッションは残しています）。`
+              : `${name} を削除しました。`
           )
           await load()
         } catch (e) {
@@ -533,8 +533,9 @@ export default function create(deps) {
                         type: 'button',
                         disabled: busy,
                         onClick: () => askRemove(r.name),
-                        className: 'shrink-0 text-xs hover:underline disabled:opacity-40 ' + MUTED,
-                        children: '消す'
+                        className: 'shrink-0 text-xs hover:underline disabled:opacity-40',
+                        style: { color: DANGER },
+                        children: '削除'
                       })
                     : null,
                   jsx('span', {

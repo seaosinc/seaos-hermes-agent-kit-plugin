@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from paths import hermes_bin, hermes_home
+from paths import hermes_bin, hermes_home, profiles_dir
 
 
 class HermesMissing(RuntimeError):
@@ -53,7 +53,28 @@ def profile_exists(name: str) -> bool:
     return profile_dir(name).is_dir()
 
 
+def clear_tombstone(name: str) -> bool:
+    """その役の「削除済み」の印を外す。
+
+    `hermes profile delete` は `profiles/.deleted/<役>` に印を置き、**以後その名前は
+    フォルダが実在しても「存在しない」と扱われる**（hermes_constants の
+    `named_profile_is_deleted`）。印は入れ直しても消えないので、同じ名前で作り直すと
+    `hermes -p <役>` も `profile list` も見つけられない。
+
+    **実際に8役ぶん踏んだ。** ディレクトリは正しくあるのに全滅し、原因に辿り着くまで
+    長くかかった。入れる前に外す。
+    """
+    marker = profiles_dir() / ".deleted" / name
+    if not marker.exists():
+        return False
+    marker.unlink()
+    return True
+
+
 def install(dist: Path, *, force: bool = False) -> Tuple[int, str]:
+    # **入れる前に「削除済み」の印を外す。** 残っていると、入れても Hermes からは
+    # 存在しないものとして扱われる（同名で作り直したときに必ず踏む）。
+    clear_tombstone(dist.name)
     args = ["profile", "install", str(dist), "-y"]
     if force:
         args.append("--force")
