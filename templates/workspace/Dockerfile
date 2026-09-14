@@ -73,6 +73,23 @@ RUN install -m 0755 -d /etc/apt/keyrings \
  && rm -rf /var/lib/apt/lists/* \
  && gh --version
 
+# AWS CLI v2。**apt の awscli は v1 で古い**ので、公式の zip から入れる。
+# アーキテクチャは dpkg に聞く（このイメージは arm64 だが、amd64 でも通るように）。
+#
+# **認証情報は焼かない。** 実行時に環境変数で渡る。無ければ `aws` は
+# その呼び出しだけが失敗し、コンテナもエージェントも落ちない。
+RUN arch="$(dpkg --print-architecture)" \
+ && case "$arch" in \
+      arm64) url=https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip ;; \
+      amd64) url=https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip ;; \
+      *) echo "未対応のアーキテクチャ: $arch" >&2; exit 1 ;; \
+    esac \
+ && curl -fsSL "$url" -o /tmp/awscliv2.zip \
+ && unzip -q /tmp/awscliv2.zip -d /tmp \
+ && /tmp/aws/install \
+ && rm -rf /tmp/aws /tmp/awscliv2.zip \
+ && aws --version
+
 # Chromium が要る OS ライブラリ。**ブラウザ本体は焼かない**——
 # PLAYWRIGHT_BROWSERS_PATH を /cache に向けてあるので、849MB のバイナリは
 # ボリュームに落ちて1台につき一度で済む。
@@ -168,7 +185,7 @@ RUN mkdir -p /etc/hermes-config/opencode \
 # **道具の一覧は手で書かない。** 実際に入っているものをビルド時に写す
 # （手書きの一覧は中身と食い違っていくため）。
 RUN { printf '\n## いま入っている道具\n\n```\n'; \
-      for c in git gh mise opencode jq rg curl; do \
+      for c in git gh mise opencode jq rg curl aws; do \
         printf '%-10s %s\n' "$c" "$($c --version 2>&1 | head -1)"; \
       done; \
       printf '```\n\nここに無いものは mise で入れる。\n'; \

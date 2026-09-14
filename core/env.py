@@ -107,6 +107,13 @@ def apply() -> Tuple[List[str], List[str]]:
                 continue
             if required and not value:
                 missing.append(f"{name} の {var}")
+            if not value:
+                # **空なら行ごと落とす。** `VAR=` と書くと「設定されている」ことに
+                # なり、そのまま作業部屋へ転送される（Hermes は値が None のときだけ
+                # 外す。空文字は通る）。AWS の認証情報が空で入ると
+                # 「Partial credentials」で落ちる——**無いより悪い。**
+                lines = _drop(lines, var)
+                continue
             lines = _upsert(lines, var, value, desc)
             wrote += 1
 

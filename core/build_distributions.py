@@ -201,6 +201,15 @@ ROLES: dict[str, dict] = {
         "env": [
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
+            # **AWS。いまは配線だけで、値は未設定。** Terraform を扱うときに要る。
+            # すべて任意——**空なら env apply が行ごと落とす**ので、作業部屋へは
+            # 転送されない。中途半端に空文字が入ると「Partial credentials」で
+            # 落ちるので、それを踏まないための形である。
+            #
+            # サーバ（EC2）ではインスタンスロールで足りるので、鍵の2つは要らない。
+            ("AWS_ACCESS_KEY_ID", "AWS のアクセスキー ID。サーバではインスタンスロールを使うので不要", False),
+            ("AWS_SECRET_ACCESS_KEY", "AWS のシークレットアクセスキー", False),
+            ("AWS_REGION", "AWS の既定リージョン（例: ap-northeast-1）", False),
         ],
         "summary": "実装・検証・PR 作成。CI とレビュー指摘の解消まで",
         "desc": "リポジトリを clone して実装・検証・push・PR 作成、CI とレビュー指摘の解消まで担う開発役。A2A 連携そのものは扱わない。",
@@ -235,6 +244,15 @@ ROLES: dict[str, dict] = {
         "env": [
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
+            # **AWS。いまは配線だけで、値は未設定。** Terraform を扱うときに要る。
+            # すべて任意——**空なら env apply が行ごと落とす**ので、作業部屋へは
+            # 転送されない。中途半端に空文字が入ると「Partial credentials」で
+            # 落ちるので、それを踏まないための形である。
+            #
+            # サーバ（EC2）ではインスタンスロールで足りるので、鍵の2つは要らない。
+            ("AWS_ACCESS_KEY_ID", "AWS のアクセスキー ID。サーバではインスタンスロールを使うので不要", False),
+            ("AWS_SECRET_ACCESS_KEY", "AWS のシークレットアクセスキー", False),
+            ("AWS_REGION", "AWS の既定リージョン（例: ap-northeast-1）", False),
         ],
         "summary": "難度の高い実装。セキュリティと品質も見る",
         "desc": "developer の上位版。実装に加えてセキュリティとコード品質まで見る。設計判断を伴うもの、developer が詰まったものを引き取る。A2A 連携そのものは扱わない。",
@@ -553,6 +571,10 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
                 # 規約が指す $HERMES_KANBAN_WORKSPACE が箱の中で空になり、
                 # 成果物の宣言が / 直下を指してしまう（実際に踏んだ）。
                 "HERMES_KANBAN_TASK", "HERMES_KANBAN_WORKSPACE",
+                # **AWS。値が無ければ転送されない。** Hermes は値が None のときだけ
+                # 外すので、空文字を書かないことが前提になる——`env apply` は空なら
+                # 行ごと落とすので、未設定のあいだは箱の中に現れない。
+                "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION",
             ],
             # 固定値。委譲先のモデルを担当に覚えさせず、ここ1箇所で決める。
             "docker_env": {"OPENCODE_MODEL": f"{OPENCODE_PROVIDER}/{spec['model']}"},
