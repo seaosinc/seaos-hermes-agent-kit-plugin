@@ -77,7 +77,12 @@ def pid_alive(pid: int) -> bool:
 
 def gateway_pid(profile: str) -> Optional[int]:
     """素のプロセスとして走っているゲートウェイの PID。"""
-    pattern = f"hermes --profile {profile} gateway run"
+    # **起こし方で綴りが違う。** こちらが起こすと `hermes --profile <役> gateway run`
+    # だが、Hermes Desktop が起こすと `python -m hermes_cli.main --profile <役>
+    # gateway run --replace` になる。`hermes` を含む前提で探していたので、
+    # デスクトップが起こしたものを「動いていない」と誤判定し、二重起動しようとして
+    # 弾かれた（実際に起きた）。**共通して出るのは `--profile <役> gateway run`。**
+    pattern = f"--profile {profile} gateway run"
     if os_kind() == "win32":
         proc = subprocess.run(
             ["powershell", "-NoProfile", "-Command",
@@ -88,7 +93,9 @@ def gateway_pid(profile: str) -> Optional[int]:
         )
         value = proc.stdout.strip()
         return int(value) if value.isdigit() else None
-    proc = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True,
+    # **`--` が要る。** 綴りが `-` で始まるので、付けないと pgrep のオプションとして
+    # 解釈されて何も見つからない。
+    proc = subprocess.run(["pgrep", "-f", "--", pattern], capture_output=True, text=True,
                           stdin=subprocess.DEVNULL)
     first = proc.stdout.split()
     return int(first[0]) if first else None
