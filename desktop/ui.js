@@ -452,7 +452,19 @@ export default function create(deps) {
             })
           : null,
 
-        check.blocking.length
+        // **古いコードが動いていたら、まずそれを言う。** 画面の内容が当てにならない。
+      version?.stale
+        ? jsx('div', {
+            className: 'rounded px-3 py-2 text-xs',
+            style: { border: `1px solid ${WARN}`, color: WARN },
+            children:
+              'ゲートウェイが古いコードで動いています。この画面の内容は当てになりません。' +
+              `（動いているのは ${version.loaded}、ディスクは ${version.revision}）` +
+              ' ゲートウェイを再起動してください。'
+          })
+        : null,
+
+      check.blocking.length
           ? jsx('div', {
               className: 'rounded px-3 py-2 text-xs',
               style: { border: `1px solid ${DANGER}`, color: DANGER },

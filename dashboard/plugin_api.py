@@ -53,6 +53,26 @@ def list_roles() -> List[Dict]:
     return out
 
 
+def _git_revision() -> str:
+    """ディスクにある版（短縮 sha）。"""
+    import subprocess
+
+    root = _REPO
+    if not (root / ".git").is_dir():
+        return ""
+    proc = subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
+                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+# **このプロセスが読み込まれた時点の版。**
+# バックエンドはゲートウェイの起動時に一度だけ読み込まれる。`plugins update` で
+# ファイルが新しくなっても、動いているコードは古いまま——そして版の表示は
+# ディスクを読むので、**新しい版を表示しながら中身は古い**という嘘をつく。
+# 実際にそれで「鍵が未設定」と表示された（古いコードが、移動前の場所を見ていた）。
+_LOADED_REVISION = _git_revision()
+
+
 def _version() -> Dict:
     """いま動いている版。**「すでに最新です」だけだと、本当に最新なのか
     更新の仕組みが壊れているのか区別が付かない。** 版を添えて答える。
@@ -69,7 +89,14 @@ def _version() -> Dict:
     if proc.returncode != 0:
         return {"revision": "", "date": ""}
     parts = (proc.stdout.strip().split("\t") + ["", ""])[:2]
-    return {"revision": parts[0], "date": parts[1]}
+    return {
+        "revision": parts[0],
+        "date": parts[1],
+        # 動いているコードの版。ディスクと食い違えば、再起動するまで
+        # 画面の内容は当てにならない。
+        "loaded": _LOADED_REVISION,
+        "stale": bool(_LOADED_REVISION and parts[0] and _LOADED_REVISION != parts[0]),
+    }
 
 
 @router.post("/self-update")
