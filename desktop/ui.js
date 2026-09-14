@@ -454,13 +454,19 @@ export default function create(deps) {
 
         // **古いコードが動いていたら、まずそれを言う。** 画面の内容が当てにならない。
       version?.stale
-        ? jsx('div', {
-            className: 'rounded px-3 py-2 text-xs',
+        ? jsxs('div', {
+            className: 'flex items-center gap-3 rounded px-3 py-2 text-xs',
             style: { border: `1px solid ${WARN}`, color: WARN },
-            children:
-              'ゲートウェイが古いコードで動いています。この画面の内容は当てになりません。' +
-              `（動いているのは ${version.loaded}、ディスクは ${version.revision}）` +
-              ' ゲートウェイを再起動してください。'
+            children: [
+              jsx('span', {
+                className: 'flex-1',
+                children: 'この画面は古いまま動いています。再起動すると新しくなります。'
+              }),
+              jsx(Button, {
+                label: '再起動',
+                onClick: () => window.hermesDesktop?.relaunchApp?.()
+              })
+            ]
           })
         : null,
 
