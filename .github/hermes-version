@@ -1,0 +1,3 @@
+# CI が検査に使う Hermes の版（NousResearch/hermes-agent のリリースタグ）。
+# 本番の mini が動かしている版に合わせる。追従 PR はこの行だけを書き換える。
+v2026.9.11

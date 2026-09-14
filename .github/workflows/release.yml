@@ -1,0 +1,37 @@
+name: 版を打つ
+
+# main に入るたび、その木の版にタグを打つ。版の形は
+# `core/build_distributions.py:_version()` と同じ `0.1.<コミット数>`——
+# 固定値では「更新が届いたか」を判定できないので、git のコミット数から採る。
+# タグの注釈に短縮 sha を残し、どの木から出た配布物かを後から辿れるようにする。
+# 同じ版が既に打たれていれば何もしない。
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    name: 版のタグ
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: この木の版にタグを打つ
+        run: |
+          count=$(git rev-list --count HEAD)
+          sha=$(git rev-parse --short HEAD)
+          tag="v0.1.${count}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} は既にある。打たない。"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${tag}" -m "seaos-hermes-agent-kit 0.1.${count}+${sha}"
+          git push origin "refs/tags/${tag}"
+          echo "${tag}（0.1.${count}+${sha}）を打った。"

@@ -1,0 +1,60 @@
+name: Hermes 契約検査
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermes-${{ github.ref }}
+  cancel-in-progress: true
+
+# 版は .github/hermes-version に置く。workflow ファイルは既定のトークンでは
+# 書き換えられないため、追従 PR（hermes-bump.yml）が触れる場所を分けておく。
+# PyPI の hermes-agent は 0.19.0 と古いので、タグから入れる。
+
+jobs:
+  hermes:
+    name: Hermes 契約検査（0.21.2）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: 依存を入れる（テストが PyYAML を使う）
+        run: pip install --quiet pyyaml
+
+      - name: Hermes を導入する（.github/hermes-version の版）
+        run: |
+          ref=$(grep -v '^#' .github/hermes-version | tr -d '[:space:]')
+          echo "固定している Hermes: $ref"
+          uv tool install "hermes-agent @ git+https://github.com/NousResearch/hermes-agent@${ref}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: 導入できたか
+        run: hermes --version
+
+      # 今は参考のみ。プラグインの入口に register() が無いため、この検査だけが落ちる
+      # （他の項目は通る）。register() を足したら continue-on-error を外し、
+      # 続けて `hermes plugins doctor . --ci` も必須にする。
+      - name: プラグイン検査（参考・まだ失敗しても止めない）
+        continue-on-error: true
+        run: hermes plugins validate .
+
+      - name: 実機導入テスト（一時 HERMES_HOME を使い、本物の ~/.hermes には触らない）
+        run: |
+          HERMES_BIN="$(command -v hermes)"
+          export HERMES_BIN
+          python tests/fresh_install_test.py
