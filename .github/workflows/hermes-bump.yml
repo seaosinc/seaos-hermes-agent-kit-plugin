@@ -1,0 +1,70 @@
+name: Hermes 追従
+
+# 週に一度、NousResearch/hermes-agent の最新リリースを見て、固定している版が
+# 古ければ .github/hermes-version を書き換える下書き PR を出す。
+# その PR で「Hermes 契約検査」が新しい版に対して走るので、キットが新版で
+# 壊れていないかがマージ前に分かる。
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  bump:
+    name: 新しい Hermes を見に行く
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 最新版と固定版を比べる
+        id: compare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api repos/NousResearch/hermes-agent/releases/latest --jq .tag_name)
+          current=$(grep -v '^#' .github/hermes-version | tr -d '[:space:]')
+          echo "最新: $latest / 固定: $current"
+          {
+            echo "latest=$latest"
+            echo "current=$current"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: 追従 PR を出す
+        if: steps.compare.outputs.latest != steps.compare.outputs.current
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.compare.outputs.latest }}
+          CURRENT: ${{ steps.compare.outputs.current }}
+        run: |
+          branch="chore/hermes-${LATEST}"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "$branch は既にある。何もしない。"
+            exit 0
+          fi
+          # 版の行だけを差し替える（先頭のコメントは残す）。
+          printf '%s\n' "$LATEST" > /tmp/new-version
+          grep '^#' .github/hermes-version > /tmp/header || true
+          cat /tmp/header /tmp/new-version > .github/hermes-version
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -qam "chore: 検査に使う Hermes を ${LATEST} に上げる"
+          git push -q origin "$branch"
+          body=$(printf '%s\n' \
+            "Hermes の最新リリースが ${LATEST} になった（このリポジトリは ${CURRENT} で検査していた）。" \
+            "" \
+            "この PR では「Hermes 契約検査」が ${LATEST} に対して走る。" \
+            "- 緑なら、新しい Hermes でもキットは通る。取り込んでよい。" \
+            "- 赤なら、新版で壊れた場所が出ている。直してから追従する。" \
+            "" \
+            "自動で出した下書き。中身は .github/hermes-version の 1 行だけ。")
+          if ! gh pr create --draft --base main --head "$branch" \
+               --title "chore: 検査に使う Hermes を ${LATEST} に上げる" --body "$body"; then
+            # PR を作れない設定のときは、気づけるように issue にする。
+            gh issue create --title "Hermes ${LATEST} が出ている（追従 PR を作れなかった）" --body "$body"
+          fi

@@ -1,0 +1,84 @@
+name: CI（キット検査）
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# PR のコードをそのまま実行するため、トークンは読み取りのみ。
+permissions:
+  contents: read
+
+# 同じブランチに続けて push したら、古い実行は打ち切る。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: 基本検査
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 配布物の版は git の履歴から刻むため、浅いクローンでは足りない。
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 依存を入れる（キットの依存は PyYAML だけ）
+        run: pip install --quiet pyyaml
+
+      - name: Python の構文
+        run: python -m compileall -q core dashboard tests
+
+      - name: YAML が読めるか（plugin.yaml とテンプレート）
+        run: |
+          python - <<'PY'
+          import pathlib, sys, yaml
+          files = [pathlib.Path("plugin.yaml")]
+          templates = pathlib.Path("templates")
+          if templates.is_dir():
+              files += sorted(templates.rglob("*.yml")) + sorted(templates.rglob("*.yaml"))
+          errors = []
+          for path in files:
+              try:
+                  yaml.safe_load(path.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  errors.append("%s: %s" % (path, exc))
+          print("YAML %d 件を確認" % len(files))
+          if errors:
+              sys.exit("\n".join(errors))
+          PY
+
+      - name: JavaScript の構文
+        run: |
+          for f in desktop/*.js; do
+            node --check "$f"
+          done
+
+      - name: キットの自己テスト（Hermes 不要な 2 本）
+        run: |
+          python tests/build_distributions_test.py
+          python tests/refcheck_test.py
+
+  # 版は手で上げない。`core/build_distributions.py:_version()` が git から採る形
+  # （`0.1.<コミット数>+<短縮 sha>`）に合わせ、CI はその版を表示するだけにする。
+  # 固定値では「更新が届いたか」を判定できない、というのがこのリポジトリの決定。
+  version:
+    name: 版の確認
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # コミット数を数えるので、浅いクローンでは足りない。
+          fetch-depth: 0
+
+      - name: この木から出る版
+        run: |
+          count=$(git rev-list --count HEAD)
+          sha=$(git rev-parse --short HEAD)
+          echo "この木から出る配布物は 0.1.${count}+${sha} になる。"
+          echo "配布物の版: 0.1.${count}+${sha}" >> "$GITHUB_STEP_SUMMARY"
