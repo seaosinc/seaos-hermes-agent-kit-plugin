@@ -87,4 +87,4 @@ DM ならメンションは要りません。
 | まったく反応しない | `seaos-kit gateway status` で pid が出ているか。出ていなければ `seaos-kit gateway restart operator` |
 | operator 以外が返事をしているようだ | `seaos-kit doctor` を実行。「Slack の窓口が奪われていないか」に ✗ が出ていたら、案内どおりに直す（→ [困ったとき](troubleshooting.md)） |
 | 添付したファイルを読めないと言われる | Slack App に `files:read` の権限があるか（手順 1 のマニフェストで作れば入っています） |
-| 画像やファイルが返ってこない（「送れなかった」と言われる） | Slack App に `files:write` の権限があるか。`seaos-kit doctor` の「Slack App の権限」に ✗ が出ます。**OAuth & Permissions → Bot Token Scopes** に足して App を再インストールする（トークンは変わりません） |
+| 画像やファイルが返ってこない（「送れなかった」と言われる） | Slack App に `files:write` の権限があるか。頼んだ作業の結果（スクショなど）が DM に返ってこないなら `im:write` も。`seaos-kit doctor` の「Slack App の権限」に ✗ が出ます。**OAuth & Permissions → Bot Token Scopes** に足して App を再インストールする（トークンは変わりません） |

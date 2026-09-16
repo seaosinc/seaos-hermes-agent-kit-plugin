@@ -242,6 +242,9 @@ SLACK_SCOPES = {
     "im:history": "DM が届かない",
     "files:read": "添付されたファイルを読めない",
     "files:write": "画像やファイルを返せない",
+    # 通知の宛先はユーザー ID で届く。文章はそのまま送れるが、ファイルは
+    # DM を開いて（conversations.open）チャンネル ID に直さないと送れない。
+    "im:write": "カードの成果物（スクショなど）を DM へ返せない",
 }
 
 
