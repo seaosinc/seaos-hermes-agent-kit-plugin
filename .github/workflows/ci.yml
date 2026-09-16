@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # 追従 PR（hermes-bump.yml）から起動するため。既定のトークンで作った PR では
+  # pull_request が発火しない。
+  workflow_dispatch:
 
 # PR のコードをそのまま実行するため、トークンは読み取りのみ。
 permissions:
@@ -28,8 +31,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: 依存を入れる（キットの依存は PyYAML だけ）
-        run: pip install --quiet pyyaml
+      # PyYAML はキットの依存。FastAPI は設定画面の API（dashboard/plugin_api.py）を
+      # 読むテストが使う（本番では Hermes の venv に入っている）。
+      - name: 依存を入れる
+        run: pip install --quiet pyyaml fastapi
 
       - name: Python の構文
         run: python -m compileall -q core dashboard tests
@@ -59,10 +64,11 @@ jobs:
             node --check "$f"
           done
 
-      - name: キットの自己テスト（Hermes 不要な 2 本）
-        run: |
-          python tests/build_distributions_test.py
-          python tests/refcheck_test.py
+      # 手元と同じ入口で流す。テストを足しても、ここを書き換えずに拾われる。
+      # Hermes を呼ぶもの（fresh_install_test.py）は run_all が飛ばし、
+      # 「Hermes 契約検査」で流す。
+      - name: キットの自己テスト（Hermes 不要なもの全部）
+        run: python tests/run_all.py
 
   # 版は手で上げない。`core/build_distributions.py:_version()` が git から採る形
   # （`0.1.<コミット数>+<短縮 sha>`）に合わせ、CI はその版を表示するだけにする。

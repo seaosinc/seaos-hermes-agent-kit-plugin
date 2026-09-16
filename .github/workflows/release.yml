@@ -26,7 +26,9 @@ jobs:
           count=$(git rev-list --count HEAD)
           sha=$(git rev-parse --short HEAD)
           tag="v0.1.${count}"
-          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+          # **リモートのタグで判定する。** checkout は既定でタグを取らないので、
+          # 手元の refs だけを見ると、再実行のたびに「無い」と判断して push が落ちる。
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             echo "${tag} は既にある。打たない。"
             exit 0
           fi

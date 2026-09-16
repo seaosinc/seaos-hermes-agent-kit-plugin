@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # 追従 PR（hermes-bump.yml）から起動するため。既定のトークンで作った PR では
+  # pull_request が発火しない。
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,11 +17,11 @@ concurrency:
 
 # 版は .github/hermes-version に置く。workflow ファイルは既定のトークンでは
 # 書き換えられないため、追従 PR（hermes-bump.yml）が触れる場所を分けておく。
-# PyPI の hermes-agent は 0.19.0 と古いので、タグから入れる。
+# PyPI の hermes-agent は 0.19.0 と古いので、タグから入れる（入れ方は下の手順）。
 
 jobs:
   hermes:
-    name: Hermes 契約検査（0.21.2）
+    name: Hermes 契約検査
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,22 +32,29 @@ jobs:
         with:
           python-version: "3.12"
 
+      # キャッシュは使わない。キーにする lock ファイルがこのリポジトリに無い。
       - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
 
       - name: 依存を入れる（テストが PyYAML を使う）
         run: pip install --quiet pyyaml
 
+      # **パッケージとしては入らない。** Hermes は wheel / sdist の作成を拒む
+      # （「Hermes is distributed via the shell installer, Docker image, or Nix」）。
+      # `uv tool install git+…` もこれで落ちるので、タグを clone して editable で入れる。
       - name: Hermes を導入する（.github/hermes-version の版）
         run: |
           ref=$(grep -v '^#' .github/hermes-version | tr -d '[:space:]')
           echo "固定している Hermes: $ref"
-          uv tool install "hermes-agent @ git+https://github.com/NousResearch/hermes-agent@${ref}"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          git clone --quiet --depth 1 --branch "$ref" https://github.com/NousResearch/hermes-agent "$RUNNER_TEMP/hermes"
+          cd "$RUNNER_TEMP/hermes"
+          uv venv --quiet --python 3.12 .venv
+          uv pip install --quiet --python .venv/bin/python -e .
+          echo "$RUNNER_TEMP/hermes/.venv/bin" >> "$GITHUB_PATH"
 
       - name: 導入できたか
-        run: hermes --version
+        run: |
+          hermes --version
+          echo "Hermes: $(hermes --version | head -1)" >> "$GITHUB_STEP_SUMMARY"
 
       # 今は参考のみ。プラグインの入口に register() が無いため、この検査だけが落ちる
       # （他の項目は通る）。register() を足したら continue-on-error を外し、
