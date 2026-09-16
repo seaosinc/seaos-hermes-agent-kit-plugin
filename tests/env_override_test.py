@@ -124,6 +124,23 @@ def test_shared_not_required_when_all_overridden():
     assert KEY not in api.validate()["blocking"], api.validate()
 
 
+def test_doctor_finds_stolen_slack_bot():
+    """キットの外（default の .env）が窓口と同じ Slack トークンを持っていたら、doctor が言う。"""
+    import doctor
+
+    reset()
+    (HOME / "profiles" / "operator" / ".env").write_text("SLACK_BOT_TOKEN=xoxb-same\n", encoding="utf-8")
+    (HOME / ".env").write_text("SLACK_BOT_TOKEN=xoxb-same\n", encoding="utf-8")
+    rep = doctor.Report()
+    doctor._slack_token_holders(rep)
+    assert rep.failures == 1, rep.lines
+    assert "xoxb-same" not in "\n".join(rep.lines), "値を出してしまった"
+    (HOME / ".env").unlink()
+    rep = doctor.Report()
+    doctor._slack_token_holders(rep)
+    assert rep.failures == 0, rep.lines
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

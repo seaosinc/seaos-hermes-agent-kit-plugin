@@ -23,7 +23,7 @@ import mem0
 import refcheck
 import roles
 import workspace
-from paths import profile_dir, profiles_dir
+from paths import hermes_home, profile_dir, profiles_dir
 
 Log = Callable[[str], None]
 
@@ -122,6 +122,47 @@ def _stale_tombstones(rep: Report) -> None:
             cleared.append(marker.name)
     if cleared:
         rep.note(f"使われていない削除済みの印を外した: {' '.join(cleared)}")
+
+
+def _slack_token_holders(rep: Report) -> None:
+    """**キットの窓口と同じ Slack トークンを、キットの外が持っていないか。**
+
+    ボットは1つのゲートウェイにしか繋がらない。キットより前に default へ Slack を
+    設定していると（`~/.hermes/.env`）、Hermes Desktop が default のゲートウェイを
+    起こしたときに**窓口を奪われ、operator が黙って止まる。** Slack からは返事が
+    来るので気づけず、operator の規約（カードの作り方、受け取ったファイルの渡し方）
+    だけが効かなくなる。キットは default を管理しないので、ここで言う。
+
+    値は出さない。どの窓口のトークンと、どのファイルが重なっているかだけを言う。
+    """
+    import env as env_mod
+
+    rep.section("Slack の窓口が奪われていないか")
+    ours: dict = {}
+    for name in roles.names():
+        token = env_mod.read_env(profile_dir(name) / ".env").get("SLACK_BOT_TOKEN")
+        if token:
+            ours.setdefault(token, name)
+    if not ours:
+        rep.note("Slack に繋ぐ窓口が無い")
+        return
+    candidates = [hermes_home() / ".env"]
+    root = profiles_dir()
+    if root.is_dir():
+        known = set(roles.names())
+        candidates += [d / ".env" for d in sorted(root.iterdir())
+                       if d.is_dir() and not d.name.startswith(".") and d.name not in known]
+    clashes = []
+    for path in candidates:
+        token = env_mod.read_env(path).get("SLACK_BOT_TOKEN")
+        if token and token in ours:
+            clashes.append((path, ours[token]))
+    if not clashes:
+        rep.ok("キットの窓口のトークンは、キットの外に無い")
+        return
+    for path, role in clashes:
+        rep.ng(f"{path} が {role} と同じ Slack トークンを持っている（ゲートウェイが起きると {role} が止まる）")
+        rep.lines.append(f"    {path} から SLACK_* を外し、seaos-kit gateway restart {role}")
 
 
 def _profiles(rep: Report) -> None:
@@ -252,6 +293,7 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     _stale_tombstones(rep)
     _orphan_secrets(rep)
     _profiles(rep)
+    _slack_token_holders(rep)
     _env_hint(rep)
     _assignees(rep)
 
