@@ -351,10 +351,17 @@ export default function create(deps) {
     const load = useCallback(async () => {
       setError('')
       try {
-        setRoles(await call(ctx, '/roles'))
-        setSecrets(await call(ctx, '/secrets'))
-        setCheck(await call(ctx, '/validate'))
-        setVersion(await call(ctx, '/version'))
+        // **並べて投げる。** 1つずつ待つと、遅いものの合計だけ画面が固まる
+        const [r, s, c, v] = await Promise.all([
+          call(ctx, '/roles'),
+          call(ctx, '/secrets'),
+          call(ctx, '/validate'),
+          call(ctx, '/version')
+        ])
+        setRoles(r)
+        setSecrets(s)
+        setCheck(c)
+        setVersion(v)
         // 道具の確認は Docker に問い合わせるぶん遅いので、画面の表示を待たせない
         call(ctx, '/machine').then(setMachine).catch(() => setMachine(null))
       } catch (e) {
@@ -454,6 +461,8 @@ export default function create(deps) {
             setDisabling({ name: role.name, impact: await call(ctx, `/roles/${role.name}/removal`) })
             return
           }
+          // **押した瞬間に見た目を変える。** 応答を待ってから変えると、押せたのか分からない
+          setRoles((rs) => rs.map((x) => (x.name === role.name ? { ...x, enabled } : x)))
           await call(ctx, '/roles/enabled', { method: 'POST', body: { name: role.name, enabled } })
           setNotice(
             enabled
@@ -463,6 +472,8 @@ export default function create(deps) {
           await load()
         } catch (e) {
           setError(e.message)
+          // 先に変えた見た目を、実際の状態へ戻す
+          load()
         }
       },
       [ctx, load]
