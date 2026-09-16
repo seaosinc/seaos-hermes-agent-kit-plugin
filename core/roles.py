@@ -62,7 +62,9 @@ def essential(name: str) -> bool:
 def describe(name: str) -> str:
     """decomposer が読む説明文。**担当の割り振りを決める唯一の入力。**"""
     spec = all_specs().get(name) or {}
-    return " ".join(str(spec.get("describe") or spec.get("desc") or "").split())
+    text = str(spec.get("describe") or spec.get("desc") or "")
+    # 外した役を名指しする文は落とす（規約と同じ規則。生成器の strip_role_blocks）
+    return " ".join(_generator().strip_role_blocks(text, set(names())).split())
 
 
 def summary(name: str) -> str:

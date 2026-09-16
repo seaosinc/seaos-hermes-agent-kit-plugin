@@ -138,7 +138,7 @@ ROLES: dict[str, dict] = {
         "skills": ["kanban-collaboration", "guest-access"],
         "plugins": ["booking-gate"],
         "hooks": ["mem0-up"],
-        "cron": ["booking-sync", "runtime-guard", "spin-guard", "container-guard",
+        "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard", "container-guard",
                  "kit-sync", "kit-maintain"],
         "env": [
             ("SLACK_BOT_TOKEN", "Slack の Bot トークン。窓口を Slack にするなら要る（Hermes Desktop から使うなら不要）", False),
@@ -237,9 +237,10 @@ ROLES: dict[str, dict] = {
                      "例:「機能を実装する」「バグを修正する」「テストが通るようにする」"
                      "「設定値を変えて反映する」。**変更の量ではなく成果条件で選ぶ**——"
                      "1行の変更でも、リポジトリへ届けて終わるならここへ。"
-                     "**実装カードの既定の行き先はここである。** 難しそうに見えても、"
+                     "**実装カードの既定の行き先はここである。** "
+                     "<!-- if-role: senior-developer -->難しそうに見えても、"
                      "まずここへ振る——難度は走らせるまで分からない。詰まった事実が出てから "
-                     "fixer が senior-developer へ振り直す。"),
+                     "fixer が senior-developer へ振り直す。<!-- end-if-role -->"),
     },
     # developer と**できることは同じ**で、モデルだけ上位に振った版。
     # 規約（SOUL）は developer から借りる——差が出てよいのはモデルとエフォートだけで、
@@ -281,8 +282,9 @@ ROLES: dict[str, dict] = {
                      "(1) developer が試して詰まり、何を試したかが記録されている "
                      "(2) 設計判断が要る（選択肢が複数あり、採る案で後の形が変わる） "
                      "(3) セキュリティか品質に影響が及ぶ（認証・権限・秘密の扱い・外部入力の経路）。"
-                     "**新規のカードは既定で developer へ振る。** 難度は走らせるまで分からないので、"
-                     "詰まった事実が出てから fixer が振り直す。"),
+                     "<!-- if-role: developer -->**新規のカードは既定で developer へ振る。** "
+                     "難度は走らせるまで分からないので、"
+                     "詰まった事実が出てから fixer が振り直す。<!-- end-if-role -->"),
     },
 }
 
@@ -649,6 +651,9 @@ CRON_JOBS = {
     # カードに現れないので、空転はボードから見えない。実際に4時間空転した。
     # 見つけたら入力待ちへ移して、人の目に入る場所へ出す。
     "spin-guard":    ("*/5 * * * *",  "spin_guard.py"),
+    # **毎分。** 存在しない・無効にした役に振られたカードは、ready のまま誰にも
+    # 起動されず、親は永久に待つ。規約から名前を落としても、外す前のカードは残る。
+    "assignee-guard": ("* * * * *",   "assignee_guard.py"),
     # **毎分。** 親が SIGKILL されると作業部屋は running のまま残り、
     # Hermes の回収係（status=exited しか見ない）は一生届かない。1つ 4GB。
     "container-guard": ("* * * * *",  "container_guard.py"),
@@ -658,6 +663,29 @@ CRON_JOBS = {
 
 
 IGNORE = shutil.ignore_patterns("__pycache__")
+
+
+# **無効にした役を名指しする規約は、配る前に落とす。**
+#
+#     <!-- if-role: senior-developer -->振り直してよい<!-- else -->振り直し先は無い<!-- end-if-role -->
+#
+# 規約に「詰まったら senior-developer へ振り直す」と書いたまま senior-developer を
+# 外すと、fixer はそこへ振る。Hermes は担当の実在を確かめないので、カードは起動に
+# 失敗し続けて止まり、親は子の完了を永久に待つ。**書かれた名前は、呼ばれる。**
+# 複数の役を空白区切りで書けば、全員が有効なときだけ残る。
+_ROLE_BLOCK = re.compile(
+    r"[ \t]*<!-- if-role: ([A-Za-z0-9_\- ]+?) -->\n?(.*?)"
+    r"(?:[ \t]*<!-- else -->\n?(.*?))?[ \t]*<!-- end-if-role -->\n?",
+    re.S)
+
+
+def strip_role_blocks(text: str, enabled: set | None) -> str:
+    """`if-role` の囲みを、有効な役に合わせて開く。`enabled=None` は全役が有効。"""
+    def pick(m: re.Match) -> str:
+        wanted = m.group(1).split()
+        on = enabled is None or all(r in enabled for r in wanted)
+        return m.group(2) if on else (m.group(3) or "")
+    return _ROLE_BLOCK.sub(pick, text)
 
 
 def copy_skills(kit: Path, d: Path, spec: dict) -> None:
@@ -757,14 +785,17 @@ def build_manifest(name: str, spec: dict, owned: list[str]) -> dict:
     }
 
 
-def build_one(kit: Path, out: Path, name: str, spec: dict) -> None:
+def build_one(kit: Path, out: Path, name: str, spec: dict, enabled: set | None = None) -> None:
     d = out / name
     d.mkdir(parents=True, exist_ok=True)
-    (d / "SOUL.md").write_text(build_soul(kit, name, spec), encoding="utf-8")
+    (d / "SOUL.md").write_text(strip_role_blocks(build_soul(kit, name, spec), enabled), encoding="utf-8")
     (d / "config.yaml").write_text(
         yaml.safe_dump(build_config(kit, name, spec), allow_unicode=True, sort_keys=False),
         encoding="utf-8")
     copy_skills(kit, d, spec)
+    for skill_md in (d / "skills").glob("*/SKILL.md"):
+        skill_md.write_text(strip_role_blocks(skill_md.read_text(encoding="utf-8"), enabled),
+                            encoding="utf-8")
     # **スキルは1つずつ名指しする。** `skills/` とまとめて宣言すると、更新のたびに
     # そのフォルダが rmtree されて作り直される（profile_distribution.py の
     # `_copy_dist_payload`）。**実機で Hermes やエージェントが生やしたスキルが
@@ -781,7 +812,8 @@ def build_one(kit: Path, out: Path, name: str, spec: dict) -> None:
           f"{' / ' + extras if extras else ''}）")
 
 
-def build(kit: Path, out: Path) -> None:
+def build(kit: Path, out: Path, enabled: set | None = None) -> None:
+    """`enabled` は有効な役の名前。規約から、外した役への言及を落とすのに使う。"""
     roles = {**ROLES, **worker_roles(kit)}
     # 役を消したら配布物も消す。残すと install できてしまい、
     # 「templates には無いのにプロファイルが生える」ことになる
@@ -790,7 +822,7 @@ def build(kit: Path, out: Path) -> None:
         print(f"  - {stale.name}（役が無くなったので削除）")
     for name, spec in roles.items():
         shutil.rmtree(out / name, ignore_errors=True)
-        build_one(kit, out, name, spec)
+        build_one(kit, out, name, spec, enabled)
 
 
 def skills_of(kit: Path, role: str) -> list[str]:
@@ -822,7 +854,7 @@ if __name__ == "__main__":
     elif len(sys.argv) > 2 and sys.argv[1] == "--describe":
         kit = Path(sys.argv[3] if len(sys.argv) > 3 else ".")
         roles = {**ROLES, **worker_roles(kit)}
-        print((roles.get(sys.argv[2]) or {}).get("describe", ""))
+        print(strip_role_blocks((roles.get(sys.argv[2]) or {}).get("describe", ""), None))
     elif len(sys.argv) > 2 and sys.argv[1] == "--env":
         # その役が要る環境変数。**.env に何を書けばいいか**を zsh 側へ渡す口。
         # 配布物の .env.EXAMPLE は profile install のときしか作られず、

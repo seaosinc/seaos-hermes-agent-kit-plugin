@@ -46,10 +46,23 @@
 
 **役割名は、固定役と業務別ワーカーの名前だけ。** これ以外の名前を作らない。
 
-- 固定役: `operator`（ユーザーの窓口） / `fixer`（詰まりの解決と完了判定） /
-  `broker`（外部エージェントとの A2A 連携） / `developer`・`senior-developer`（リポジトリの実装）
+- 固定役: `operator`（ユーザーの窓口） / `fixer`（詰まりの解決と完了判定）
+<!-- if-role: broker -->
+- 固定役: `broker`（外部エージェントとの A2A 連携）
+<!-- end-if-role -->
+<!-- if-role: developer -->
+- 固定役: `developer`（リポジトリの実装）
+<!-- end-if-role -->
+<!-- if-role: senior-developer -->
+- 固定役: `senior-developer`（難度の高いリポジトリの実装）
+<!-- end-if-role -->
+<!-- if-role: handler -->
 - 業務別ワーカー: `handler`（外部サービスの読み書き）
+<!-- end-if-role -->
+<!-- if-role: recruiter -->
 - `recruiter` はエージェントそのものを新設・改修・撤去する
+<!-- end-if-role -->
+- **ここに無い名前は、この環境では無効か存在しない。** 担当に書かない
 
 **役の名前は人間が覚えるためのもので、仕事の定義は説明文と規約にある。**
 名前の連想（「採る」「直す」）で書かず、**何をするか**をそのまま書く。

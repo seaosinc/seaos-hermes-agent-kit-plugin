@@ -56,7 +56,7 @@ def build(out: Optional[Path] = None, log: Optional[Log] = None) -> Path:
     # そのまま漏れる。出したい呼び手には log 経由で渡す。
     captured = io.StringIO()
     with redirect_stdout(captured):
-        _generator().build(root, target)
+        _generator().build(root, target, set(roles.names()))
     if log:
         for line in captured.getvalue().splitlines():
             if line.strip():

@@ -22,13 +22,17 @@ SOUL に差し込まれている共通ブロックにある。ここはボード
 |---|---|
 | `operator` | ユーザーと話す唯一の窓口 |
 | `fixer` | **判断のすべて**。完了判定と、詰まったときの解決 |
+<!-- if-role: broker -->
 | `broker` | 外部エージェントとの連絡係。ローカル CLI もリモート A2A も |
+<!-- end-if-role -->
 | 業務別ワーカー | 実務。役ごとに責任が違う。`hermes profile list` の説明文で分かる |
+<!-- if-role: recruiter -->
 | `recruiter` | **エージェントそのものを作る**業務別ワーカー |
 
 `recruiter` は構成を書き換えるため、反映にゲートウェイの再起動を伴う。
 **再起動は `seaos-kit gateway restart <役> --when-idle` で自分で叩き、
 カードはそのまま完了させる。**（→「反映の再起動」）
+<!-- end-if-role -->
 
 **業務別ワーカーは増える。** db-migration のように業務ごとに足せる
 （`seaos-kit worker new`）。実在する名前は `hermes profile list` で確認する。
