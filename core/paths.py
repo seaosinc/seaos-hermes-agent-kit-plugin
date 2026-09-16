@@ -18,8 +18,18 @@ def kit_root() -> Path:
 
 
 def hermes_home() -> Path:
-    """Hermes の HOME。既定は ~/.hermes（環境変数で差し替え可）。"""
-    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    """Hermes の HOME。既定は ~/.hermes（環境変数で差し替え可）。
+
+    **プロファイルの中を指していたら、2つ上を採る。** 定期実行とゲートウェイは
+    `HERMES_HOME=~/.hermes/profiles/<役>` で走る。そのまま使うと、役の選択も
+    プロファイルの置き場も見当違いの場所を見て、「記録が無い＝全役有効」
+    「どのプロファイルも無い」と判断する。kit-sync が10分ごとに全役の導入を試みて
+    失敗し続け、外した役を入れ直していた（実際に踏んだ）。
+    """
+    home = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    if home.parent.name == "profiles":
+        return home.parent.parent
+    return home
 
 
 def local_workers_dir() -> Path:

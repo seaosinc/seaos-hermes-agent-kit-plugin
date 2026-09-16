@@ -108,6 +108,17 @@ def test_env_apply_skips_disabled_profile():
     assert "sk-test" in (HOME / "profiles" / "developer" / ".env").read_text(encoding="utf-8")
 
 
+def test_profile_scoped_home_sees_the_same_selection():
+    """定期実行は HERMES_HOME=<HOME>/profiles/<役> で走る。そこからも同じ記録を読む。"""
+    reset()
+    selection.set_enabled("broker", False)
+    os.environ["HERMES_HOME"] = str(HOME / "profiles" / "operator")
+    try:
+        assert "broker" not in roles.names(), "プロファイルの中から走ると、外した役が戻る"
+    finally:
+        os.environ["HERMES_HOME"] = str(HOME)
+
+
 def test_forget_on_removal():
     reset()
     selection.set_enabled("handler", False)
