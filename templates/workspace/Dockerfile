@@ -195,6 +195,11 @@ RUN { printf '\n## いま入っている道具\n\n```\n'; \
 # /etc に置くのは、ログインシェルが /etc/profile 経由で読むためである。
 COPY profile.sh /etc/profile.d/hermes-workspace.sh
 
+# ホストのパスと箱の中のパスを行き来する。**Windows ではこれが無いと本文のパスが読めない**
+# （箱の側を /seaos/… に振り替えてあるため）。macOS ではそのまま返すだけ。
+COPY seaos-path /usr/local/bin/seaos-path
+RUN chmod 755 /usr/local/bin/seaos-path
+
 WORKDIR /workspace
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["sleep", "infinity"]

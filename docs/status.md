@@ -58,7 +58,16 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
 ## 残っている作業
 
 1. **Windows の実機確認。** 実装は入れたが、動かしていない
-   （`gateway_pid` の PowerShell 経由の検出、`kit.cmd` のラッパ、Scheduled Task）。
+   （`gateway_pid` の PowerShell 経由の検出、`kit.cmd` のラッパ、Scheduled Task、
+   winget での Docker / Node.js の導入と UAC の出方）。
+
+   **作業部屋のパスは手を打った（未検証）。** 箱へは「左右同じパス」で渡していたが、
+   Windows のパス（`C:\…`）は Linux の箱の中に作れず、`-v` の区切りともぶつかる。
+   Windows のときだけ箱の側を `/seaos/<葉>` に振り替え、対応表を `SEAOS_PATH_MAP` で
+   箱へ渡す。箱の中の `seaos-path` が本文のパスを読み替え、`--host` で宣言用に戻す。
+   macOS では同じパスが返るので、規約は OS によらず1通り。実機で確かめること:
+   Docker Desktop が `C:\…:/seaos/…:ro` を受け付けるか、宣言した `C:\…` のパスで
+   完了の添付が通るか。
 2. **AWS を developer / senior-developer に触らせる。** Terraform を扱い始めると要る。
    いまこの2役が持つのは箱（terminal / workspace）と GH_TOKEN だけで、AWS の状態を
    読む手が無い。作業部屋にも `aws` は入っていない（git / gh / mise / opencode /

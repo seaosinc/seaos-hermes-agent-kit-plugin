@@ -94,6 +94,28 @@ FILES_ROOT = os.environ.get(
     "WORKSPACE_FILES_ROOT", str(Path.home() / ".hermes/kanban/files"))
 ATTACHMENTS_ROOT = os.environ.get(
     "WORKSPACE_ATTACHMENTS_ROOT", str(Path.home() / ".hermes/kanban/attachments"))
+
+
+def box_path(host: str) -> str:
+    """ホストのパスを、作業部屋の中でどこに見せるか。
+
+    **ふつうは左右同じ。** 成果物の宣言（artifacts）はホストで解決されるので、
+    同じパスなら箱の中で書いた文字列がそのまま通る。
+
+    **Windows のパス（`C:\\…`）だけは振り替える。** Linux の箱の中にドライブ名の
+    パスは作れず、`-v` の区切り（`:`）ともぶつかる。箱の側は `/seaos/<葉>` に置き、
+    行き来は箱の中の `seaos-path` がやる（SEAOS_PATH_MAP を読む）。
+    """
+    if re.match(r"^[A-Za-z]:[\\/]", host):
+        return "/seaos/" + re.split(r"[\\/]", host.rstrip("\\/"))[-1]
+    return host
+
+
+def path_map() -> str:
+    """`seaos-path` が読む対応表。`ホスト=箱;…`。左右同じものも入れる（無害）。"""
+    return ";".join(f"{h}={box_path(h)}" for h in (ARTIFACTS_ROOT, FILES_ROOT, ATTACHMENTS_ROOT))
+
+
 # 作業部屋1つに割り当てる資源。**上限であって、確保量ではない。**
 #
 # 実測で要るのは、clone と読み書きなら 200MB 以下、`npm ci` で 0.5〜1GB、
@@ -618,11 +640,11 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
                 f"{WORKSPACE_CACHE}:/cache",
                 # 成果物を外へ出すための口。**左右同じパスにするのが要点**で、
                 # ずらすと artifacts の宣言がホスト側で解決できない。
-                f"{ARTIFACTS_ROOT}:{ARTIFACTS_ROOT}",
+                f"{ARTIFACTS_ROOT}:{box_path(ARTIFACTS_ROOT)}",
                 # 受け取ったファイルと添付。**書かせない**——元の資料を担当が
                 # 書き換えると、別のカードが読む内容まで変わる。
-                f"{FILES_ROOT}:{FILES_ROOT}:ro",
-                f"{ATTACHMENTS_ROOT}:{ATTACHMENTS_ROOT}:ro",
+                f"{FILES_ROOT}:{box_path(FILES_ROOT)}:ro",
+                f"{ATTACHMENTS_ROOT}:{box_path(ATTACHMENTS_ROOT)}:ro",
             ],
             # ホストの値を名前で転送する。**イメージには焼かない。**
             "docker_forward_env": [
@@ -637,7 +659,9 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
                 "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION",
             ],
             # 固定値。委譲先のモデルを担当に覚えさせず、ここ1箇所で決める。
-            "docker_env": {"OPENCODE_MODEL": f"{OPENCODE_PROVIDER}/{spec['model']}"},
+            "docker_env": {"OPENCODE_MODEL": f"{OPENCODE_PROVIDER}/{spec['model']}",
+                           # ホストと箱のパスの対応（seaos-path が読む。Windows でだけ意味を持つ）
+                           "SEAOS_PATH_MAP": path_map()},
         }
 
     if spec.get("plugins"):

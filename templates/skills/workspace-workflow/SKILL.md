@@ -39,10 +39,16 @@ metadata:
 | **CI を見届ける** | `gh pr checks <番号> --watch`（緑になるまで。落ちたら直して push し直す） |
 | **指摘を確かめる** | `gh pr view <番号> --comments` / `gh pr diff <番号>` |
 | AWS を見る | `aws …`（**認証情報が無い間は失敗する**。カードが AWS を求めていないなら使わない） |
-| 見せたいものを出す | `cp <ファイル> "$HERMES_KANBAN_WORKSPACE/"` → 完了時に `artifacts` で絶対パスを宣言 |
+| 見せたいものを出す | `out=$(seaos-path "$HERMES_KANBAN_WORKSPACE")` → `cp <ファイル> "$out/"` → 完了時に `artifacts` へ `seaos-path --host "$out/<ファイル>"` の出力を宣言 |
+| 本文に書かれたファイルを読む | `seaos-path "<本文のパス>"` の出力を読む（読み取り専用） |
 
-`$HERMES_KANBAN_WORKSPACE` は**部屋の中でもそのまま使える**——同じ場所が同じ絶対パスで
-見えているので、読み替えは要らない。
+**ホストのパスは `seaos-path` を通してから使う。** カード本文や `$HERMES_KANBAN_WORKSPACE` に
+入っているのはホストのパスである。macOS では部屋の中でも同じパスで見えているので、
+`seaos-path` はそのまま返す。Windows ではホストのパス（`C:\…`）が部屋の中に無いので、
+`/seaos/…` に読み替える。**どちらでも同じ手順で通るように、常に通す。**
+
+`artifacts` に書くのは**ホストのパス**である（完了の処理はホストで動く）。
+部屋の中のパスを書くと、Windows では見つからずに完了が失敗する。
 
 ## 触った数だけ要るもの
 

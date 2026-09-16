@@ -138,7 +138,7 @@ def build(*, warm: bool = True, log: Optional[Log] = None) -> bool:
     with tempfile.TemporaryDirectory(prefix="kit-ws-") as ctx:
         ctx_path = Path(ctx)
         src = kit_root() / "templates" / "workspace"
-        for name in ("Dockerfile", "profile.sh", "opencode-instructions.md"):
+        for name in ("Dockerfile", "profile.sh", "opencode-instructions.md", "seaos-path"):
             shutil.copy(src / name, ctx_path / name)
         extra = ctx_path / "extra-ca.crt"
         if ca_path.is_file():
@@ -229,6 +229,13 @@ def verify(log: Optional[Log] = None) -> bool:
             lambda v: v == "hermes-worker",
             "git の名乗り",
             "commit できない（名乗りが無い）",
+        ),
+        (
+            # Windows では本文のパスをこれで読み替える。無いと添付も成果物も通らない
+            "SEAOS_PATH_MAP='C:\\h=/seaos/h' seaos-path 'C:\\h\\a'",
+            lambda v: v == "/seaos/h/a",
+            "パスの読み替え  seaos-path",
+            "seaos-path が無い（Windows で本文のパスが読めない）",
         ),
         (
             'echo "$GIT_TERMINAL_PROMPT|$CI|$PAGER"',

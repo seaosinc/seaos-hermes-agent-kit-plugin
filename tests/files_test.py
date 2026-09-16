@@ -141,6 +141,53 @@ def test_handler_reads_files_only():
     assert "{{" not in str(server)
 
 
+def test_windows_paths_are_moved_under_seaos():
+    """Windows のパスは箱の中に作れないので /seaos/… に振り替え、対応表を箱へ渡す。"""
+    import importlib
+
+    saved = {k: os.environ.get(k) for k in
+             ("WORKSPACE_ARTIFACTS_ROOT", "WORKSPACE_FILES_ROOT", "WORKSPACE_ATTACHMENTS_ROOT")}
+    os.environ.update({
+        "WORKSPACE_ARTIFACTS_ROOT": r"C:\Users\u\.hermes\kanban\workspaces",
+        "WORKSPACE_FILES_ROOT": r"C:\Users\u\.hermes\kanban\files",
+        "WORKSPACE_ATTACHMENTS_ROOT": r"C:\Users\u\.hermes\kanban\attachments",
+    })
+    try:
+        win = importlib.reload(bd)
+        term = win.build_config(ROOT, "developer", dict(win.ROLES["developer"]))["terminal"]
+        vols = term["docker_volumes"]
+        assert r"C:\Users\u\.hermes\kanban\workspaces:/seaos/workspaces" in vols, vols
+        assert r"C:\Users\u\.hermes\kanban\files:/seaos/files:ro" in vols, vols
+        assert "/seaos/files" in term["docker_env"]["SEAOS_PATH_MAP"]
+        # macOS の形は左右同じのまま
+        assert bd.box_path("/Users/u/.hermes/kanban/files") == "/Users/u/.hermes/kanban/files"
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        importlib.reload(bd)
+
+
+def test_seaos_path_script_round_trips():
+    """箱の中の seaos-path が、本文のパスを読み替え、宣言用にホストへ戻す。"""
+    import subprocess
+
+    script = ROOT / "templates/workspace/seaos-path"
+
+    def run(*args, mapping):
+        return subprocess.run(["sh", str(script), *args], capture_output=True, text=True,
+                              env={**os.environ, "SEAOS_PATH_MAP": mapping}).stdout.strip()
+
+    win = r"C:\U\.hermes\kanban\files=/seaos/files;C:\U\.hermes\kanban\workspaces=/seaos/workspaces"
+    assert run(r"C:\U\.hermes\kanban\files\d\見積 v2.xlsx.md", mapping=win) == "/seaos/files/d/見積 v2.xlsx.md"
+    assert run("--host", "/seaos/workspaces/t1/a.png", mapping=win) == r"C:\U\.hermes\kanban\workspaces\t1\a.png"
+    mac = "/Users/u/.hermes/kanban/files=/Users/u/.hermes/kanban/files"
+    assert run("/Users/u/.hermes/kanban/files/a.md", mapping=mac) == "/Users/u/.hermes/kanban/files/a.md"
+    assert run("/elsewhere/x", mapping=win) == "/elsewhere/x"
+
+
 def test_prune_removes_old_only():
     old = files.keep([received("doc_0123456789ab_old.txt")])[0].parent
     new = files.keep([received("doc_0123456789ab_new.txt")])[0].parent

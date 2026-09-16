@@ -1,0 +1,41 @@
+#!/bin/sh
+# ホストのパスと、作業部屋（この箱）の中のパスを行き来する。
+#
+#   seaos-path <ホストのパス>          → 箱の中で読み書きできるパス
+#   seaos-path --host <箱の中のパス>   → ホストのパス（完了時の artifacts に書く）
+#
+# **macOS / Linux では何も変えずに返す。** 箱へは左右同じパスで渡してあるので、
+# ホストのパスがそのまま箱の中でも通る。
+#
+# **Windows では振り替える。** `C:\Users\…` は Linux の箱の中に作れないので、
+# 箱の側は `/seaos/…` に置いてある。対応は生成器が SEAOS_PATH_MAP に焼く
+# （`ホスト=箱;ホスト=箱`）。カード本文にはホストのパスが書かれるので、
+# 読む前にここを通す。
+set -eu
+to=box
+if [ "${1:-}" = "--host" ]; then to=host; shift; fi
+p="${1:-}"
+if [ -z "$p" ]; then
+  echo "使い方: seaos-path [--host] <パス>" >&2
+  exit 2
+fi
+norm=$(printf '%s' "$p" | tr '\\' '/')
+old_ifs=$IFS
+IFS=';'
+for pair in ${SEAOS_PATH_MAP:-}; do
+  host=$(printf '%s' "${pair%%=*}" | tr '\\' '/')
+  box=${pair#*=}
+  if [ "$to" = box ]; then
+    case "$norm" in "$host"|"$host"/*) printf '%s%s\n' "$box" "${norm#"$host"}"; exit 0 ;; esac
+  else
+    case "$norm" in
+      "$box"|"$box"/*)
+        rest=${norm#"$box"}
+        # Windows のホストなら区切りも戻す（宣言したパスがそのままホストで解決される）
+        case "${pair%%=*}" in *\\*) rest=$(printf '%s' "$rest" | tr '/' '\\') ;; esac
+        printf '%s%s\n' "${pair%%=*}" "$rest"; exit 0 ;;
+    esac
+  fi
+done
+IFS=$old_ifs
+printf '%s\n' "$p"
