@@ -107,6 +107,40 @@ def test_same_root_as_generator():
         os.environ["WORKSPACE_FILES_ROOT"] = str(HOME / "kanban" / "files")
 
 
+def test_office_gets_markdown_beside_it():
+    """Excel などは隣に .md を置き、そのパスも返す（担当の多くはそちらしか読めない）。"""
+    original = files.to_markdown
+    files.to_markdown = lambda _p: "| 品目 | 数量 |"
+    try:
+        kept = files.keep([received("doc_0123456789ab_見積.xlsx"), received("doc_0123456789ab_memo.txt")])
+    finally:
+        files.to_markdown = original
+    names = [p.name for p in kept]
+    assert names == ["見積.xlsx", "見積.xlsx.md", "memo.txt"], names
+    assert kept[1].read_text(encoding="utf-8") == "| 品目 | 数量 |"
+
+
+def test_failed_conversion_still_passes_original():
+    original = files.to_markdown
+    files.to_markdown = lambda _p: None
+    try:
+        kept = files.keep([received("doc_0123456789ab_壊れた.pdf")])
+    finally:
+        files.to_markdown = original
+    assert [p.name for p in kept] == ["壊れた.pdf"], kept
+
+
+def test_handler_reads_files_only():
+    """シェルの無い handler に、置き場と添付だけを読む MCP が載る。書く道具は載らない。"""
+    spec = bd.worker_roles(ROOT)["handler"]
+    server = bd.build_config(ROOT, "handler", spec)["mcp_servers"]["files"]
+    assert server["args"][-2:] == [bd.FILES_ROOT, bd.ATTACHMENTS_ROOT], server["args"]
+    tools = set(server["tools"]["include"])
+    assert "read_text_file" in tools
+    assert not tools & {"write_file", "edit_file", "move_file", "create_directory"}, tools
+    assert "{{" not in str(server)
+
+
 def test_prune_removes_old_only():
     old = files.keep([received("doc_0123456789ab_old.txt")])[0].parent
     new = files.keep([received("doc_0123456789ab_new.txt")])[0].parent

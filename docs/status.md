@@ -202,7 +202,10 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
 - `files keep` は Hermes の cache の外を断る（窓口は他人の文章を読む。秘密を箱の見える
   場所へ出させないため）
 - 置き場は日次の保守でカードと同じ日数（`PURGE_DAYS`、既定 90）で畳む
-- **シェルを持たない役（handler）は読めない。** 読めないと書いて止まる規約にしてある
+- **Excel / Word / PowerPoint / PDF は隣に `.md` を置く**（markitdown を uvx で借りる。
+  Hermes の venv には入れない）。uvx が無ければ元のファイルだけ渡る
+- **シェルを持たない役（handler）は、読み取り専用の `files` MCP で読む**
+  （`templates/shared/mcp/files.yaml`）。見えるのは置き場と板の添付だけで、書く道具は載せない
 - 箱のマウントは config.yaml にあるので、**既存の環境では `update --force-config` が要る**
 
 ## 変えていない前提

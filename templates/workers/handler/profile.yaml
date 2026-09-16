@@ -30,6 +30,12 @@ model: "openai/gpt-5.6-sol"
 shell: false
 workspace: false
 
+# **ファイルは読む。** シェルが無いので、読み取り専用の MCP で渡す
+# （templates/shared/mcp/files.yaml。置き場と板の添付しか見えない）。
+mcp_shared:
+- context7
+- files
+
 # **コードは書かない。** clone も push も委譲もしないので、実装の規約と
 # delegate-to-cli-agents スキルは載せない。書くのは外部サービスの状態と記録だけで、
 # リポジトリの中身を変えるのは箱を持つ developer / senior-developer の仕事である。

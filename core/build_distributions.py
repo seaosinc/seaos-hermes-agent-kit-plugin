@@ -634,8 +634,21 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         # 役が自分で書いたものを後にして、共通より優先させる。
         servers.update(mcp.get("servers", mcp) if isinstance(mcp, dict) else {})
     if servers:
-        cfg["mcp_servers"] = servers
+        # **置き場のパスは機械ごとに違う**ので、雛形には `{{FILES_ROOT}}` と書いて
+        # ここで埋める。`${HOME}` のような環境変数で書くと、鍵の有無で MCP を
+        # 切り替える仕組み（env.sync_mcp_enabled）が「値が無い」と見て無効にする。
+        cfg["mcp_servers"] = _fill_paths(servers)
     return cfg
+
+
+def _fill_paths(value):
+    if isinstance(value, dict):
+        return {k: _fill_paths(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_fill_paths(v) for v in value]
+    if isinstance(value, str):
+        return value.replace("{{FILES_ROOT}}", FILES_ROOT).replace("{{ATTACHMENTS_ROOT}}", ATTACHMENTS_ROOT)
+    return value
 
 
 # cron のジョブ表。実体のスキーマ（schedule はオブジェクト、id や state が要る）に

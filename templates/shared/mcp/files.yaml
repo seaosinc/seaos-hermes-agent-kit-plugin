@@ -1,0 +1,24 @@
+# **受け取ったファイルを読む口。** シェルを持たない役に渡す。
+#
+# ユーザーが Slack で渡した資料は `~/.hermes/kanban/files/` に置かれ、カード本文に
+# パスが書かれる（core/files.py）。シェルのある役は file / terminal で読めるが、
+# シェルを持たない役（handler）は読む手が無かった。
+#
+# **見える範囲は置き場と板の添付だけ。** サーバは引数に挙げたディレクトリの外を
+# 拒否する。この役は他人の文章を読み、外部サービスへ書ける——ホストの任意の
+# ファイル（`.env` など）を読めると、そのまま外へ出せてしまう。
+#
+# **読む道具だけを登録する。** サーバは write_file / edit_file / move_file も出す。
+# Office / PDF は置き場で Markdown に変換済みなので、read_text_file で足りる。
+files:
+  command: npx
+  args: ["-y", "@modelcontextprotocol/server-filesystem", "{{FILES_ROOT}}", "{{ATTACHMENTS_ROOT}}"]
+  tools:
+    include:
+      - read_text_file
+      - read_media_file
+      - read_multiple_files
+      - list_directory
+      - get_file_info
+      - list_allowed_directories
+  enabled: true
