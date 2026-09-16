@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -29,6 +30,35 @@ Log = Callable[[str], None]
 
 # Hermes の添付と同じ上限（kanban_db.KANBAN_ATTACHMENT_MAX_BYTES）
 MAX_BYTES = 25 * 1024 * 1024
+
+
+# **中身を読むのに専用の道具が要る形式。** 隣に Markdown へ変換したものを置く。
+# Excel を開くのに担当ごとの作法（openpyxl を入れる、シートを数える…）を持たせると、
+# 役ごとに読める・読めないが分かれる。変換を置き場で1回だけやれば、
+# **テキストを読める役なら誰でも読める**（シェルを持たない役も、読み取りの MCP で）。
+CONVERTIBLE = {".xlsx", ".xls", ".docx", ".pptx", ".pdf"}
+# **uvx で隔離して借りる。** Hermes の venv へ入れない——pandas や onnxruntime まで
+# 引き込むので、本体の依存とぶつかりうる（本体は改造しない）。プラグインの
+# pip_dependencies も入らない（Hermes が導入時に読むのは記憶プロバイダだけ）。
+# 同じ環境にたまたま入っていれば、それを使う。
+MARKITDOWN_SPEC = "markitdown[docx,pdf,pptx,xlsx,xls]"
+
+
+def converter_ready(timeout: int = 600) -> bool:
+    """変換の道具を一度取ってきて、使える状態か確かめる（導入時に呼ぶ）。
+
+    **初回は数十秒かかる**（依存を落とす）。窓口がファイルを受けたその場で待たせない。
+    """
+    uvx = shutil.which("uvx")
+    if not uvx:
+        return False
+    try:
+        proc = subprocess.run([uvx, "--from", MARKITDOWN_SPEC, "markitdown", "--help"],
+                              capture_output=True, text=True, timeout=timeout,
+                              stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return proc.returncode == 0
 
 
 class FilesError(RuntimeError):
@@ -65,6 +95,28 @@ def _is_received(path: Path) -> bool:
     return len(parts) >= 3 and parts[0] == "profiles" and parts[2] == "cache"
 
 
+def to_markdown(src: Path) -> str | None:
+    """Office / PDF を Markdown にする。**変換できなければ None**（元のファイルは渡る）。"""
+    try:
+        from markitdown import MarkItDown  # type: ignore[import-not-found]
+
+        return MarkItDown().convert(str(src)).text_content
+    except ImportError:
+        pass
+    except Exception:  # noqa: BLE001  （壊れたファイル。元を渡せば足りる）
+        return None
+    uvx = shutil.which("uvx")
+    if not uvx:
+        return None
+    try:
+        proc = subprocess.run([uvx, "--from", MARKITDOWN_SPEC, "markitdown", str(src)],
+                              capture_output=True, text=True, timeout=300,
+                              stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout if proc.returncode == 0 and proc.stdout.strip() else None
+
+
 def keep(paths: List[Path], log: Optional[Log] = None) -> List[Path]:
     """受け取ったファイルを置き場へ写し、**置いた先の絶対パス**を返す。
 
@@ -95,6 +147,14 @@ def keep(paths: List[Path], log: Optional[Log] = None) -> List[Path]:
         kept.append(target)
         if log:
             log(str(target))
+        if target.suffix.lower() in CONVERTIBLE:
+            text = to_markdown(target)
+            if text is not None:
+                md = target.with_name(target.name + ".md")
+                md.write_text(text, encoding="utf-8")
+                kept.append(md)
+                if log:
+                    log(str(md))
     return kept
 
 

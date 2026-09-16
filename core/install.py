@@ -122,6 +122,16 @@ def install(*, log: Optional[Log] = None) -> Result:
     except OSError as exc:
         say(f"✗ 作業部屋を用意できませんでした: {exc}")
 
+    # **受け取った Office / PDF を Markdown にする道具。** 初回は依存を落とすので、
+    # ファイルを受けたその場ではなく、ここで待つ。無くても元のファイルは渡る。
+    say("ファイルの変換を用意します")
+    import files as files_mod
+
+    if files_mod.converter_ready():
+        say("Excel / Word / PowerPoint / PDF を Markdown にできます")
+    else:
+        say("uvx が無いので飛ばします（元のファイルだけを渡します。シェルの無い役は Office を読めません）")
+
     say("共有記憶を用意します")
     if not mem0.up(log=say):
         res.failures += 1
