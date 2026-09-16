@@ -234,8 +234,3 @@ def managed_env_vars() -> List[str]:
             if key not in seen:
                 seen.append(key)
     return seen
-
-
-def without_board() -> List[str]:
-    """板に載らない役（人間が直接呼ぶ）。doctor が kanban の欠落を咎めないため。"""
-    return [n for n, sp in all_specs().items() if sp.get("no_kanban")]

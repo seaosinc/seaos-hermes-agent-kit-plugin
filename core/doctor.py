@@ -167,7 +167,6 @@ def _slack_token_holders(rep: Report) -> None:
 def _profiles(rep: Report) -> None:
     rep.section("各役")
     specs = roles.all_specs()
-    board_less = set(roles.without_board())
 
     for name in roles.names():
         rep.lines.append(f"--- {name}")
@@ -194,10 +193,6 @@ def _profiles(rep: Report) -> None:
         toolsets = cfg.get("toolsets") or []
         if "kanban" in toolsets:
             rep.ok("toolsets に kanban")
-        elif name in board_less:
-            # **板に載らない役は例外である。** 咎めると doctor が毎回赤くなり、
-            # 本物の異常が埋もれる。
-            rep.ok("toolsets に kanban 無し（板に載らない役として意図的）")
         else:
             rep.ng("toolsets に kanban が無い → カードを扱えない")
 

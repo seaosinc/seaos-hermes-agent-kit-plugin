@@ -156,9 +156,8 @@ def _parser() -> argparse.ArgumentParser:
 def _cmd_roles(args: argparse.Namespace) -> int:
     enabled = set(roles.names())
     for name in roles.all_names():
-        board = "" if name not in roles.without_board() else "  （板に載らない）"
         state = "" if name in enabled else "  （無効）"
-        print(f"{name}{state}{board}")
+        print(f"{name}{state}")
     return 0
 
 

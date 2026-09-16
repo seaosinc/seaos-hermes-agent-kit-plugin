@@ -526,10 +526,6 @@ def test_kanban_auto_subscription_is_disabled():
     """カード作成時の機械的な会話投稿を止め、明示的な wake 購読へ寄せる。"""
     for name, spec in bd.ROLES.items():
         cfg = bd.build_config(ROOT, name, spec)
-        if spec.get("no_kanban"):
-            # 板に載らない役（avatar）は kanban 設定ごと持たない。
-            assert "kanban" not in cfg, f"{name} は板に載らないのに kanban 設定がある"
-            continue
         assert cfg["kanban"]["auto_subscribe_on_create"] is False
 
 

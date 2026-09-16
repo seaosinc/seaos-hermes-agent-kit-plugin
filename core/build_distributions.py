@@ -208,29 +208,25 @@ ROLES: dict[str, dict] = {
         "desc": "A2A を通じて他のエージェントと連携し、依頼と成果を伝達する役。実装は developer に任せる。",
         "describe": "A2A でエージェントを発見・呼び出し、成果を検証してカードに記録する。リポジトリの実装は developer が担当する。",
     },
-    # 画面を触る役。**板に載らない。** 人間が直接呼んだときだけ動くので、
-    # kanban の担当になり得ない状態にしてある（no_kanban）。
+    # 画面を触る役。
     #
     # モデルは上位を充てる。GUI 操作は「構造情報ゼロの画像から座標を当てる」仕事で、
     # 安い模型は論理座標と実ピクセル（scale 2.0）の変換を素で間違え、
     # 不正な tool call を出して固まった（実測）。**ここは精度が速度と金額に勝る。**
     "avatar": {
         "model": SMART,
-        "no_kanban": True,
         "computer_use": True,
         "no_delegation": True,
         # 箱に入れない。**操作対象はホストの画面そのもの**なので、
         # コンテナの中に居ては何も触れない。
         "workspace": False,
-        "skills": [],
+        "skills": ["kanban-collaboration"],
         "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
-        "summary": "画面を操作する（人が呼んだときだけ動く）",
-        "desc": "人間が明示的に呼んだときだけ動く、GUI 操作専用の実行役。CLI や API では代替できない画面操作だけを担当する。",
-        "describe": ("人間の分身として画面を操作する役。クリック・キー入力・スクリーンショット。"
-                     "**kanban の自動振り分け先に選んではならない**——このプロファイルに"
-                     "タスクを assign してよいのは人間だけで、decomposer / orchestrator は"
-                     "絶対にここへルーティングしないこと。GUI 操作が必要そうなタスクでも、"
-                     "人間の明示指示がない限り他の役へ回すこと。"),
+        "summary": "この PC の画面を操作する・スクショを撮る",
+        "desc": "GUI 操作専用の実行役。CLI や API では代替できない画面操作と、この PC の画面のスクリーンショットを担当する。",
+        "describe": ("人間の分身としてこの PC の画面を操作する役。クリック・キー入力・スクリーンショット。"
+                     "例:「この PC の画面のスクショを撮って送る」「このアプリの設定画面を開いて値を確かめる」。"
+                     "CLI や API で済む作業、Web ページのスクショ（developer が作業部屋で撮る）は扱わない。"),
     },
     # **この PC に道具を揃える役。** Docker や Node.js のように、Hermes もキットも
     # 持ってこない道具を入れる。ホストに直接入れるので箱には入れない。
@@ -501,8 +497,6 @@ def _platform_tools(spec: dict) -> list:
         # **コマンドを実行する手を持たせない。** MCP と web だけで調べる役に使う。
         # workspace を false にするだけでは、シェルがホストへ移るだけで手は残る。
         tools = [t for t in tools if t not in ("terminal", "file")]
-    if spec.get("no_kanban"):
-        tools = [t for t in tools if t != "kanban"]
     if spec.get("computer_use"):
         # 画面を触る役。**vision と対で渡す**——スクリーンショットを撮っても、
         # 読む手が無ければ何も分からない。
@@ -649,13 +643,6 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         },
         "auxiliary": {"kanban_decomposer": {"model": SMART}},
     }
-    if spec.get("no_kanban"):
-        # **板に載らない役。** 人間が直接呼んだときだけ動くので、カードを配られても困る
-        # （配られた時点で「人間が呼んだ」が偽になる）。道具ごと外して、
-        # ディスパッチャから見て担当になり得ない状態にする。
-        cfg["toolsets"] = ["hermes-cli"]
-        cfg.pop("kanban", None)
-        cfg.pop("auxiliary", None)
     # **共有記憶は全役が持つ。** 報告はカードの comment と mem0 の両方に残す
     # ——カードは purge で消えるが、mem0 は残り、役をまたいで引ける。
     #
@@ -982,12 +969,6 @@ if __name__ == "__main__":
     elif len(sys.argv) > 2 and sys.argv[1] == "--roles":
         kit = Path(sys.argv[2])
         print(" ".join({**ROLES, **worker_roles(kit)}.keys()))
-    elif len(sys.argv) > 1 and sys.argv[1] == "--no-kanban":
-        # 板に載らない役。**doctor が「kanban が無い」を咎めないため**の口
-        # （zsh 側で役名を別に持つと、役を足したときに片方だけ古くなる）。
-        kit = Path(sys.argv[2] if len(sys.argv) > 2 else ".")
-        roles = {**ROLES, **worker_roles(kit)}
-        print(" ".join(n for n, sp in roles.items() if sp.get("no_kanban")))
     elif len(sys.argv) > 2 and sys.argv[1] == "--memory-roles":
         # 共有記憶を引く役。**zsh 側で別に持たない**ための口
         # （持つと、判断役を増やしたときに片方だけ古くなる）。
