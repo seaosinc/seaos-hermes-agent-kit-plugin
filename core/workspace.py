@@ -62,11 +62,13 @@ def settings() -> Dict[str, str]:
 
 
 def boxed_roles() -> List[str]:
-    """箱を持つ役。**増えるほど最悪値（枚数 × メモリ）が上がる。**"""
-    return [
-        n for n, sp in roles.all_specs().items()
-        if sp.get("workspace") and sp.get("shell", True)
-    ]
+    """箱を持つ**有効な**役。**増えるほど最悪値（枚数 × メモリ）が上がる。**
+
+    外した役は箱を立てないので数えない（数えると doctor の見立てがずれる）。
+    """
+    specs = roles.all_specs()
+    return [n for n in roles.names()
+            if specs[n].get("workspace") and specs[n].get("shell", True)]
 
 
 # ── CA ────────────────────────────────────────────────────────────────────

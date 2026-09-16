@@ -527,19 +527,19 @@ def _slack_platform(spec: dict) -> dict:
     # （専用ボットは特定のチャンネルだけ見る、など）。既定は下のとおりで、
     # `slack_extra` / `slack_config` に書いた分が勝つ。
     slack: dict = {
-            "reply_to_mode": "first",
-            "extra": {
-                "require_mention": True,
-                "thread_require_mention": True,
-                # 先頭が他人あてのメンションなら、自分も呼ばれていない限り無視する
-                "ignore_other_user_mentions": True,
-                "reply_in_thread": True,
-                # Slack の送受信リアクションは本体の機能を使う。実際に有効化するには
-                # App 側の reactions:read / reactions:write scope と reaction_added /
-                # reaction_removed event subscription も必要（オーナーが再認可する）。
-                "reactions": True,
-                "reaction_triggers": True,
-            },
+        "reply_to_mode": "first",
+        "extra": {
+            "require_mention": True,
+            "thread_require_mention": True,
+            # 先頭が他人あてのメンションなら、自分も呼ばれていない限り無視する
+            "ignore_other_user_mentions": True,
+            "reply_in_thread": True,
+            # Slack の送受信リアクションは本体の機能を使う。実際に有効化するには
+            # App 側の reactions:read / reactions:write scope と reaction_added /
+            # reaction_removed event subscription も必要（オーナーが再認可する）。
+            "reactions": True,
+            "reaction_triggers": True,
+        },
     }
     slack["extra"].update(spec.get("slack_extra") or {})
     slack.update(spec.get("slack_config") or {})

@@ -8,21 +8,29 @@
 | | |
 |---|---|
 | `core/` | 生成・差分・説明文の同期・鍵配布・反映。**Python のみ** |
-| `core/cli.py` | 薄い皮（16コマンド） |
-| `core/worker.py` | 業務別ワーカーの CRUD |
-| `core/workspace.py` | 作業部屋（CA / build / warm / verify / clean / gc） |
+| `core/build_distributions.py` | 生成器。**役の配置表（`ROLES`）の唯一の正** |
+| `core/roles.py` | 配置表の引き口（生成器の読み込みとキャッシュ、有効な役、鍵の規則） |
+| `core/selection.py` | 入れる役の選択（外した役だけを記録） |
+| `core/kit.py` | 反映（生成 → 導入・更新 → 説明文 → 鍵 → MCP の有効・無効） |
+| `core/env.py` | 鍵の配布と、鍵に従った MCP の有効・無効 |
+| `core/cli.py` | 薄い皮（`seaos-kit --help` で一覧） |
+| `core/worker.py` | 業務別ワーカーの CRUD と共有（PR） |
+| `core/workspace.py` | 作業部屋（CA / build / warm / verify / gc / shell） |
+| `core/files.py` | 受け取ったファイルの置き場（Office / PDF の変換を含む） |
+| `core/machine.py` | この PC の道具の台帳と導入（provisioner の手） |
 | `core/mem0.py` | 共有記憶（起動・接続・切り離し） |
 | `core/booking.py` | アクセスゲートの検証とゲスト操作 |
 | `core/hotl.py` | HOTL 設定の検証 |
-| `core/terraform.py` | AWS の箱に渡す値の書き出し |
-| `core/doctor.py` | 設定漏れの検証（全モジュールの check を束ねる） |
+| `core/envhint.py` | この PC の事実を各役へ書く |
+| `core/doctor.py` / `refcheck.py` / `check_mcp_tools.py` | 設定漏れと、規約が名指しした名前の検証 |
 | `core/selftest.py` | 生成物の形の検査 |
-| `core/selfupdate.py` | pull → 反映 → 検証 |
+| `core/selfupdate.py` / `maintain.py` | pull → 反映 → 検証、日次の保守 |
 | `core/platform_ops.py` | **OS で違うことだけ**（常駐 / コマンドの置き場 / 自動起動） |
 | `core/install.py` | 導入と撤去（配布物に載らないもの） |
-| `dashboard/plugin_api.py` | GUI から core を呼ぶ口。全ルート応答を実機で確認済み |
-| `desktop/plugin.js` | 鍵 → 役 → 反映 の3段ウィザード。素の ESM（ビルド不要） |
-| `templates/` | 役の定義。旧キットから持ち込み、**現行の8役と一致**（diff が全て `=`） |
+| `dashboard/plugin_api.py` | GUI から core を呼ぶ口 |
+| `desktop/plugin.js` / `ui.js` | 設定画面。薄い皮（plugin.js）が中身（ui.js）をその場で読み込む。素の ESM（ビルド不要） |
+| `templates/` | 役の規約・スキル・作業部屋・定期実行のスクリプト |
+| `tests/` | `tests/run_all.py` でまとめて走る（`--all` で hermes を実際に呼ぶものも） |
 
 インストールはローカルの bare リポジトリから実証済み。
 
@@ -45,9 +53,8 @@ hermes plugins enable seaos-hermes-agent-kit
 
 ## 対応 OS
 
-**利用者向けは Windows と macOS の2つ。** Linux は落とさない——terraform が立てる
-AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすため（`terraform/main.tf`）。
-つまり Linux は「自分自身を動かす先」としてだけ残る。
+**利用者向けは Windows と macOS の2つ。** Linux の分岐（systemd）も残してある——
+AWS の箱（Ubuntu）でキットを動かす想定のため。このリポジトリには箱を立てる定義は無い。
 
 | | 常駐 | コマンドの置き場 |
 |---|---|---|

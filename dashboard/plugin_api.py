@@ -49,6 +49,7 @@ def list_roles() -> List[Dict]:
     """
     out: List[Dict] = []
     enabled = set(roles.names())
+    source = _source()  # 鍵ごとに .env を読み直さない
     for name in roles.all_names():
         out.append(
             {
@@ -65,7 +66,7 @@ def list_roles() -> List[Dict]:
                         "name": roles.env_key(name, var),
                         "label": var,
                         "description": desc,
-                        "configured": bool(_source().get(roles.env_key(name, var))),
+                        "configured": bool(source.get(roles.env_key(name, var))),
                     }
                     for var, _req, desc in roles.env_requirements(name)
                     if var in set(roles.own_env_vars(name))
@@ -76,7 +77,7 @@ def list_roles() -> List[Dict]:
                         "name": roles.env_key(name, var),
                         "label": var,
                         "description": "この役だけ別の値を使うときに入れます。未設定なら共通の値を使います。",
-                        "configured": bool(_source().get(roles.env_key(name, var))),
+                        "configured": bool(source.get(roles.env_key(name, var))),
                         "override": True,
                     }
                     for var in roles.override_env_vars(name)
