@@ -20,7 +20,7 @@ import kit
 import mem0
 import platform_ops
 import roles
-from paths import hermes_home, kit_root, profile_dir
+from paths import profile_dir
 
 Log = Callable[[str], None]
 
@@ -42,8 +42,7 @@ def register_cron(*, log: Optional[Log] = None) -> Result:
     （実際に死んだ）。登録は公式の `hermes cron create` に任せ、ここは
     「無ければ作る」だけにする。スクリプトの実体は配布物が運ぶ。
     """
-    import build_distributions as gen
-
+    gen = roles.generator()
     res = Result()
     say: Log = log or (lambda _l: None)
     profile = booking.gate_profile()
@@ -54,10 +53,8 @@ def register_cron(*, log: Optional[Log] = None) -> Result:
         say(f"✗ {profile} の定期実行を読み取れませんでした")
         return res
 
-    roles_spec = {**gen.ROLES, **gen.worker_roles(kit_root())}
-    for role, spec in roles_spec.items():
-        if role != profile:
-            continue
+    spec = roles.all_specs().get(profile) or {}
+    for role in [profile]:
         for name in spec.get("cron", []):
             expr, script = gen.CRON_JOBS[name]
             if re.search(rf"Name:\s*{re.escape(name)}\b", listing):

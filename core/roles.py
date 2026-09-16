@@ -7,29 +7,92 @@ Python になった以上、サブプロセスを挟まず直接 import する�
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from paths import kit_root
+from paths import kit_root, local_workers_dir
+
+_GENERATOR_PATH = Path(__file__).resolve().parent / "build_distributions.py"
+# 生成器の環境変数（モデル名・置き場）。変われば読み直す。
+_GENERATOR_ENV = ("MODEL_FAST", "MODEL_SMART", "MODEL_SENIOR", "WORKSPACE_IMAGE",
+                  "WORKSPACE_ARTIFACTS_ROOT", "WORKSPACE_FILES_ROOT", "WORKSPACE_ATTACHMENTS_ROOT",
+                  "KIT_VERSION", "HERMES_HOME")
+_cache: Dict[str, Tuple[Any, Any]] = {}
 
 
-def _generator():
-    """build_distributions.py を module として読む（ファイル名が識別子にならないため）。"""
-    path = Path(__file__).resolve().parent / "build_distributions.py"
-    spec = importlib.util.spec_from_file_location("kit_generator", path)
+def _stamp(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def generator():
+    """生成器（build_distributions.py）を module として読む。**ファイルが変わったときだけ読み直す。**
+
+    `import` で済ませないのは、設定画面のバックエンドが長く生きるから。
+    `plugins update` でファイルが新しくなっても、import したものは古いまま残る。
+    かといって呼ぶたびに読み直すと、1回 60ms が1リクエストで100回を超え、
+    設定画面の一覧に 7 秒かかった（実測）。更新時刻と環境変数で見分ける。
+    """
+    key = (_stamp(_GENERATOR_PATH), tuple(os.environ.get(k) for k in _GENERATOR_ENV))
+    hit = _cache.get("generator")
+    if hit and hit[0] == key:
+        return hit[1]
+    spec = importlib.util.spec_from_file_location("kit_generator", _GENERATOR_PATH)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"生成器を読み込めない: {path}")
+        raise RuntimeError(f"生成器を読み込めない: {_GENERATOR_PATH}")
     module = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault("kit_generator", module)
+    sys.modules["kit_generator"] = module
     spec.loader.exec_module(module)
+    _cache["generator"] = (key, module)
     return module
 
 
+def _workers_stamp() -> tuple:
+    """役の定義が置かれた場所の状態。**足した・消した・書き換えた**を見分ける。"""
+    out = []
+    for root in (kit_root() / "templates" / "workers", local_workers_dir()):
+        if not root.is_dir():
+            continue
+        for d in sorted(root.iterdir()):
+            if d.is_dir():
+                out.append((str(d), _stamp(d), _stamp(d / "profile.yaml"), _stamp(d / "mcp.yaml"),
+                            _stamp(d / "SOUL.md")))
+    return tuple(out)
+
+
 def all_specs() -> Dict[str, dict]:
-    """固定役（ROLES）＋業務別ワーカー（templates/workers/）。"""
-    gen = _generator()
-    return {**gen.ROLES, **gen.worker_roles(kit_root())}
+    """固定役（ROLES）＋業務別ワーカー（templates/workers/）。
+
+    **読み直すのは、生成器か役の定義が変わったときだけ。** 設定画面の1回の表示で
+    役ごとに何度も引かれる。
+    """
+    gen = generator()
+    key = (id(gen), _workers_stamp())
+    hit = _cache.get("specs")
+    if hit and hit[0] == key:
+        return dict(hit[1])
+    specs = {**gen.ROLES, **gen.worker_roles(kit_root())}
+    _cache["specs"] = (key, specs)
+    return dict(specs)
+
+
+def mcp_servers(name: str) -> Dict[str, dict]:
+    """その役に載る MCP サーバ。"""
+    return generator().mcp_servers_of(kit_root(), name, all_specs().get(name) or {})
+
+
+def mcp_env_vars(name: str) -> Dict[str, List[str]]:
+    """その役の MCP が参照する環境変数（サーバ名 -> 変数名）。"""
+    return generator().mcp_env_vars(kit_root(), name, all_specs().get(name) or {})
+
+
+def skills(name: str) -> List[str]:
+    """その役に載るスキル。"""
+    return generator().skills_of(kit_root(), name, all_specs().get(name))
 
 
 def all_names() -> List[str]:
@@ -64,7 +127,7 @@ def describe(name: str) -> str:
     spec = all_specs().get(name) or {}
     text = str(spec.get("describe") or spec.get("desc") or "")
     # 外した役を名指しする文は落とす（規約と同じ規則。生成器の strip_role_blocks）
-    return " ".join(_generator().strip_role_blocks(text, set(names())).split())
+    return " ".join(generator().strip_role_blocks(text, set(names())).split())
 
 
 def summary(name: str) -> str:

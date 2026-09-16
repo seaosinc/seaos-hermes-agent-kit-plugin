@@ -7,15 +7,15 @@ platform 実装に閉じる。ここには platform 分岐を書かないこと�
 
 from __future__ import annotations
 
-import importlib.util
 import io
 import shutil
-import sys
 import tempfile
 from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, List, Optional
+
+import yaml
 
 import env as env_mod
 import hermes
@@ -35,15 +35,6 @@ class Result:
         return self.failures == 0
 
 
-def _generator():
-    path = Path(__file__).resolve().parent / "build_distributions.py"
-    spec = importlib.util.spec_from_file_location("kit_generator", path)
-    module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    sys.modules.setdefault("kit_generator", module)
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
-    return module
-
-
 def build(out: Optional[Path] = None, log: Optional[Log] = None) -> Path:
     """templates/ → 配布物。**dist/ は生成物なので毎回作り直す。**"""
     root = kit_root()
@@ -56,7 +47,7 @@ def build(out: Optional[Path] = None, log: Optional[Log] = None) -> Path:
     # そのまま漏れる。出したい呼び手には log 経由で渡す。
     captured = io.StringIO()
     with redirect_stdout(captured):
-        _generator().build(root, target, set(roles.names()))
+        roles.generator().build(root, target, set(roles.names()))
     if log:
         for line in captured.getvalue().splitlines():
             if line.strip():
@@ -82,6 +73,9 @@ def sync_descriptions(log: Optional[Log] = None) -> Result:
         if not hermes.profile_exists(name):
             continue
         text = roles.describe(name) if name in enabled else DISABLED_DESCRIPTION
+        if _current_description(name) == text:
+            # **同じなら叩かない。** 1回 0.3 秒の hermes 呼び出しが、反映のたびに全役ぶん走っていた
+            continue
         if not text:
             continue
         code, _out = hermes.set_description(name, text)
@@ -119,8 +113,6 @@ def prune_skills(log: Optional[Log] = None) -> Result:
     その役には載っていない——これがキット由来の残骸である。
     **キットが知らないスキルには触らない**（Hermes やエージェントが生やしたもの）。
     """
-    import build_distributions as gen
-
     root = kit_root()
     ours = {p.name for p in (root / "templates" / "skills").glob("*") if p.is_dir()}
     ours |= {p.name for p in (root / "templates" / "workers").glob("*/skills/*") if p.is_dir()}
@@ -130,7 +122,7 @@ def prune_skills(log: Optional[Log] = None) -> Result:
         pdir = profile_dir(name)
         if not pdir.is_dir():
             continue
-        declared = set(gen.skills_of(root, name))
+        declared = set(roles.skills(name))
         for skill in sorted((pdir / "skills").glob("*")):
             if not skill.is_dir() or skill.name in declared or skill.name not in ours:
                 continue
@@ -140,6 +132,40 @@ def prune_skills(log: Optional[Log] = None) -> Result:
         for line in result.lines:
             log(line)
     return result
+
+
+def _current_description(name: str) -> str:
+    """いま入っている説明文（空白は畳む）。読めなければ空。"""
+    try:
+        doc = yaml.safe_load((profile_dir(name) / "profile.yaml").read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return ""
+    return " ".join(str(doc.get("description") or "").split())
+
+
+def _installed_matches(dist: Path, name: str) -> bool:
+    """**配るものが、入っているものと同じか。** 同じなら profile update を飛ばす。
+
+    比べるのは配布物の持ち物（distribution_owned）のうち、中身で比べられるもの。
+    - `config.yaml` は比べない。update が既定で保持するので、違っていて正常
+    - `distribution.yaml` はインストーラが書き直すので、版だけ比べる
+    """
+    pdir = profile_dir(name)
+    try:
+        built = yaml.safe_load((dist / "distribution.yaml").read_text(encoding="utf-8")) or {}
+        installed = yaml.safe_load((pdir / "distribution.yaml").read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return False
+    if str(built.get("version")) != str(installed.get("version")):
+        return False
+    for owned in built.get("distribution_owned") or []:
+        rel = owned.rstrip("/")
+        if rel in ("config.yaml", "distribution.yaml"):
+            continue
+        a, b = dist / rel, pdir / rel
+        if not (_same_tree(a, b) if a.is_dir() else _same_file(a, b)):
+            return False
+    return True
 
 
 def enable_role(name: str, log: Optional[Log] = None) -> Result:
@@ -218,7 +244,7 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     result = Result()
     out = build(log=log)
 
-    updated = 0
+    updated = unchanged = 0
     notable: List[str] = []
     for name in roles.names():
         dist = out / name
@@ -237,6 +263,9 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
                            else f"{name} を入れ直せませんでした")
             result.failures += 0 if code == 0 else 1
             continue
+        if not force_config and _installed_matches(dist, name):
+            unchanged += 1
+            continue
         code, _ = hermes.update(name, force_config=force_config)
         if code == 0:
             updated += 1
@@ -246,6 +275,8 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
 
     if updated:
         result.lines.append(f"エージェント {updated} 件を更新しました")
+    elif unchanged and not notable:
+        result.lines.append("エージェントは最新です")
     result.lines.extend(notable)
 
     # **コマンドの置き場も反映のうち。** 規約は seaos-kit を叩けと書いてあるので、
@@ -261,7 +292,7 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     # 持ち物として作り、ホストの役（窓口）が書けなくなる。
     import files as files_mod
 
-    for folder in (files_mod.files_root(), Path(_generator().ATTACHMENTS_ROOT)):
+    for folder in (files_mod.files_root(), Path(roles.generator().ATTACHMENTS_ROOT)):
         try:
             folder.mkdir(parents=True, exist_ok=True)
         except OSError as exc:

@@ -336,9 +336,14 @@ ROLES: dict[str, dict] = {
 
 
 def local_workers_root() -> Path:
-    """この環境で作った役の置き場。**キットの外。**（core/paths.py と同じ規則）"""
-    home = os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes")
-    return Path(home) / "seaos-kit" / "workers"
+    """この環境で作った役の置き場。**キットの外。**（core/paths.py と同じ規則）
+
+    定期実行は HERMES_HOME がプロファイルの中を指すので、そのときは2つ上を採る。
+    """
+    home = Path(os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes"))
+    if home.parent.name == "profiles":
+        home = home.parent.parent
+    return home / "seaos-kit" / "workers"
 
 
 def worker_dirs(kit: Path) -> list[Path]:
@@ -801,10 +806,13 @@ def copy_runtime(kit: Path, d: Path, spec: dict) -> list[str]:
 _PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
 
 
-def mcp_servers_of(kit: Path, role: str) -> dict:
-    """その役に載る MCP サーバ（名前 -> 設定）。共通のものに、役が書いたものを重ねる。"""
-    roles = {**ROLES, **worker_roles(kit)}
-    spec = roles.get(role) or {}
+def mcp_servers_of(kit: Path, role: str, spec: dict | None = None) -> dict:
+    """その役に載る MCP サーバ（名前 -> 設定）。共通のものに、役が書いたものを重ねる。
+
+    `spec` を渡せば配置表を読み直さない（呼び手が既に持っているとき）。
+    """
+    if spec is None:
+        spec = {**ROLES, **worker_roles(kit)}.get(role) or {}
     servers: dict = {}
     for name in spec.get("mcp_shared") or []:
         f = kit / "templates/shared/mcp" / f"{name}.yaml"
@@ -817,7 +825,7 @@ def mcp_servers_of(kit: Path, role: str) -> dict:
     return servers
 
 
-def mcp_env_vars(kit: Path, role: str) -> dict[str, list[str]]:
+def mcp_env_vars(kit: Path, role: str, spec: dict | None = None) -> dict[str, list[str]]:
     """その役の MCP サーバが参照している環境変数（サーバ名 -> 変数名）。
 
     **宣言（env_requires）と突き合わせるために要る。** MCP が使う鍵を宣言し
@@ -825,7 +833,7 @@ def mcp_env_vars(kit: Path, role: str) -> dict[str, list[str]]:
     まま繋がって道具まで出す——**呼んだときだけ 400** になる。
     handler の Slack で実際に起きた（SLACK_BOT_TOKEN の宣言漏れ）。
     """
-    servers = mcp_servers_of(kit, role)
+    servers = mcp_servers_of(kit, role, spec)
 
     out: dict[str, list[str]] = {}
     for server, body in servers.items():
@@ -895,14 +903,14 @@ def build(kit: Path, out: Path, enabled: set | None = None) -> None:
         build_one(kit, out, name, spec, enabled)
 
 
-def skills_of(kit: Path, role: str) -> list[str]:
+def skills_of(kit: Path, role: str, spec: dict | None = None) -> list[str]:
     """その役に載るスキル。**doctor はここを正とする。**
 
     インストーラは distribution.yaml を正規化して独自キーを落とすので、
     配布物側に一覧を持たせても読み返せない。生成側が答える。
     """
-    roles = {**ROLES, **worker_roles(kit)}
-    spec = roles.get(role)
+    if spec is None:
+        spec = {**ROLES, **worker_roles(kit)}.get(role)
     if not spec:
         return []
     names = list(spec.get("skills", []))

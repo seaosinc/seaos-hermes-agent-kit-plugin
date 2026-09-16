@@ -57,14 +57,7 @@ def docker(*args: str, capture: bool = True, check: bool = False) -> Tuple[int, 
 
 def settings() -> Dict[str, str]:
     """image / cache を生成器から引く。**2箇所で名前を持たない。**"""
-    import importlib.util
-    import sys
-
-    path = Path(__file__).resolve().parent / "build_distributions.py"
-    spec = importlib.util.spec_from_file_location("kit_generator", path)
-    gen = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    sys.modules.setdefault("kit_generator", gen)
-    spec.loader.exec_module(gen)  # type: ignore[union-attr]
+    gen = roles.generator()
     return {"image": gen.WORKSPACE_IMAGE, "cache": gen.WORKSPACE_CACHE}
 
 

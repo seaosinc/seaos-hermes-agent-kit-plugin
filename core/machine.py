@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import roles
-from paths import kit_root, os_kind
+from paths import os_kind
 
 # cron やゲートウェイから呼ばれると PATH が痩せている。**入っているのに「無い」と
 # 判定する**と、入れ直しのカードが立ち続けるので、定番の置き場も見る。
@@ -117,8 +117,6 @@ def _docker_running() -> bool:
 
 def needed_by(tool: str) -> List[str]:
     """**有効な役のうち**、その道具が無いと働かないもの。空なら今は要らない。"""
-    import build_distributions as gen
-
     specs = roles.all_specs()
     out: List[str] = []
     for name in roles.names():
@@ -127,7 +125,7 @@ def needed_by(tool: str) -> List[str]:
             if (spec.get("workspace") and spec.get("shell", True)) or spec.get("hooks"):
                 out.append(name)   # hooks は operator の mem0 起動（Docker で動く）
         elif tool == "node":
-            servers = gen.mcp_servers_of(kit_root(), name)
+            servers = roles.mcp_servers(name)
             if any(str((s or {}).get("command", "")) in ("npx", "node") for s in servers.values()):
                 out.append(name)
     return out

@@ -22,7 +22,6 @@
 
 from __future__ import annotations
 
-import os
 import re
 import subprocess
 import sys
@@ -211,9 +210,7 @@ def missing_tools(role: str, members: Dict[str, Set[str]]) -> Tuple[Dict[str, Li
 
 def missing_skills(role: str) -> List[str]:
     """配置表が載せると言ったスキルが、実機の役に届いているか。"""
-    import build_distributions as gen
-
-    declared = gen.skills_of(kit_root(), role)
+    declared = roles_mod.skills(role)
     landed = {p.name for p in (profile_dir(role) / "skills").glob("*") if p.is_dir()}
     return sorted(set(declared) - landed)
 
@@ -259,7 +256,7 @@ def vocabulary(used: Set[str]) -> Set[str]:
     """
     known: Set[str] = set(_PROSE)
 
-    import build_distributions as gen
+    gen = roles_mod.generator()
 
     known |= set(roles_mod.names())
     known |= {p.name for p in (kit_root() / "templates" / "skills").glob("*") if p.is_dir()}
@@ -282,17 +279,6 @@ def vocabulary(used: Set[str]) -> Set[str]:
             known |= deeper
             for leaf in sorted(deeper & used):
                 known |= _choice_groups(_help_text(argv + [sub, leaf]))
-
-    # 設定ファイルのキー。`description` や `platforms` は「名前」ではなく項目名で、
-    # 出どころは雛形そのものにある。
-    for spec in (kit_root() / "templates" / "workers" / "_template" / "profile.yaml",
-                 kit_root() / "plugin.yaml"):
-        if spec.is_file():
-            known |= set(re.findall(r"^\s*([a-z][a-z0-9_-]*):", _read(spec), re.M))
-    for d in profiles_dir().glob("*"):
-        meta = d / "distribution.yaml"
-        if meta.is_file():
-            known |= set(re.findall(r"^\s*([a-z][a-z0-9_-]*):", _read(meta), re.M))
 
     # 設定ファイルのキー。`description` や `platforms` は「名前」ではなく項目名で、
     # 出どころは雛形そのものにある。
