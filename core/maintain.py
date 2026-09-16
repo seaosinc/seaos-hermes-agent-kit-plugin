@@ -151,6 +151,11 @@ def maintain(*, log: Optional[Log] = None) -> Result:
     res.lines.extend(purged.lines)
     res.failures += purged.failures
 
+    # 受け取ったファイルも同じ日数で畳む。カードが消えたあとは誰も読まない
+    import files as files_mod
+
+    files_mod.prune(days, log=res.lines.append)
+
     # 4. 箱を捨ててもボリュームとイメージ層は残る
     try:
         ws.gc()

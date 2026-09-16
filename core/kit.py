@@ -257,6 +257,17 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         result.failures += 1
         result.lines.append(f"コマンドを配置できませんでした: {exc}")
 
+    # **箱へ渡す置き場を先に作る。** 無いまま箱を立てると、Docker が root の
+    # 持ち物として作り、ホストの役（窓口）が書けなくなる。
+    import files as files_mod
+
+    for folder in (files_mod.files_root(), Path(_generator().ATTACHMENTS_ROOT)):
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            result.lines.append(f"✗ {folder} を作れませんでした: {exc}")
+            result.failures += 1
+
     pruned = prune_skills()
     result.lines.extend(pruned.lines)
 

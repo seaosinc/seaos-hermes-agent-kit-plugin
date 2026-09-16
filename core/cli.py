@@ -99,6 +99,11 @@ def main(argv: list[str] | None = None) -> int:
     wrm.add_argument("name")
     wrm.add_argument("--keep-profile", action="store_true", help="プロファイルは残す")
 
+    fl = sub.add_parser("files", help="受け取ったファイルを、担当が読める場所へ置く")
+    flsub = fl.add_subparsers(dest="fcmd", required=True)
+    flk = flsub.add_parser("keep", help="置き場へ写し、置いた先のパスを出す（本文に書く）")
+    flk.add_argument("paths", nargs="+", type=Path)
+
     wp = sub.add_parser("workspace", help="作業部屋（使い捨てコンテナ）")
     wpsub = wp.add_subparsers(dest="wpcmd", required=True)
     wpsub.add_parser("verify", help="建ててあるイメージの中身を確かめる")
@@ -244,6 +249,17 @@ def main(argv: list[str] | None = None) -> int:
             out = worker_mod.remove(args.name, keep_profile=args.keep_profile)
             print(f"  ✓ {out['name']} を削除（プロファイル: {'削除' if out['profile_removed'] else '残置'}）")
             return 0
+
+    if args.cmd == "files":
+        import files as files_mod
+
+        try:
+            # **パスだけを1行ずつ出す。** 窓口はこれをそのまま本文へ写す。
+            files_mod.keep(args.paths, log=print)
+        except files_mod.FilesError as exc:
+            print(f"✗ {exc}", file=sys.stderr)
+            return 1
+        return 0
 
     if args.cmd == "workspace":
         if args.wpcmd == "verify":

@@ -87,6 +87,13 @@ OPENCODE_PROVIDER = os.environ.get("OPENCODE_PROVIDER", "openrouter")
 # Path().resolve() でホストを見るため、箱の中のパスでは通らない）。
 ARTIFACTS_ROOT = os.environ.get(
     "WORKSPACE_ARTIFACTS_ROOT", str(Path.home() / ".hermes/kanban/workspaces"))
+# **受け取ったファイルの置き場と、板の添付。** どちらも箱の中から読めないと、
+# Slack で渡された資料を実装役が開けない。**読み取り専用・左右同じパス**で渡す
+# ——本文に書かれたホストのパスが、箱の中でもそのまま通る（core/files.py）。
+FILES_ROOT = os.environ.get(
+    "WORKSPACE_FILES_ROOT", str(Path.home() / ".hermes/kanban/files"))
+ATTACHMENTS_ROOT = os.environ.get(
+    "WORKSPACE_ATTACHMENTS_ROOT", str(Path.home() / ".hermes/kanban/attachments"))
 # 作業部屋1つに割り当てる資源。**上限であって、確保量ではない。**
 #
 # 実測で要るのは、clone と読み書きなら 200MB 以下、`npm ci` で 0.5〜1GB、
@@ -586,6 +593,10 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
                 # 成果物を外へ出すための口。**左右同じパスにするのが要点**で、
                 # ずらすと artifacts の宣言がホスト側で解決できない。
                 f"{ARTIFACTS_ROOT}:{ARTIFACTS_ROOT}",
+                # 受け取ったファイルと添付。**書かせない**——元の資料を担当が
+                # 書き換えると、別のカードが読む内容まで変わる。
+                f"{FILES_ROOT}:{FILES_ROOT}:ro",
+                f"{ATTACHMENTS_ROOT}:{ATTACHMENTS_ROOT}:ro",
             ],
             # ホストの値を名前で転送する。**イメージには焼かない。**
             "docker_forward_env": [
