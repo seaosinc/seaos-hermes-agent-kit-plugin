@@ -37,11 +37,31 @@ MAX_BYTES = 25 * 1024 * 1024
 # 役ごとに読める・読めないが分かれる。変換を置き場で1回だけやれば、
 # **テキストを読める役なら誰でも読める**（シェルを持たない役も、読み取りの MCP で）。
 CONVERTIBLE = {".xlsx", ".xls", ".docx", ".pptx", ".pdf"}
-# **uvx で隔離して借りる。** Hermes の venv へ入れない——pandas や onnxruntime まで
+# **uv で隔離して借りる。** Hermes の venv へ入れない——pandas や onnxruntime まで
 # 引き込むので、本体の依存とぶつかりうる（本体は改造しない）。プラグインの
 # pip_dependencies も入らない（Hermes が導入時に読むのは記憶プロバイダだけ）。
 # 同じ環境にたまたま入っていれば、それを使う。
 MARKITDOWN_SPEC = "markitdown[docx,pdf,pptx,xlsx,xls]"
+
+
+def _uv_run() -> list[str] | None:
+    """markitdown を隔離して動かすコマンドの頭。**Hermes が持っている uv を先に使う。**
+
+    Hermes のインストーラは、macOS でも Windows でも自分用の uv を
+    `~/.hermes/bin/uv[.exe]` に置く（PATH には載せない。hermes_cli/managed_uv.py）。
+    Hermes が動いている機械なら、利用者が uv を入れていなくてもここにある。
+    `uv tool run` は `uvx` と同じ動き。
+    """
+    name = "uv.exe" if os.name == "nt" else "uv"
+    for base in (hermes_home(), Path.home() / ".hermes"):
+        uv = base / "bin" / name
+        if uv.is_file() and os.access(uv, os.X_OK):
+            return [str(uv), "tool", "run", "--from", MARKITDOWN_SPEC, "markitdown"]
+    for cmd in (["uv", "tool", "run"], ["uvx"]):
+        exe = shutil.which(cmd[0])
+        if exe:
+            return [exe, *cmd[1:], "--from", MARKITDOWN_SPEC, "markitdown"]
+    return None
 
 
 def converter_ready(timeout: int = 600) -> bool:
@@ -49,11 +69,11 @@ def converter_ready(timeout: int = 600) -> bool:
 
     **初回は数十秒かかる**（依存を落とす）。窓口がファイルを受けたその場で待たせない。
     """
-    uvx = shutil.which("uvx")
-    if not uvx:
+    head = _uv_run()
+    if not head:
         return False
     try:
-        proc = subprocess.run([uvx, "--from", MARKITDOWN_SPEC, "markitdown", "--help"],
+        proc = subprocess.run([*head, "--help"],
                               capture_output=True, text=True, timeout=timeout,
                               stdin=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
@@ -105,11 +125,11 @@ def to_markdown(src: Path) -> str | None:
         pass
     except Exception:  # noqa: BLE001  （壊れたファイル。元を渡せば足りる）
         return None
-    uvx = shutil.which("uvx")
-    if not uvx:
+    head = _uv_run()
+    if not head:
         return None
     try:
-        proc = subprocess.run([uvx, "--from", MARKITDOWN_SPEC, "markitdown", str(src)],
+        proc = subprocess.run([*head, str(src)],
                               capture_output=True, text=True, timeout=300,
                               stdin=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):

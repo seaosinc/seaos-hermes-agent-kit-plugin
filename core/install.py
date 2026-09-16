@@ -130,7 +130,7 @@ def install(*, log: Optional[Log] = None) -> Result:
     if files_mod.converter_ready():
         say("Excel / Word / PowerPoint / PDF を Markdown にできます")
     else:
-        say("uvx が無いので飛ばします（元のファイルだけを渡します。シェルの無い役は Office を読めません）")
+        say("uv が見つからないので飛ばします（元のファイルだけを渡します。シェルの無い役は Office を読めません）")
 
     say("共有記憶を用意します")
     if not mem0.up(log=say):
