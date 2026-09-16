@@ -30,7 +30,6 @@ cron の --no-agent で走るので、標準出力がそのまま通知になる
 """
 
 import os
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -41,8 +40,9 @@ from pathlib import Path
 # 120回ぶん見送られたということ。rate_limit の窓はこれより短い。
 SPIN_LIMIT_SECONDS = int(os.environ.get("KANBAN_SPIN_LIMIT", "1800"))
 
-HERMES = os.environ.get("HERMES_BIN") or shutil.which("hermes") \
-    or str(Path.home() / ".local/bin/hermes")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from kit_common import HERMES, board  # noqa: E402
 
 # 理由ごとの、カードに書く解き方。**綴りは事実なので書く。**
 HOWTO = {
@@ -65,14 +65,6 @@ HOWTO = {
         "枠か、使うモデルを見直す。"
     ),
 }
-
-
-def board() -> Path | None:
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    db = home / "kanban.db"
-    if not db.exists() and home.name and home.parent.name == "profiles":
-        db = home.parent.parent / "kanban.db"
-    return db if db.exists() else None
 
 
 def spinning(conn: sqlite3.Connection, now: int) -> list[tuple[str, str, str, str, int]]:
@@ -100,7 +92,7 @@ def spinning(conn: sqlite3.Connection, now: int) -> list[tuple[str, str, str, st
             "WHERE task_id = ? AND kind = 'respawn_guarded' AND created_at > ?",
             (tid, last_other),
         ).fetchone()
-        started, count = streak[0], streak[1]
+        started = streak[0]
         if not started or now - started < SPIN_LIMIT_SECONDS:
             continue
         payload = conn.execute(

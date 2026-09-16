@@ -31,6 +31,10 @@ import sqlite3
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from kit_common import board  # noqa: E402
+
 # 終わったカードは直しても意味がない
 LIVE = ("triage", "todo", "ready", "running", "blocked", "review", "scheduled")
 # 既定の上限。今日の実測では調査が3分、実装が6分だったので、30分あれば足りる。
@@ -38,12 +42,9 @@ DEFAULT_SECONDS = int(os.environ.get("KANBAN_DEFAULT_MAX_RUNTIME", "1800"))
 
 
 def main() -> int:
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    # プロファイル配下から起動されるので、ボードは1つ上（共有の kanban.db）
-    db = home / "kanban.db"
-    if not db.exists() and home.name and home.parent.name == "profiles":
-        db = home.parent.parent / "kanban.db"
-    if not db.exists():
+    # プロファイル配下から起動されるので、ボードは共有の HOME にある（kit_common）
+    db = board()
+    if db is None:
         return 0
 
     marks = ",".join("?" * len(LIVE))

@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 import roles
-from paths import hermes_home, kit_root, profile_dir, profiles_dir
+from paths import hermes_home, kit_root, profile_dir
 
 Log = Callable[[str], None]
 

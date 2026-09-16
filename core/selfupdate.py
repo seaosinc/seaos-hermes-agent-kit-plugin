@@ -11,8 +11,7 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import doctor as doctor_mod
 import kit

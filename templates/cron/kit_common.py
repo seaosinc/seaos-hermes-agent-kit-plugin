@@ -7,15 +7,28 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 PLUGIN_ID = "seaos-hermes-agent-kit"
 
+# `hermes` の実体。cron の PATH は痩せているので、見つからなければ定番の置き場。
+HERMES = os.environ.get("HERMES_BIN") or shutil.which("hermes") \
+    or str(Path.home() / ".local/bin/hermes")
+
 
 def hermes_home() -> Path:
-    return Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    """共有の HOME。**cron はプロファイルの中（`profiles/<役>`）で走る**ので、そのときは2つ上。"""
+    home = Path(os.environ.get("HERMES_HOME") or (Path.home() / ".hermes"))
+    return home.parent.parent if home.parent.name == "profiles" else home
+
+
+def board() -> Path | None:
+    """共有の板（kanban.db）。無ければ None（まだ一度も使っていない環境）。"""
+    db = hermes_home() / "kanban.db"
+    return db if db.exists() else None
 
 
 def kit_root() -> Path | None:

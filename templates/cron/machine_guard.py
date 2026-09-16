@@ -16,8 +16,6 @@ cron の --no-agent で走るので、標準出力がそのまま通知になる
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import sqlite3
 import subprocess
 import sys
@@ -26,16 +24,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from kit_common import kit, out  # noqa: E402
+from kit_common import HERMES, hermes_home, kit, out  # noqa: E402
 
 ROLE = "provisioner"
-HERMES = os.environ.get("HERMES_BIN") or shutil.which("hermes") \
-    or str(Path.home() / ".local/bin/hermes")
-
-
-def root() -> Path:
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    return home.parent.parent if home.parent.name == "profiles" else home
 
 
 def provisioner_available(home: Path) -> bool:
@@ -61,7 +52,7 @@ def open_card(db: Path, tool: str) -> bool:
 
 
 def main() -> int:
-    home = root()
+    home = hermes_home()
     if not provisioner_available(home):
         return 0
     proc = kit("machine", "check", "--json")

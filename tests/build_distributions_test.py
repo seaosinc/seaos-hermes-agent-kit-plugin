@@ -13,7 +13,6 @@ enabled になっていなかった、役を消しても配布物が残った。
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import sys
@@ -255,10 +254,6 @@ def test_every_role_has_a_human_summary():
     describe（decomposer 向けの長文）を40字で切って出していた——文の途中で
     切れて読めなかった。表を配置表へ移し、ワーカーは profile.yaml に書く。
     """
-    import sys as _sys
-    _sys.path.insert(0, str(ROOT / "core"))
-    import roles as roles_mod
-
     specs = {**bd.ROLES, **bd.worker_roles(ROOT)}
     for role in specs:
         text = (specs[role].get("summary") or "").strip()

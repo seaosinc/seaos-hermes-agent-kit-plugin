@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="走行中のカードが無くなってから（誰も落とさない）")
     gwsub.add_parser("status", help="いまの状態")
 
-    ins = sub.add_parser("install", help="全役を導入し、配布物に載らないものを揃える")
+    sub.add_parser("install", help="全役を導入し、配布物に載らないものを揃える")
     unins = sub.add_parser("uninstall", help="撤去する（既定はキット自身の痕跡だけ）")
     unins.add_argument("--profiles", action="store_true", help="役のプロファイルも消す")
 

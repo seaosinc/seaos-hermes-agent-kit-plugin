@@ -28,6 +28,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from kit_common import board  # noqa: E402
+
 LIVE = ("running", "review")
 DOCKER = os.environ.get("HERMES_DOCKER_BINARY") or shutil.which("docker") or "docker"
 
@@ -35,14 +39,6 @@ DOCKER = os.environ.get("HERMES_DOCKER_BINARY") or shutil.which("docker") or "do
 def _docker(*args, timeout=20):
     return subprocess.run([DOCKER, *args], capture_output=True, text=True,
                           timeout=timeout, stdin=subprocess.DEVNULL)
-
-
-def _board() -> Path | None:
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    for cand in (home / "kanban.db", home.parent.parent / "kanban.db"):
-        if cand.exists():
-            return cand
-    return None
 
 
 def main() -> int:
@@ -64,7 +60,7 @@ def main() -> int:
     if not rows:
         return 0
 
-    db = _board()
+    db = board()
     live: set[str] = set()
     if db:
         try:

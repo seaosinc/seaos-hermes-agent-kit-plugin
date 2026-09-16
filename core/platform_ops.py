@@ -27,7 +27,7 @@ import signal
 import subprocess
 import time
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 import hermes
 from paths import hermes_home, kit_root, os_kind, profile_dir
@@ -144,7 +144,8 @@ def _start_plain(profile: str, log: Optional[Log] = None) -> bool:
     return False
 
 
-def _restart_plain(profile: str, log: Optional[Log] = None) -> bool:
+def _stop_plain(profile: str) -> bool:
+    """素のプロセスを止める。止まったかは pid の消滅で確かめる。"""
     pid = gateway_pid(profile)
     if pid:
         _terminate(pid)
@@ -158,6 +159,11 @@ def _restart_plain(profile: str, log: Optional[Log] = None) -> bool:
         if stubborn:
             _kill(stubborn)
             time.sleep(1)
+    return not gateway_pid(profile)
+
+
+def _restart_plain(profile: str, log: Optional[Log] = None) -> bool:
+    _stop_plain(profile)
     return _start_plain(profile, log=log)
 
 
@@ -202,18 +208,7 @@ def stop_gateway(profile: str) -> bool:
     """
     if os_kind() == "linux":
         hermes.run(["gateway", "stop", "-p", profile])
-    pid = gateway_pid(profile)
-    if pid:
-        _terminate(pid)
-        for _ in range(10):
-            time.sleep(1)
-            if not gateway_pid(profile):
-                break
-        stubborn = gateway_pid(profile)
-        if stubborn:
-            _kill(stubborn)
-            time.sleep(1)
-    return not gateway_pid(profile)
+    return _stop_plain(profile)
 
 
 def restart_gateway(profile: str, log: Optional[Log] = None) -> bool:

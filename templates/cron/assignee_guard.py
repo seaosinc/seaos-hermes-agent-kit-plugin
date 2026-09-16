@@ -22,24 +22,15 @@ cron の --no-agent で走るので、標準出力がそのまま通知になる
 """
 
 import json
-import os
 import re
-import shutil
 import sqlite3
 import subprocess
 import sys
 from pathlib import Path
 
-HERMES = os.environ.get("HERMES_BIN") or shutil.which("hermes") \
-    or str(Path.home() / ".local/bin/hermes")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-
-def root() -> Path:
-    """共有の HOME。**プロファイル配下から起動される**ので、その場合は2つ上。"""
-    home = Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
-    if home.parent.name == "profiles":
-        home = home.parent.parent
-    return home
+from kit_common import HERMES, hermes_home  # noqa: E402
 
 
 def disabled(home: Path) -> set:
@@ -65,7 +56,7 @@ def why_not(home: Path, who: str, off: set) -> str:
 
 
 def main() -> int:
-    home = root()
+    home = hermes_home()
     db = home / "kanban.db"
     if not db.exists():
         return 0

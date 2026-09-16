@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from paths import hermes_bin, hermes_home, profiles_dir
 

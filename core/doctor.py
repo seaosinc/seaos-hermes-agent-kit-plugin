@@ -10,7 +10,6 @@ booking / hotl / workspace / mem0 の検査は、それぞれのモジュール�
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Callable, List, Optional
 
 import yaml

@@ -132,7 +132,6 @@ def maintain(*, log: Optional[Log] = None) -> Result:
     import workspace as ws
 
     res = Result()
-    say: Log = log or (lambda _l: None)
 
     # 1. 規約が編集されていれば反映する（静かに。失敗しても後段は回す）
     updated = kit.update()
