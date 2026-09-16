@@ -186,8 +186,9 @@ ROLES: dict[str, dict] = {
         "skills": ["kanban-collaboration", "precedent-lookup"],
         # 「道具が足りない」という判断を下す役なので、道具の綴りを確かめる口を持つ
         "mcp_shared": ["context7"],
-        # **記憶を引くのは判断する役だけ。** 前例を今回に当てはめてよいかを
-        # 決める責任が、引く役と同じところにある必要がある。
+        # **前例の引き方（precedent-lookup）を持つのは判断する役だけ。** 前例を
+        # 今回に当てはめてよいかを決める責任が、引く役と同じところにある必要がある。
+        # mem0 への接続は全役が持つ（core/mem0.py の memory_roles）。
         "memory": True,
         "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
         "summary": "詰まりを解決し、完了を判定する",
@@ -970,8 +971,8 @@ if __name__ == "__main__":
         kit = Path(sys.argv[2])
         print(" ".join({**ROLES, **worker_roles(kit)}.keys()))
     elif len(sys.argv) > 2 and sys.argv[1] == "--memory-roles":
-        # 共有記憶を引く役。**zsh 側で別に持たない**ための口
-        # （持つと、判断役を増やしたときに片方だけ古くなる）。
+        # 共有記憶に繋ぐ役（全役）。**zsh 側で別に持たない**ための口
+        # （持つと、役を増やしたときに片方だけ古くなる）。
         kit = Path(sys.argv[2])
         print(" ".join({**ROLES, **worker_roles(kit)}.keys()))
     elif len(sys.argv) > 2 and sys.argv[1] == "--skills":

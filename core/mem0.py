@@ -118,9 +118,14 @@ def ensure_env(log: Optional[Log] = None) -> Path:
 
 
 def memory_roles() -> List[str]:
-    """共有記憶を引く役。**ここで名簿を持たない**（持つと役を増やしたときにずれる）。"""
-    enabled = set(roles.names())
-    return [n for n, sp in roles.all_specs().items() if sp.get("memory") and n in enabled]
+    """mem0 に繋ぐ役。**有効な全役である。**
+
+    共通の規約は全役に `mem0_add` で書かせ、生成器も全役の provider を mem0 にする。
+    以前は前例を引く役（fixer）にだけ接続情報を置いていたので、**他の役は書いた
+    つもりで一度も届いていなかった**（「mem0 が unavailable」とだけ出て動き続ける）。
+    前例の引き方を誰に配るかは、接続とは別に `precedent-lookup` で決める。
+    """
+    return roles.names()
 
 
 def wire_one(name: str, port: str, key: str, log: Optional[Log] = None) -> bool:
@@ -150,10 +155,10 @@ def wire_one(name: str, port: str, key: str, log: Optional[Log] = None) -> bool:
 
 
 def wire(log: Optional[Log] = None) -> bool:
-    """引く役へ繋ぎ、**引かない役からは接続情報を外す。**
+    """有効な全役へ繋ぐ。
 
-    mem0.json には API キーが入っている。provider が選ばれていなければ動作は
-    しないが、鍵は使う役だけに置く。
+    無効にした役のプロファイルが残っていても、そこへは鍵を置かない
+    （mem0.json には API キーが入っている）。
     """
     values = _read_env(mem0_env())
     port, key = values.get("MEM0_PORT", ""), values.get("MEM0_API_KEY", "")
@@ -166,27 +171,26 @@ def wire(log: Optional[Log] = None) -> bool:
     for name in pull:
         wire_one(name, port, key, log=log)
 
-    for name in roles.names():
+    for name in roles.all_names():
         if name in pull:
             continue
         stale = profile_dir(name) / "mem0.json"
         if stale.is_file():
             stale.unlink()
             if log:
-                log(f"- {name} から接続情報を外した（記憶を引かない役）")
+                log(f"- {name} から接続情報を外した（無効にした役）")
     return True
 
 
-def wire_new_worker(name: str, log: Optional[Log] = None) -> None:
-    """update が新しいプロファイルを作った直後に呼ぶ。
+def rewire(log: Optional[Log] = None) -> None:
+    """update のたびに繋ぎ直す。**mem0 を立てていない環境では黙って何もしない。**
 
-    ここを通らないと doctor が「mem0 を参照していない」で落ち、ワーカーを
-    増やすたびに install が要るはめになる。mem0 が無い環境では黙って何もしない。
+    ここを通らないと、後から有効にした役（avatar など）は `mem0 up` を
+    やり直すまで繋がらない。
     """
     values = _read_env(mem0_env())
-    port, key = values.get("MEM0_PORT", ""), values.get("MEM0_API_KEY", "")
-    if port and key:
-        wire_one(name, port, key, log=log)
+    if values.get("MEM0_PORT") and values.get("MEM0_API_KEY"):
+        wire(log=log)
 
 
 def up(log: Optional[Log] = None) -> bool:

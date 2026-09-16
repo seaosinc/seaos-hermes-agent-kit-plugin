@@ -344,7 +344,7 @@ def _cmd_mem0(args: argparse.Namespace) -> int:
         return 0 if mem0.down(log=_print) else 1
     if args.mcmd == "check":
         _print(f"起動中: {mem0.running()}")
-        _print(f"記憶を引く役: {' '.join(mem0.memory_roles())}")
+        _print(f"繋ぐ役: {' '.join(mem0.memory_roles())}")
         return 0
     return 2
 

@@ -302,6 +302,11 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     pruned = prune_skills()
     result.lines.extend(pruned.lines)
 
+    # **共有記憶へ繋ぐ。** 後から有効にした役も、ここで繋がる。
+    import mem0
+
+    mem0.rewire(log=result.lines.append)
+
     # **この PC の事実を書き直す。** config.yaml ごと入れ替わると消えるので、
     # 反映のたびに置く（実際に全役から消えていた）。
     import envhint

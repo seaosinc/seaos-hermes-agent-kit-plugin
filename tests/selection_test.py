@@ -113,6 +113,29 @@ def test_forget_on_removal():
     assert "handler" in roles.names()
 
 
+def test_every_enabled_role_is_wired_to_mem0():
+    """有効な全役が mem0 に繋がり、無効にした役からは鍵が外れる。
+
+    規約は全役に `mem0_add` を書かせる。繋ぐのが fixer だけだと、他の役は書いたつもりで
+    一度も届かない（実際にそうなっていた）。
+    """
+    import mem0
+    from paths import profile_dir
+
+    reset()
+    mem0.mem0_dir().mkdir(parents=True, exist_ok=True)
+    mem0.mem0_env().write_text("MEM0_PORT=8888\nMEM0_API_KEY=k-test\n", encoding="utf-8")
+    for name in roles.all_names():
+        profile_dir(name).mkdir(parents=True, exist_ok=True)
+    selection.set_enabled("avatar", False)
+    (profile_dir("avatar") / "mem0.json").write_text("{}", encoding="utf-8")
+
+    mem0.rewire()
+    for name in roles.names():
+        assert (profile_dir(name) / "mem0.json").is_file(), f"{name} が mem0 に繋がっていない"
+    assert not (profile_dir("avatar") / "mem0.json").exists(), "無効にした役に鍵が残っている"
+
+
 if __name__ == "__main__":
     run_tests(globals())
     finish()
