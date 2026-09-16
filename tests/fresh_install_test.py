@@ -23,20 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HERMES = Path(os.environ.get("HERMES_BIN") or (Path.home() / ".local/bin/hermes"))
 
-failures: list[str] = []
-
-
-def check(name: str, fn) -> None:
-    try:
-        fn()
-    except AssertionError as e:
-        failures.append(name)
-        print(f"  ✗ {name}\n      {e}")
-    except Exception as e:  # noqa: BLE001
-        failures.append(name)
-        print(f"  ✗ {name}\n      {type(e).__name__}: {e}")
-    else:
-        print(f"  ✓ {name}")
+from _harness import check, finish  # noqa: E402
 
 
 def run(args: list[str], home: Path) -> subprocess.CompletedProcess:
@@ -153,8 +140,4 @@ if __name__ == "__main__":
     check("更新でユーザーのデータが残る", test_user_data_survives_update)
     check("実機で生えたスキルが更新で消えない", test_runtime_skill_survives_update)
     shutil.rmtree(HOME, ignore_errors=True)
-    print()
-    if failures:
-        print(f"★ {len(failures)} 件失敗")
-        sys.exit(1)
-    print("すべて通った")
+    finish()

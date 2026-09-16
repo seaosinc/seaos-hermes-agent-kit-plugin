@@ -18,17 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 
-failures: list[str] = []
-
-
-def check(name: str, fn) -> None:
-    try:
-        fn()
-    except AssertionError as e:
-        failures.append(name)
-        print(f"  ✗ {name}\n      {e}")
-    else:
-        print(f"  ✓ {name}")
+from _harness import check, finish  # noqa: E402
 
 
 class Rep:
@@ -196,8 +186,4 @@ if __name__ == "__main__":
     check("現役の役は挙げない", test_live_role_is_not_reported)
     check("MCP が鍵に従う", test_mcp_follows_the_key)
     check("役と一緒に鍵も落ちる", test_role_secrets_are_dropped_with_the_role)
-    print()
-    if failures:
-        print(f"★ {len(failures)} 件失敗")
-        sys.exit(1)
-    print("すべて通った")
+    finish()

@@ -29,20 +29,7 @@ import kit  # noqa: E402
 import roles  # noqa: E402
 import selection  # noqa: E402
 
-failures: list[str] = []
-
-
-def check(name: str, fn) -> None:
-    try:
-        fn()
-    except AssertionError as e:
-        failures.append(name)
-        print(f"  ✗ {name}\n      {e}")
-    except Exception as e:  # noqa: BLE001
-        failures.append(name)
-        print(f"  ✗ {name}\n      {type(e).__name__}: {e}")
-    else:
-        print(f"  ✓ {name}")
+from _harness import finish, run_tests  # noqa: E402
 
 
 def reset() -> None:
@@ -127,11 +114,5 @@ def test_forget_on_removal():
 
 
 if __name__ == "__main__":
-    for name, fn in list(globals().items()):
-        if name.startswith("test_") and callable(fn):
-            check(fn.__doc__.splitlines()[0] if fn.__doc__ else name, fn)
-    print()
-    if failures:
-        print(f"★ {len(failures)} 件失敗")
-        sys.exit(1)
-    print("すべて通った")
+    run_tests(globals())
+    finish()
