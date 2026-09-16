@@ -183,6 +183,9 @@ def set_value(name: str, value: str, desc: str = "") -> None:
     ここは書き込みだけを担い、どこへ配るかは apply() が決める。
     """
     path = env_file()
+    # **置き場が無ければ作る。** 入れたての環境には `~/.hermes/seaos-kit/` が無く、
+    # 最初の鍵を保存した時点で落ちる（テストの一時 HOME で踏んだ）。
+    path.parent.mkdir(parents=True, exist_ok=True)
     lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
     lines = _upsert(lines, name, value, desc or f"{name}")
     path.write_text("\n".join(lines).strip() + "\n", encoding="utf-8")
