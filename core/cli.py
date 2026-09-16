@@ -31,7 +31,7 @@ def _print(line: str) -> None:
     print(f"  {line}")
 
 
-def main(argv: list[str] | None = None) -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="kit",
         description="SEAOS のエージェント役一式を生成・導入・検査する",
@@ -150,222 +150,278 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("maintain", help="日次の保守一式（反映 → 掃除 → 検証）")
 
-    args = parser.parse_args(argv)
+    return parser
 
-    if args.cmd == "roles":
-        enabled = set(roles.names())
-        for name in roles.all_names():
-            board = "" if name not in roles.without_board() else "  （板に載らない）"
-            state = "" if name in enabled else "  （無効）"
-            print(f"{name}{state}{board}")
+
+def _cmd_roles(args: argparse.Namespace) -> int:
+    enabled = set(roles.names())
+    for name in roles.all_names():
+        board = "" if name not in roles.without_board() else "  （板に載らない）"
+        state = "" if name in enabled else "  （無効）"
+        print(f"{name}{state}{board}")
+    return 0
+
+
+def _cmd_enable_disable(args: argparse.Namespace) -> int:
+    import selection
+
+    try:
+        if args.cmd == "enable":
+            result = kit.enable_role(args.name, log=_print)
+        else:
+            result = kit.disable_role(args.name, remove_profile=args.remove_profile, log=_print)
+    except selection.SelectionError as exc:
+        _print(f"✗ {exc}")
+        return 1
+    return 0 if result.ok() else 1
+
+
+def _cmd_build(args: argparse.Namespace) -> int:
+    kit.build(log=_print)
+    return 0
+
+
+def _cmd_diff(args: argparse.Namespace) -> int:
+    result = kit.diff(log=_print)
+    return 0 if result.ok() else 1
+
+
+def _cmd_describe(args: argparse.Namespace) -> int:
+    result = kit.sync_descriptions(log=_print)
+    return 0 if result.ok() else 1
+
+
+def _cmd_env(args: argparse.Namespace) -> int:
+    result = kit.apply_env(log=_print)
+    return 0 if result.ok() else 1
+
+
+def _cmd_update(args: argparse.Namespace) -> int:
+    result = kit.update(force_config=args.force_config, log=_print)
+    return 0 if result.ok() else 1
+
+
+def _cmd_doctor(args: argparse.Namespace) -> int:
+    rep = doctor_mod.run(log=lambda l: print(l if l.startswith("=== ") or not l else f"  {l}"))
+    print()
+    print("✓ 問題なし" if rep.passed() else f"★ {rep.failures} 件の問題")
+    return 0 if rep.passed() else 1
+
+
+def _cmd_test(args: argparse.Namespace) -> int:
+    ok, _lines = selftest.run(log=print)
+    return 0 if ok else 1
+
+
+def _cmd_upgrade(args: argparse.Namespace) -> int:
+    ok = selfupdate.run(dry_run=args.dry_run, force_config=args.force_config, log=print)
+    return 0 if ok else 1
+
+
+def _cmd_worker(args: argparse.Namespace) -> int:
+    if args.wcmd == "list":
+        print(f"{'NAME':<20} {'ORIGIN':<9} {'MODEL':<24} {'DEPLOYED':<10} DESCRIPTION")
+        for r in worker_mod.listing():
+            mark = "yes" if r["deployed"] else "-"
+            origin = "この環境" if r["origin"] == "local" else "配布"
+            print(f"{r['name']:<20} {origin:<9} {r['model']:<24} {mark:<10} {r['description'][:36]}")
         return 0
+    if args.wcmd in ("new", "set"):
+        def _pairs(items):
+            out = {}
+            for item in items:
+                key, _, value = item.partition("=")
+                if not key or not value:
+                    raise worker_mod.WorkerError(f"KEY=VALUE の形で書くこと: {item}")
+                out[key] = value
+            return out
 
-    if args.cmd in ("enable", "disable"):
-        import selection
-
-        try:
-            if args.cmd == "enable":
-                result = kit.enable_role(args.name, log=_print)
-            else:
-                result = kit.disable_role(args.name, remove_profile=args.remove_profile, log=_print)
-        except selection.SelectionError as exc:
-            _print(f"✗ {exc}")
-            return 1
-        return 0 if result.ok() else 1
-
-    if args.cmd == "build":
-        kit.build(log=_print)
-        return 0
-
-    if args.cmd == "diff":
-        result = kit.diff(log=_print)
-        return 0 if result.ok() else 1
-
-    if args.cmd == "describe":
-        result = kit.sync_descriptions(log=_print)
-        return 0 if result.ok() else 1
-
-    if args.cmd == "env":
-        result = kit.apply_env(log=_print)
-        return 0 if result.ok() else 1
-
-    if args.cmd == "update":
-        result = kit.update(force_config=args.force_config, log=_print)
-        return 0 if result.ok() else 1
-
-    if args.cmd == "doctor":
-        rep = doctor_mod.run(log=lambda l: print(l if l.startswith("=== ") or not l else f"  {l}"))
-        print()
-        print("✓ 問題なし" if rep.passed() else f"★ {rep.failures} 件の問題")
-        return 0 if rep.passed() else 1
-
-    if args.cmd == "test":
-        ok, _lines = selftest.run(log=print)
-        return 0 if ok else 1
-
-    if args.cmd == "upgrade":
-        ok = selfupdate.run(dry_run=args.dry_run, force_config=args.force_config, log=print)
-        return 0 if ok else 1
-
-    if args.cmd == "worker":
-        if args.wcmd == "list":
-            print(f"{'NAME':<20} {'ORIGIN':<9} {'MODEL':<24} {'DEPLOYED':<10} DESCRIPTION")
-            for r in worker_mod.listing():
-                mark = "yes" if r["deployed"] else "-"
-                origin = "この環境" if r["origin"] == "local" else "配布"
-                print(f"{r['name']:<20} {origin:<9} {r['model']:<24} {mark:<10} {r['description'][:36]}")
-            return 0
-        if args.wcmd in ("new", "set"):
-            def _pairs(items):
-                out = {}
-                for item in items:
-                    key, _, value = item.partition("=")
-                    if not key or not value:
-                        raise worker_mod.WorkerError(f"KEY=VALUE の形で書くこと: {item}")
-                    out[key] = value
-                return out
-
-            if args.wcmd == "new":
-                res = worker_mod.new(
-                    args.name, desc=args.desc, summary=args.summary or "",
-                    model=args.model or "", extra=args.extra or "",
-                    soul=args.soul, source=args.source, skills=args.skill,
-                    mcps=_pairs(args.mcp), envs=_pairs(args.env))
-                _print(f"{args.name} を作った: {res.path}")
-                _print("反映するには update を実行する")
-                return 0
-
-            changed = worker_mod.update_worker(
-                args.name, desc=args.desc, summary=args.summary, model=args.model,
-                extra=args.extra,
-                soul=args.soul, add_skills=args.skill, rm_skills=args.rm_skill,
+        if args.wcmd == "new":
+            res = worker_mod.new(
+                args.name, desc=args.desc, summary=args.summary or "",
+                model=args.model or "", extra=args.extra or "",
+                soul=args.soul, source=args.source, skills=args.skill,
                 mcps=_pairs(args.mcp), envs=_pairs(args.env))
-            _print(f"{args.name}: {', '.join(changed) if changed else '変更なし'}")
-            if changed:
-                _print("反映するには update を実行する")
+            _print(f"{args.name} を作った: {res.path}")
+            _print("反映するには update を実行する")
             return 0
 
-        if args.wcmd == "share":
-            out = worker_mod.share(args.name, log=_print)
-            return 0 if out.get("url") else 1
-
-        if args.wcmd == "show":
-            for key, value in worker_mod.show(args.name).items():
-                shown = ", ".join(value) if isinstance(value, list) else value
-                print(f"  {key:<12} {shown}")
-            return 0
-        if args.wcmd == "rm":
-            out = worker_mod.remove(args.name, keep_profile=args.keep_profile)
-            print(f"  ✓ {out['name']} を削除（プロファイル: {'削除' if out['profile_removed'] else '残置'}）")
-            return 0
-
-    if args.cmd == "machine":
-        import json
-
-        import machine
-
-        try:
-            if args.mcmd2 == "check":
-                rows = machine.status()
-                if args.json:
-                    print(json.dumps(rows, ensure_ascii=False, indent=2))
-                else:
-                    for r in rows:
-                        state = ("✗ 足りない" if r["missing"] else
-                                 "✓" if r["installed"] else "- 入っていない（今は要らない）")
-                        if r["installed"] and r.get("running") is False and r["name"] == "docker":
-                            state = "✗ 止まっている" if r["missing"] else "- 止まっている"
-                        used = f"（{', '.join(r['neededBy'])} が使う）" if r["neededBy"] else ""
-                        _print(f"{r['label']:<12} {state} {used}")
-                return 1 if any(r["missing"] for r in rows) else 0
-            if args.mcmd2 == "install":
-                res = machine.install(args.tool)
-                _print(("✓ " if res["ok"] else "✗ ") + res["command"])
-                if res["output"]:
-                    print(res["output"])
-                if res["needsHuman"]:
-                    _print("人の操作が要ります（管理者の承認か、前提の道具）。上の出力を人に渡してください")
-                return 0 if res["ok"] else (3 if res["needsHuman"] else 1)
-            if args.mcmd2 == "start":
-                ok = machine.start(args.tool)
-                _print("✓ 動いています" if ok else "✗ 起動を確かめられませんでした（初回は利用規約の同意が要ることがあります）")
-                return 0 if ok else 1
-        except machine.MachineError as exc:
-            _print(f"✗ {exc}")
-            return 2
-
-    if args.cmd == "files":
-        import files as files_mod
-
-        try:
-            # **パスだけを1行ずつ出す。** 窓口はこれをそのまま本文へ写す。
-            files_mod.keep(args.paths, log=print)
-        except files_mod.FilesError as exc:
-            print(f"✗ {exc}", file=sys.stderr)
-            return 1
+        changed = worker_mod.update_worker(
+            args.name, desc=args.desc, summary=args.summary, model=args.model,
+            extra=args.extra,
+            soul=args.soul, add_skills=args.skill, rm_skills=args.rm_skill,
+            mcps=_pairs(args.mcp), envs=_pairs(args.env))
+        _print(f"{args.name}: {', '.join(changed) if changed else '変更なし'}")
+        if changed:
+            _print("反映するには update を実行する")
         return 0
 
-    if args.cmd == "workspace":
-        if args.wpcmd == "verify":
-            return 0 if ws.verify(log=_print) else 1
-        if args.wpcmd == "build":
-            return 0 if ws.build(warm=not args.no_warm, log=_print) else 1
-        if args.wpcmd == "ca":
-            ws.extract_ca(log=_print)
-            return 0
-        if args.wpcmd == "shell":
-            return ws.shell()
+    if args.wcmd == "share":
+        out = worker_mod.share(args.name, log=_print)
+        return 0 if out.get("url") else 1
 
-        if args.wpcmd == "gc":
-            ws.gc(log=_print)
-            return 0
-
-    if args.cmd == "mem0":
-        if args.mcmd == "up":
-            return 0 if mem0.up(log=_print) else 1
-        if args.mcmd == "down":
-            return 0 if mem0.down(log=_print) else 1
-        if args.mcmd == "check":
-            _print(f"起動中: {mem0.running()}")
-            _print(f"記憶を引く役: {' '.join(mem0.memory_roles())}")
-            return 0
-
-    if args.cmd == "gateway":
-        prof = getattr(args, "profile", None) or booking.gate_profile()
-        if args.gcmd == "restart":
-            fn = platform_ops.restart_when_idle if args.when_idle else platform_ops.restart_gateway
-            return 0 if fn(prof, log=_print) else 1
-        if args.gcmd == "status":
-            _print(f"役: {prof}")
-            _print(f"pid: {platform_ops.gateway_pid(prof) or '（動いていない）'}")
-            _print(f"走行中カード: {platform_ops.running_cards()}")
-            _print(platform_ops.autostart_hint())
-            return 0
-
-    if args.cmd == "install":
-        res = install_mod.install(log=print)
-        return 0 if res.ok() else 1
-
-    if args.cmd == "uninstall":
-        res = install_mod.uninstall(remove_profiles=args.profiles, log=print)
-        return 0 if res.ok() else 1
-
-    if args.cmd == "purge":
-        res = maintain_mod.purge(confirm=args.yes, older_than=args.older_than, log=_print)
-        return 0 if res.ok() else 1
-
-    if args.cmd == "maintain":
-        res = maintain_mod.maintain(log=_print)
-        for line in res.lines:
-            _print(line)
-        return 0 if res.ok() else 1
-
-    if args.cmd == "guest":
-        code, out = booking.guest([a for a in args.rest if a != "--"])
-        print(out.rstrip())
-        return code
-
+    if args.wcmd == "show":
+        for key, value in worker_mod.show(args.name).items():
+            shown = ", ".join(value) if isinstance(value, list) else value
+            print(f"  {key:<12} {shown}")
+        return 0
+    if args.wcmd == "rm":
+        out = worker_mod.remove(args.name, keep_profile=args.keep_profile)
+        print(f"  ✓ {out['name']} を削除（プロファイル: {'削除' if out['profile_removed'] else '残置'}）")
+        return 0
     return 2
+
+
+def _cmd_machine(args: argparse.Namespace) -> int:
+    import json
+
+    import machine
+
+    try:
+        if args.mcmd2 == "check":
+            rows = machine.status()
+            if args.json:
+                print(json.dumps(rows, ensure_ascii=False, indent=2))
+            else:
+                for r in rows:
+                    state = ("✗ 足りない" if r["missing"] else
+                             "✓" if r["installed"] else "- 入っていない（今は要らない）")
+                    if r["installed"] and r.get("running") is False and r["name"] == "docker":
+                        state = "✗ 止まっている" if r["missing"] else "- 止まっている"
+                    used = f"（{', '.join(r['neededBy'])} が使う）" if r["neededBy"] else ""
+                    _print(f"{r['label']:<12} {state} {used}")
+            return 1 if any(r["missing"] for r in rows) else 0
+        if args.mcmd2 == "install":
+            res = machine.install(args.tool)
+            _print(("✓ " if res["ok"] else "✗ ") + res["command"])
+            if res["output"]:
+                print(res["output"])
+            if res["needsHuman"]:
+                _print("人の操作が要ります（管理者の承認か、前提の道具）。上の出力を人に渡してください")
+            return 0 if res["ok"] else (3 if res["needsHuman"] else 1)
+        if args.mcmd2 == "start":
+            ok = machine.start(args.tool)
+            _print("✓ 動いています" if ok else "✗ 起動を確かめられませんでした（初回は利用規約の同意が要ることがあります）")
+            return 0 if ok else 1
+    except machine.MachineError as exc:
+        _print(f"✗ {exc}")
+        return 2
+    return 2
+
+
+def _cmd_files(args: argparse.Namespace) -> int:
+    import files as files_mod
+
+    try:
+        # **パスだけを1行ずつ出す。** 窓口はこれをそのまま本文へ写す。
+        files_mod.keep(args.paths, log=print)
+    except files_mod.FilesError as exc:
+        print(f"✗ {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_workspace(args: argparse.Namespace) -> int:
+    if args.wpcmd == "verify":
+        return 0 if ws.verify(log=_print) else 1
+    if args.wpcmd == "build":
+        return 0 if ws.build(warm=not args.no_warm, log=_print) else 1
+    if args.wpcmd == "ca":
+        ws.extract_ca(log=_print)
+        return 0
+    if args.wpcmd == "shell":
+        return ws.shell()
+
+    if args.wpcmd == "gc":
+        ws.gc(log=_print)
+        return 0
+    return 2
+
+
+def _cmd_mem0(args: argparse.Namespace) -> int:
+    if args.mcmd == "up":
+        return 0 if mem0.up(log=_print) else 1
+    if args.mcmd == "down":
+        return 0 if mem0.down(log=_print) else 1
+    if args.mcmd == "check":
+        _print(f"起動中: {mem0.running()}")
+        _print(f"記憶を引く役: {' '.join(mem0.memory_roles())}")
+        return 0
+    return 2
+
+
+def _cmd_gateway(args: argparse.Namespace) -> int:
+    prof = getattr(args, "profile", None) or booking.gate_profile()
+    if args.gcmd == "restart":
+        fn = platform_ops.restart_when_idle if args.when_idle else platform_ops.restart_gateway
+        return 0 if fn(prof, log=_print) else 1
+    if args.gcmd == "status":
+        _print(f"役: {prof}")
+        _print(f"pid: {platform_ops.gateway_pid(prof) or '（動いていない）'}")
+        _print(f"走行中カード: {platform_ops.running_cards()}")
+        _print(platform_ops.autostart_hint())
+        return 0
+    return 2
+
+
+def _cmd_install(args: argparse.Namespace) -> int:
+    res = install_mod.install(log=print)
+    return 0 if res.ok() else 1
+
+
+def _cmd_uninstall(args: argparse.Namespace) -> int:
+    res = install_mod.uninstall(remove_profiles=args.profiles, log=print)
+    return 0 if res.ok() else 1
+
+
+def _cmd_purge(args: argparse.Namespace) -> int:
+    res = maintain_mod.purge(confirm=args.yes, older_than=args.older_than, log=_print)
+    return 0 if res.ok() else 1
+
+
+def _cmd_maintain(args: argparse.Namespace) -> int:
+    res = maintain_mod.maintain(log=_print)
+    for line in res.lines:
+        _print(line)
+    return 0 if res.ok() else 1
+
+
+def _cmd_guest(args: argparse.Namespace) -> int:
+    code, out = booking.guest([a for a in args.rest if a != "--"])
+    print(out.rstrip())
+    return code
+
+
+# 下位コマンド -> 処理。**処理は core の関数を呼ぶだけ**にする（判断を皮に書かない）。
+HANDLERS = {
+    "roles": _cmd_roles,
+    "enable": _cmd_enable_disable,
+    "disable": _cmd_enable_disable,
+    "build": _cmd_build,
+    "diff": _cmd_diff,
+    "describe": _cmd_describe,
+    "env": _cmd_env,
+    "update": _cmd_update,
+    "doctor": _cmd_doctor,
+    "test": _cmd_test,
+    "upgrade": _cmd_upgrade,
+    "worker": _cmd_worker,
+    "machine": _cmd_machine,
+    "files": _cmd_files,
+    "workspace": _cmd_workspace,
+    "mem0": _cmd_mem0,
+    "gateway": _cmd_gateway,
+    "install": _cmd_install,
+    "uninstall": _cmd_uninstall,
+    "purge": _cmd_purge,
+    "maintain": _cmd_maintain,
+    "guest": _cmd_guest,
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    return HANDLERS[args.cmd](args)
 
 
 if __name__ == "__main__":
