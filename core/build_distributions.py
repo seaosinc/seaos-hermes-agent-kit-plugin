@@ -138,7 +138,8 @@ ROLES: dict[str, dict] = {
         "skills": ["kanban-collaboration", "guest-access"],
         "plugins": ["booking-gate"],
         "hooks": ["mem0-up"],
-        "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard", "container-guard",
+        "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard", "machine-guard",
+                 "container-guard",
                  "kit-sync", "kit-maintain"],
         "env": [
             ("SLACK_BOT_TOKEN", "Slack の Bot トークン。窓口を Slack にするなら要る（Hermes Desktop から使うなら不要）", False),
@@ -208,6 +209,29 @@ ROLES: dict[str, dict] = {
                      "タスクを assign してよいのは人間だけで、decomposer / orchestrator は"
                      "絶対にここへルーティングしないこと。GUI 操作が必要そうなタスクでも、"
                      "人間の明示指示がない限り他の役へ回すこと。"),
+    },
+    # **この PC に道具を揃える役。** Docker や Node.js のように、Hermes もキットも
+    # 持ってこない道具を入れる。ホストに直接入れるので箱には入れない。
+    #
+    # 入れてよい道具は core/machine.py の台帳に限る（`seaos-kit machine install` が
+    # 台帳に無い名前を断る）。この役は Slack 由来のカードで動くことがあり、
+    # **任意のパッケージを入れる口にしない。**
+    #
+    # 人が意識しなくても動くように、足りないものは operator の定期実行
+    # （machine-guard）がこの役へのカードとして立てる。
+    "provisioner": {
+        "model": FAST,
+        "no_delegation": True,
+        "workspace": False,
+        "skills": ["kanban-collaboration"],
+        "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "summary": "この PC に、チームが使う道具（Docker など）を揃える",
+        "desc": "エージェントが使う道具のうち、Hermes もキットも持ってこないもの（Docker、Node.js など）をこの PC に入れて使える状態にする役。",
+        "describe": ("この PC に、エージェントが動くための道具を入れて使える状態にする役。"
+                     "対象はキットの台帳にある道具（Docker、Node.js、LibreOffice）だけ。"
+                     "例:「Docker を入れる」「Docker が止まっているので起こす」「LibreOffice を入れる」。"
+                     "**リポジトリの開発環境（言語やパッケージ）はここではない**——それは作業部屋の中で"
+                     "コードを書く役が揃える。"),
     },
     "developer": {
         "model": FAST,
@@ -667,6 +691,9 @@ CRON_JOBS = {
     # **毎分。** 存在しない・無効にした役に振られたカードは、ready のまま誰にも
     # 起動されず、親は永久に待つ。規約から名前を落としても、外す前のカードは残る。
     "assignee-guard": ("* * * * *",   "assignee_guard.py"),
+    # **毎時。** 道具が足りなければ provisioner へのカードを立てる。人が気づく前に揃える。
+    # 道具の有無は分単位で変わらないので、毎分は要らない。
+    "machine-guard": ("17 * * * *",  "machine_guard.py"),
     # **毎分。** 親が SIGKILL されると作業部屋は running のまま残り、
     # Hermes の回収係（status=exited しか見ない）は一生届かない。1つ 4GB。
     "container-guard": ("* * * * *",  "container_guard.py"),
@@ -750,14 +777,8 @@ def copy_runtime(kit: Path, d: Path, spec: dict) -> list[str]:
 _PLACEHOLDER = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)")
 
 
-def mcp_env_vars(kit: Path, role: str) -> dict[str, list[str]]:
-    """その役の MCP サーバが参照している環境変数（サーバ名 -> 変数名）。
-
-    **宣言（env_requires）と突き合わせるために要る。** MCP が使う鍵を宣言し
-    忘れると、`env apply` はその鍵を配らないのに、サーバは `enabled: true` の
-    まま繋がって道具まで出す——**呼んだときだけ 400** になる。
-    handler の Slack で実際に起きた（SLACK_BOT_TOKEN の宣言漏れ）。
-    """
+def mcp_servers_of(kit: Path, role: str) -> dict:
+    """その役に載る MCP サーバ（名前 -> 設定）。共通のものに、役が書いたものを重ねる。"""
     roles = {**ROLES, **worker_roles(kit)}
     spec = roles.get(role) or {}
     servers: dict = {}
@@ -769,6 +790,18 @@ def mcp_env_vars(kit: Path, role: str) -> dict[str, list[str]]:
     if path and Path(path).exists():
         mcp = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
         servers.update(mcp.get("servers", mcp) if isinstance(mcp, dict) else {})
+    return servers
+
+
+def mcp_env_vars(kit: Path, role: str) -> dict[str, list[str]]:
+    """その役の MCP サーバが参照している環境変数（サーバ名 -> 変数名）。
+
+    **宣言（env_requires）と突き合わせるために要る。** MCP が使う鍵を宣言し
+    忘れると、`env apply` はその鍵を配らないのに、サーバは `enabled: true` の
+    まま繋がって道具まで出す——**呼んだときだけ 400** になる。
+    handler の Slack で実際に起きた（SLACK_BOT_TOKEN の宣言漏れ）。
+    """
+    servers = mcp_servers_of(kit, role)
 
     out: dict[str, list[str]] = {}
     for server, body in servers.items():

@@ -208,6 +208,27 @@ AWS の箱が Ubuntu 24.04 で、cloud-init がそこでキットを動かすた
   （`templates/shared/mcp/files.yaml`）。見えるのは置き場と板の添付だけで、書く道具は載せない
 - 箱のマウントは config.yaml にあるので、**既存の環境では `update --force-config` が要る**
 
+## この PC の道具は provisioner が揃える
+
+Hermes もキットも持ってこない道具がある。無くても導入は通り、**使う最初のカードで落ちる。**
+
+| 道具 | 要る役 | 自動で揃えるか |
+|---|---|---|
+| Docker | 箱を持つ役（developer / senior-developer）、共有記憶（operator） | する（入れる → 起こす → 作業部屋を建てる） |
+| Node.js | `npx` で起動する MCP を持つ役（handler） | する |
+| LibreOffice | まだ誰も使っていない | しない（使う側ができてから） |
+| uv | 変換（files） | 要らない。Hermes が `~/.hermes/bin/uv` を持っている |
+
+- **台帳は `core/machine.py` の `CATALOG`。** `seaos-kit machine install` は台帳に無い名前を断る。
+  provisioner は Slack 由来のカードで動くので、任意のパッケージを入れる口にしない
+- **人が意識しなくても動く。** `seaos-kit install` の最後と、operator の定期実行
+  `machine-guard`（毎時）が、足りない道具ごとに provisioner へカードを立てる。
+  開いているカードがあれば立てず、閉じたあとも足りなければ週が変わってから立て直す
+- **管理者の承認だけは人が押す**（macOS のパスワード、Windows の UAC、Docker の利用規約）。
+  `install` が終了コード 3 を返したら、provisioner は needs_input で止まり、何をどこで押すかを書く
+- 設定画面の「この PC」に状態が出る。provisioner を外しているときだけ、入れるコマンドを見せる
+- 既存の環境では `seaos-kit install`（冪等）で machine-guard が登録され、その場で確認が走る
+
 ## 変えていない前提
 
 - **Hermes 本体は改造しない**（`~/.hermes/hermes-agent/` は読むだけ）

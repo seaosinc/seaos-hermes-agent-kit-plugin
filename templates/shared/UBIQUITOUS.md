@@ -56,6 +56,9 @@
 <!-- if-role: senior-developer -->
 - 固定役: `senior-developer`（難度の高いリポジトリの実装）
 <!-- end-if-role -->
+<!-- if-role: provisioner -->
+- 固定役: `provisioner`（この PC に、チームが使う道具を入れる）
+<!-- end-if-role -->
 <!-- if-role: handler -->
 - 業務別ワーカー: `handler`（外部サービスの読み書き）
 <!-- end-if-role -->

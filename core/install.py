@@ -103,6 +103,27 @@ def install(*, log: Optional[Log] = None) -> Result:
     say("定期実行を登録します")
     res.failures += register_cron(log=say).failures
 
+    # **足りない道具は provisioner に揃えさせる。** 入れたその場で立てると、
+    # 人が意識する前に動き出す（定期実行を待たない）。provisioner を外していれば、
+    # 何が足りないかだけ言う。
+    say("この PC の道具を確かめます")
+    import machine
+
+    missing = [r for r in machine.status() if r["missing"]]
+    if not missing:
+        say("足りない道具はありません")
+    else:
+        say("足りない道具: " + "、".join(r["label"] for r in missing))
+        script = profile_dir(booking.gate_profile()) / "scripts" / "machine_guard.py"
+        if script.is_file() and "provisioner" in roles.names():
+            import subprocess
+            import sys
+
+            subprocess.run([sys.executable, str(script)], stdin=subprocess.DEVNULL)
+            say("provisioner にカードを立てました（管理者の承認が要るところは Slack で聞きます）")
+        else:
+            say("provisioner が無効なので、seaos-kit machine install <道具> で入れてください")
+
     # **作業部屋のイメージ。** これが無いと、箱を持つ役（developer /
     # senior-developer）は最初のカードで失敗する。入れたばかりの環境には
     # 当然無いので、ここで作る。
