@@ -119,6 +119,37 @@ def own_env_vars(name: str) -> List[str]:
     return [v for v in (spec.get("env_own") or []) if v in declared]
 
 
+# **役ごとに上書きできる鍵。** 共通の値があれば全役がそれを使い、役つきの名前
+# （`DEVELOPER__OPENROUTER_API_KEY`）に値があればその役だけがそちらを使う。
+# 役ごとに請求を分けたい・上限を分けたい、という用途。
+#
+# own（`env_own`）との違いは**共通へ落ちるかどうか**。Slack のトークンは落ちると
+# 二重返事の事故になるので落とさないが、モデルの鍵は落ちてよい——
+# 無いと何も動かない唯一の鍵なので、むしろ落ちないと困る。
+OVERRIDABLE_ENV = ("OPENROUTER_API_KEY",)
+
+
+def override_env_vars(name: str) -> List[str]:
+    """**その役が、共通の値を役つきの値で上書きできる変数。**"""
+    declared = [var for var, _req, _desc in env_requirements(name)]
+    own = set(own_env_vars(name))
+    return [v for v in OVERRIDABLE_ENV if v in declared and v not in own]
+
+
+def env_value(name: str, var: str, source: Dict[str, str]) -> str:
+    """その役に配る値。**3つの規則をここ1箇所で決める。**
+
+    - 専用（own）: 役つきの名前だけを見る。共通へは落ちない
+    - 上書きできる（override）: 役つきの名前に値があればそれ、無ければ共通
+    - それ以外: 共通だけ
+    """
+    if var in own_env_vars(name):
+        return source.get(env_key(name, var), "")
+    if var in override_env_vars(name):
+        return source.get(env_key(name, var), "") or source.get(var, "")
+    return source.get(var, "")
+
+
 def managed_env_vars() -> List[str]:
     """キットが管理している変数の全体。**知らない変数には触らないため**に使う。"""
     # **外した役の鍵も管理下に置く。** 外している間に「知らない鍵」として
@@ -129,6 +160,11 @@ def managed_env_vars() -> List[str]:
         for var, _req, _desc in env_requirements(name):
             # 自分専用の値を要る変数は、役つきの名前だけを管理する
             key = env_key(name, var) if var in own else var
+            if key not in seen:
+                seen.append(key)
+        # 上書きは共通の名前と**両方**を管理する（共通は他の役も使う）
+        for var in override_env_vars(name):
+            key = env_key(name, var)
             if key not in seen:
                 seen.append(key)
     return seen

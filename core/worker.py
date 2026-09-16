@@ -508,7 +508,8 @@ def remove(name: str, *, keep_profile: bool = False) -> Dict:
     # **その役だけの鍵も落とす。** 役が消えれば管理対象から外れるので、
     # 正の `.env` に値が入ったまま取り残される（実際に残った）。
     # 定義を消す前に、何を持っていたかを読む。
-    own_keys = [roles.env_key(name, var) for var in roles.own_env_vars(name)]
+    own_keys = [roles.env_key(name, var)
+                for var in [*roles.own_env_vars(name), *roles.override_env_vars(name)]]
 
     shutil.rmtree(d)
 

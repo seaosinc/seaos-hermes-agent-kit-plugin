@@ -126,14 +126,12 @@ def apply() -> Tuple[List[str], List[str]]:
 
         declared: List[str] = []
         wrote = 0
-        own = set(roles.own_env_vars(name))
         for var, required, desc in roles.env_requirements(name):
             declared.append(var)
-            # **その役だけの値を見る。共有へは落ちない。** 落とすと、窓口を
-            # 増やしたときに同じ Slack トークンで2つのゲートウェイが繋がり、
-            # 両方が同じ発言に返事をする（実際に踏んだ）。
-            value = source.get(roles.env_key(name, var), "") if var in own \
-                else source.get(var, "")
+            # **専用の鍵は共有へ落ちない。** 落とすと、窓口を増やしたときに同じ
+            # Slack トークンで2つのゲートウェイが繋がり、両方が同じ発言に返事をする
+            # （実際に踏んだ）。上書きできる鍵（モデルの鍵）は、役つきが空なら共有を使う。
+            value = roles.env_value(name, var, source)
             if not value and existing.get(var):
                 # **既にある値を空で潰さない。** 正に無いのは「まだ入れていない」
                 # だけかもしれず、消すと動いている役の鍵が飛ぶ。

@@ -70,6 +70,17 @@ def list_roles() -> List[Dict]:
                     for var, _req, desc in roles.env_requirements(name)
                     if var in set(roles.own_env_vars(name))
                 ],
+                # **共通の値を、この役だけ差し替える鍵。** 空なら共通を使う。
+                "overrideSecrets": [
+                    {
+                        "name": roles.env_key(name, var),
+                        "label": var,
+                        "description": "この役だけ別の値を使うときに入れます。未設定なら共通の値を使います。",
+                        "configured": bool(_source().get(roles.env_key(name, var))),
+                        "override": True,
+                    }
+                    for var in roles.override_env_vars(name)
+                ],
                 # 配られてきた役か、この環境で作った役か。後者は git に入らない
                 "origin": roles.origin(name),
             }
@@ -227,7 +238,19 @@ def list_secrets() -> List[Dict]:
             entry["usedBy"].append(name)
     for var, entry in seen.items():
         entry["configured"] = bool(source.get(var))
+        # **全員が自分の値を持っていれば、共通は無くても動く。** 必須のまま
+        # 赤く出すと、埋める必要の無い欄を埋めさせることになる。
+        if entry["required"] and not entry["configured"] and _all_overridden(var, entry["usedBy"], source):
+            entry["required"] = False
     return sorted(seen.values(), key=lambda e: (not e["required"], e["name"]))
+
+
+def _all_overridden(var: str, users: List[str], source: Dict[str, str]) -> bool:
+    """その鍵を使う役が、**全員**役ごとの値を持っているか。"""
+    return bool(users) and all(
+        var in roles.override_env_vars(role) and source.get(roles.env_key(role, var))
+        for role in users
+    )
 
 
 @router.get("/validate")
@@ -284,6 +307,15 @@ def set_secret(body: SecretIn) -> Dict:
     """
     if body.name not in roles.managed_env_vars():
         raise HTTPException(status_code=400, detail=f"{body.name} は管理対象外の項目です")
+
+    if not body.value:
+        # **空で送られたら、役ごとの上書きを外す**（共通の値へ戻す）。
+        # それ以外を空にする口は作らない——必須の鍵が画面から消せてしまう。
+        overrides = {roles.env_key(r, v) for r in roles.all_names() for v in roles.override_env_vars(r)}
+        if body.name not in overrides:
+            raise HTTPException(status_code=400, detail="値が空です")
+        env_mod.drop_value(body.name)
+        return {"name": body.name, "configured": False}
 
     env_mod.set_value(body.name, body.value, f"{body.name}（GUI から設定）")
     return {"name": body.name, "configured": bool(body.value)}

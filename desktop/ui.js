@@ -67,11 +67,16 @@ export default function create(deps) {
    *
    * **普段は入力欄を出さない。** 設定済みの鍵に空欄が並ぶのは、何を求められて
    * いるのか分からない。行は状態だけを見せ、変更したいときにダイアログを開く。 */
-  function SecretRow({ secret, onEdit }) {
+  function SecretRow({ secret, onEdit, onClear }) {
     // **必須は名前の脇に `*`。** 無いとキット自体が成り立たないものだけに付く。
     // 任意の鍵は、空でも動く代わりに何が使えなくなるかを書く。
     const missing = !secret.configured
-    const note = secret.configured
+    // **上書きの鍵は、空が正常。** 共通の値を使うだけなので、未設定を咎めない。
+    const note = secret.override
+      ? secret.configured
+        ? 'この役だけ、共通とは別の値を使っています'
+        : '未設定なら共通の値を使います'
+      : secret.configured
       ? ''
       : secret.disables?.length
         ? `未設定の間は ${secret.disables.join('、')} を無効にします`
@@ -99,8 +104,25 @@ export default function create(deps) {
         jsx('span', {
           className: 'shrink-0 text-xs ' + (secret.configured || !secret.required ? MUTED : ''),
           style: secret.configured || !secret.required ? null : { color: DANGER },
-          children: secret.configured ? '設定済み' : secret.required ? '必須・未設定' : '未設定'
+          children: secret.override
+            ? secret.configured
+              ? '個別に設定'
+              : '共通を使用'
+            : secret.configured
+              ? '設定済み'
+              : secret.required
+                ? '必須・未設定'
+                : '未設定'
         }),
+        secret.override && secret.configured && onClear
+          ? jsx('button', {
+              type: 'button',
+              onClick: () => onClear(secret),
+              className: 'shrink-0 text-xs hover:underline',
+              style: { color: ACCENT },
+              children: '共通に戻す'
+            })
+          : null,
         jsx('button', {
           type: 'button',
           onClick: () => onEdit(secret),
@@ -143,7 +165,7 @@ export default function create(deps) {
         style: { border: BORDER, background: SURFACE },
         onClick: (e) => e.stopPropagation(),
         children: [
-          jsx('div', { className: 'text-sm font-medium', children: secret.name }),
+          jsx('div', { className: 'text-sm font-medium', children: secret.label || secret.name }),
           jsx('div', {
             className: 'mt-1 text-xs opacity-60',
             children: secret.description || ''
@@ -267,7 +289,7 @@ export default function create(deps) {
    * 窓口ごとに Slack のトークンが要るので、混ぜると役の数だけ行が増えて読めなくなる。
    * ダイアログが役に属するので、中では変数名だけでよい（役名が文脈になる）。
    */
-  function OwnSecretsDialog({ role, secrets, onEdit, onClose }) {
+  function OwnSecretsDialog({ role, secrets, overrides = [], onEdit, onClear, onClose }) {
     return jsx('div', {
       className: 'fixed inset-0 z-40 flex items-center justify-center bg-black/40',
       onClick: onClose,
@@ -277,14 +299,31 @@ export default function create(deps) {
         onClick: (e) => e.stopPropagation(),
         children: [
           jsx('div', { className: 'text-sm font-medium', children: `${role} の接続情報` }),
-          jsx('div', {
-            className: 'mt-1 text-xs opacity-60',
-            children: 'この窓口だけが使います。他の窓口とは共有されません。'
-          }),
-          jsx('div', {
-            className: 'mt-3',
-            children: secrets.map((x) => jsx(SecretRow, { secret: x, onEdit }, x.name))
-          }),
+          secrets.length
+            ? jsx('div', {
+                className: 'mt-1 text-xs opacity-60',
+                children: 'この窓口だけが使います。他の窓口とは共有されません。'
+              })
+            : null,
+          secrets.length
+            ? jsx('div', {
+                className: 'mt-3',
+                children: secrets.map((x) => jsx(SecretRow, { secret: x, onEdit }, x.name))
+              })
+            : null,
+          // **共通の値を、この役だけ差し替える。** 請求や上限を役ごとに分けたいときに使う。
+          overrides.length
+            ? jsx('div', {
+                className: 'mt-4 text-xs opacity-60',
+                children: '共通の接続情報を、この役だけ別の値にできます。'
+              })
+            : null,
+          overrides.length
+            ? jsx('div', {
+                className: 'mt-1',
+                children: overrides.map((x) => jsx(SecretRow, { secret: x, onEdit, onClear }, x.name))
+              })
+            : null,
           jsx('div', {
             className: 'mt-4 flex justify-end',
             children: jsx(Button, { label: '閉じる', onClick: onClose })
@@ -323,6 +362,20 @@ export default function create(deps) {
     useEffect(() => {
       load()
     }, [load])
+
+    // 役ごとの上書きを外す（空で送ると、サーバが行を落として共通へ戻す）
+    const clearSecret = useCallback(
+      async (secret) => {
+        setError('')
+        try {
+          await call(ctx, '/secrets', { method: 'POST', body: { name: secret.name, value: '' } })
+          await load()
+        } catch (e) {
+          setError(e.message)
+        }
+      },
+      [ctx, load]
+    )
 
     const saveSecret = useCallback(
       async (name, value) => {
@@ -640,7 +693,7 @@ export default function create(deps) {
                     ]
                   }),
                   // **共有はこの環境の役だけ。** 配布物は既に入っている。
-                  r.enabled && r.ownSecrets?.length
+                  r.enabled && (r.ownSecrets?.length || r.overrideSecrets?.length)
                     ? jsxs('button', {
                         type: 'button',
                         onClick: () => setOwnOf(r),
@@ -648,7 +701,7 @@ export default function create(deps) {
                         style: { color: ACCENT },
                         children: [
                           '設定',
-                          r.ownSecrets.every((x) => x.configured)
+                          (r.ownSecrets || []).every((x) => x.configured)
                             ? null
                             : jsx('span', { style: { color: WARN }, className: 'ml-1', children: '●' })
                         ]
@@ -725,7 +778,9 @@ export default function create(deps) {
           ? jsx(OwnSecretsDialog, {
               role: ownOf.name,
               secrets: (roles.find((x) => x.name === ownOf.name) || ownOf).ownSecrets || [],
+              overrides: (roles.find((x) => x.name === ownOf.name) || ownOf).overrideSecrets || [],
               onEdit: setEditing,
+              onClear: clearSecret,
               onClose: () => setOwnOf(null)
             })
           : null,
