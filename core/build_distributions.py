@@ -228,8 +228,8 @@ ROLES: dict[str, dict] = {
         "summary": "この PC に、チームが使う道具（Docker など）を揃える",
         "desc": "エージェントが使う道具のうち、Hermes もキットも持ってこないもの（Docker、Node.js など）をこの PC に入れて使える状態にする役。",
         "describe": ("この PC に、エージェントが動くための道具を入れて使える状態にする役。"
-                     "対象はキットの台帳にある道具（Docker、Node.js、LibreOffice）だけ。"
-                     "例:「Docker を入れる」「Docker が止まっているので起こす」「LibreOffice を入れる」。"
+                     "対象はキットの台帳にある道具（Docker、Node.js）だけ。"
+                     "例:「Docker を入れる」「Docker が止まっているので起こす」「Node.js を入れる」。"
                      "**リポジトリの開発環境（言語やパッケージ）はここではない**——それは作業部屋の中で"
                      "コードを書く役が揃える。"),
     },

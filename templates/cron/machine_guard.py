@@ -75,7 +75,7 @@ def main() -> int:
     week = time.strftime("%G-W%V")
     created = []
     for r in rows:
-        if not r.get("missing") or not r.get("auto"):
+        if not r.get("missing"):
             continue
         tool = r["name"]
         try:

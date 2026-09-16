@@ -216,7 +216,6 @@ Hermes もキットも持ってこない道具がある。無くても導入は�
 |---|---|---|
 | Docker | 箱を持つ役（developer / senior-developer）、共有記憶（operator） | する（入れる → 起こす → 作業部屋を建てる） |
 | Node.js | `npx` で起動する MCP を持つ役（handler） | する |
-| LibreOffice | まだ誰も使っていない | しない（使う側ができてから） |
 | uv | 変換（files） | 要らない。Hermes が `~/.hermes/bin/uv` を持っている |
 
 - **台帳は `core/machine.py` の `CATALOG`。** `seaos-kit machine install` は台帳に無い名前を断る。

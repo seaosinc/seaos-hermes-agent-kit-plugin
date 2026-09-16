@@ -49,7 +49,6 @@ class Tool:
     commands: List[str]                     # どれか1つが見つかれば「入っている」
     install: Dict[str, List[str]]           # OS -> コマンド
     after: List[str] = field(default_factory=list)   # 入れたあとにやること（seaos-kit の下位コマンド）
-    auto: bool = True                       # 足りなければ provisioner のカードを自動で立てるか
 
 
 CATALOG: Dict[str, Tool] = {
@@ -76,19 +75,6 @@ CATALOG: Dict[str, Tool] = {
                       "--accept-source-agreements", "--accept-package-agreements"],
         },
     ),
-    "libreoffice": Tool(
-        name="libreoffice",
-        label="LibreOffice",
-        why="古い形式の Office や、計算結果の入っていない Excel を読むのに使う（任意）",
-        commands=["soffice", "libreoffice"],
-        install={
-            "darwin": ["brew", "install", "--cask", "libreoffice"],
-            "win32": ["winget", "install", "-e", "--id", "TheDocumentFoundation.LibreOffice",
-                      "--accept-source-agreements", "--accept-package-agreements"],
-        },
-        # **まだキットが使っていない。** 使う側ができるまでは、勝手に 1GB を入れない。
-        auto=False,
-    ),
 }
 
 
@@ -106,10 +92,6 @@ def find(command: str) -> Optional[str]:
             p = Path(d) / f"{command}{ext}"
             if p.is_file():
                 return str(p)
-    if os_kind() == "darwin" and command in ("soffice", "libreoffice"):
-        app = Path("/Applications/LibreOffice.app/Contents/MacOS/soffice")
-        if app.is_file():
-            return str(app)
     return None
 
 
@@ -157,7 +139,7 @@ def status() -> List[Dict]:
     for tool in CATALOG.values():
         path = next((p for p in (find(c) for c in tool.commands) if p), None)
         row = {
-            **{k: v for k, v in asdict(tool).items() if k in ("name", "label", "why", "auto", "after")},
+            **{k: v for k, v in asdict(tool).items() if k in ("name", "label", "why", "after")},
             "installed": bool(path),
             "path": path or "",
             "neededBy": needed_by(tool.name),

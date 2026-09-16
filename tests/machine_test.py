@@ -68,7 +68,10 @@ def test_missing_means_needed_and_absent():
         machine.find = lambda _c: None
         rows = {r["name"]: r for r in machine.status()}
         assert rows["docker"]["missing"] and rows["node"]["missing"]
-        assert not rows["libreoffice"]["missing"], "誰も使わないものを足りないと言った"
+        selection.set_enabled("handler", False)
+        rows = {r["name"]: r for r in machine.status()}
+        assert not rows["node"]["missing"], "誰も使わないものを足りないと言った"
+        selection.selection_file().unlink(missing_ok=True)
         machine.find = lambda c: f"/bin/{c}"
         machine._docker_running = lambda: False
         rows = {r["name"]: r for r in machine.status()}
