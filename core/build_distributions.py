@@ -481,6 +481,152 @@ def build_soul(kit: Path, name: str, spec: dict) -> str:
     return (body.rstrip() + "\n\n<!-- SHARED:BEGIN -->\n" + shared + "\n<!-- SHARED:END -->\n")
 
 
+def _platform_tools(spec: dict) -> list:
+    """その役が使える道具（cli と slack で同じものを渡す）。"""
+    # terminal は archive / unlink に要る。**プラットフォーム別に有効化する**ので、
+    # ここに書かないと config を入れ替えたときに slack 側が落ちる。
+    # file は terminal と同じ場所を触る（箱がある役は箱の中、ホストの役はホスト）。
+    # **シェルを持たない役には渡さない**——渡すとホストのファイルへ手が届いてしまう。
+    tools = ["clarify", "file", "kanban", "memory", "session_search",
+             "skills", "terminal", "todo", "web"]
+    if spec.get("gateway"):
+        # **定期実行は窓口だけが持つ。** cron は**板の外に仕事を作れる唯一の道具**で、
+        # 他の役が持つと、止まっても `kanban ls` にも出ない作業が生える
+        # ——ボードが唯一の共有状態である、という前提がそこだけ崩れる。
+        #
+        # 繰り返しの依頼は、窓口が cron に「カードを立てる一手」だけを持たせる
+        # （operator の SOUL）。仕事そのものは毎回カードとして板に現れる。
+        tools.append("cronjob")
+    if not spec.get("shell", True):
+        # **コマンドを実行する手を持たせない。** MCP と web だけで調べる役に使う。
+        # workspace を false にするだけでは、シェルがホストへ移るだけで手は残る。
+        tools = [t for t in tools if t not in ("terminal", "file")]
+    if spec.get("no_kanban"):
+        tools = [t for t in tools if t != "kanban"]
+    if spec.get("computer_use"):
+        # 画面を触る役。**vision と対で渡す**——スクリーンショットを撮っても、
+        # 読む手が無ければ何も分からない。
+        tools += ["computer_use", "vision"]
+    return tools
+
+
+def _slack_platform(spec: dict) -> dict:
+    """窓口の Slack の振る舞い。"""
+    # **窓口の振る舞い。** スレッドに複数人がいる前提で組む。
+    #
+    # チャンネルでもスレッドでも、**呼ばれたときだけ**答える。スレッドは
+    # 既定だと「一度参加したら以降はメンション不要」なので、人が増えると
+    # 他人あての発言にも反応する。DM は逆で、メンションは要らない
+    # （require_mention はチャンネルとスレッドにしか効かない）。
+    #
+    # **チャンネルではスレッドに返す。** 人がいる場所で平場に流すと、
+    # 他の会話に割り込む。`reply_in_thread` は DM とチャンネルを区別しない
+    # 1つのスイッチなので（Hermes の `_resolve_thread_ts` は文脈を見ない）、
+    # 人がいる側に合わせる。
+    # **役ごとに上書きできる。** 窓口が複数あるとき、振る舞いは同じとは限らない
+    # （専用ボットは特定のチャンネルだけ見る、など）。既定は下のとおりで、
+    # `slack_extra` / `slack_config` に書いた分が勝つ。
+    slack: dict = {
+            "reply_to_mode": "first",
+            "extra": {
+                "require_mention": True,
+                "thread_require_mention": True,
+                # 先頭が他人あてのメンションなら、自分も呼ばれていない限り無視する
+                "ignore_other_user_mentions": True,
+                "reply_in_thread": True,
+                # Slack の送受信リアクションは本体の機能を使う。実際に有効化するには
+                # App 側の reactions:read / reactions:write scope と reaction_added /
+                # reaction_removed event subscription も必要（オーナーが再認可する）。
+                "reactions": True,
+                "reaction_triggers": True,
+            },
+    }
+    slack["extra"].update(spec.get("slack_extra") or {})
+    slack.update(spec.get("slack_config") or {})
+    return slack
+
+
+def _hotl_settings() -> dict:
+    """承認を待たない役（recruiter）の設定。"""
+    # 承認プロンプトを出さない（HOTL: Human Out The Loop）。
+    #
+    # この環境には承認に応えるユーザーがいない。無人実行では承認待ちがタイムアウトして
+    # 拒否になり、ツールは再試行と迂回を禁止するので、カードはそこで永久に止まる。
+    # SOUL.md は Hermes の保護命令ファイル（AGENTS.md / CLAUDE.md と同じ扱い）で、
+    # 置き場所を問わず書き込みに承認を要求する——**それが recruiter の仕事の中核**。
+    #
+    # 緩めるのはこの役だけにする。全体を緩めると、どのエージェントも任意の命令ファイルを
+    # 書き換えられるようになる。1体に絞れば、書き換えの経路もその1体に限られる。
+    # 引き換えに、止めるものは承認ではなく SOUL の規約になる
+    # （「自分の足元を書き換えるときは止まって報告する」）。
+    return {
+        "approvals": {
+            "mode": "off",
+            "cron_mode": "approve",
+            "single_query_mode": "approve",
+            "mcp_reload_confirm": False,
+            "destructive_slash_confirm": False,
+        },
+        "security": {"protected_instruction_files": False},
+        "hooks_auto_accept": True,
+    }
+
+
+def _workspace_terminal(spec: dict) -> dict:
+    """作業部屋（カードごとの使い捨てコンテナ）に入る役の terminal 設定。"""
+    # 作業部屋（DESIGN.md の「作業部屋」）。カードごとにコンテナを立てて捨てる。
+    return {
+        # **`backend` で書く。`env_type` では効かない。**
+        # 既定に terminal.backend: local が入っており（config_defaults.py:376）、
+        # cli.py:631 が backend を env_type より優先して上書きする。
+        # env_type だけ書くと、他の TERMINAL_* は正しく渡るのに
+        # バックエンドだけ local のまま——**気づきにくい形で箱に入らない。**
+        "backend": "docker",
+        "docker_image": WORKSPACE_IMAGE,
+        # **cwd を省けない。** ディスパッチャがカードのホスト側ワークスペース
+        # （コンテナ内に存在しないパス）を TERMINAL_CWD へ焼き込むため
+        # （kanban_db.py:10786）。担当は gateway ではなく `hermes -p <役> --cli` で
+        # 起動するので、config の値が必ず勝つ（cli.py:694 "CLI: always export"）。
+        "cwd": "/workspace",
+        # **true にする。** false だと /workspace が tmpfs になり、コマンドの合間に
+        # 部屋ごと消える。clone した成果が次の操作へ渡らず、以後の terminal が全部
+        # `No such container` で落ちる（実装カードが同じ原因で5回続けて失敗した）。
+        # 調べるだけのカードは1コマンドで完結するので落ちず、**clone を伴う実装だけ**
+        # が落ちるため、原因が作業部屋にあると気づきにくい。
+        "container_persistent": True,
+        "docker_network": True,
+        "container_cpu": WORKSPACE_CPU,
+        "container_memory": WORKSPACE_MEMORY,
+        # 部屋を捨てても残る唯一の場所。**公開パッケージと言語ランタイムだけ**が入る。
+        "docker_volumes": [
+            f"{WORKSPACE_CACHE}:/cache",
+            # 成果物を外へ出すための口。**左右同じパスにするのが要点**で、
+            # ずらすと artifacts の宣言がホスト側で解決できない。
+            f"{ARTIFACTS_ROOT}:{box_path(ARTIFACTS_ROOT)}",
+            # 受け取ったファイルと添付。**書かせない**——元の資料を担当が
+            # 書き換えると、別のカードが読む内容まで変わる。
+            f"{FILES_ROOT}:{box_path(FILES_ROOT)}:ro",
+            f"{ATTACHMENTS_ROOT}:{box_path(ATTACHMENTS_ROOT)}:ro",
+        ],
+        # ホストの値を名前で転送する。**イメージには焼かない。**
+        "docker_forward_env": [
+            "GH_TOKEN", "OPENROUTER_API_KEY",
+            # **カードの識別と成果物の置き場。** 秘密ではないが、渡さないと
+            # 規約が指す $HERMES_KANBAN_WORKSPACE が箱の中で空になり、
+            # 成果物の宣言が / 直下を指してしまう（実際に踏んだ）。
+            "HERMES_KANBAN_TASK", "HERMES_KANBAN_WORKSPACE",
+            # **AWS。値が無ければ転送されない。** Hermes は値が None のときだけ
+            # 外すので、空文字を書かないことが前提になる——`env apply` は空なら
+            # 行ごと落とすので、未設定のあいだは箱の中に現れない。
+            "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION",
+        ],
+        # 固定値。委譲先のモデルを担当に覚えさせず、ここ1箇所で決める。
+        "docker_env": {"OPENCODE_MODEL": f"{OPENCODE_PROVIDER}/{spec['model']}",
+                       # ホストと箱のパスの対応（seaos-path が読む。Windows でだけ意味を持つ）
+                       "SEAOS_PATH_MAP": path_map()},
+    }
+
+
 def build_config(kit: Path, name: str, spec: dict) -> dict:
     """**キットが決めることだけ**を書く。書かなかったものは Hermes の既定が入る。"""
     cfg: dict = {
@@ -534,158 +680,18 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
     if agent_cfg:
         cfg["agent"] = agent_cfg
 
-    # terminal は archive / unlink に要る。**プラットフォーム別に有効化する**ので、
-    # ここに書かないと config を入れ替えたときに slack 側が落ちる。
-    # file は terminal と同じ場所を触る（箱がある役は箱の中、ホストの役はホスト）。
-    # **シェルを持たない役には渡さない**——渡すとホストのファイルへ手が届いてしまう。
-    tools = ["clarify", "file", "kanban", "memory", "session_search",
-             "skills", "terminal", "todo", "web"]
-    if spec.get("gateway"):
-        # **定期実行は窓口だけが持つ。** cron は**板の外に仕事を作れる唯一の道具**で、
-        # 他の役が持つと、止まっても `kanban ls` にも出ない作業が生える
-        # ——ボードが唯一の共有状態である、という前提がそこだけ崩れる。
-        #
-        # 繰り返しの依頼は、窓口が cron に「カードを立てる一手」だけを持たせる
-        # （operator の SOUL）。仕事そのものは毎回カードとして板に現れる。
-        tools.append("cronjob")
-    if not spec.get("shell", True):
-        # **コマンドを実行する手を持たせない。** MCP と web だけで調べる役に使う。
-        # workspace を false にするだけでは、シェルがホストへ移るだけで手は残る。
-        tools = [t for t in tools if t not in ("terminal", "file")]
-    if spec.get("no_kanban"):
-        tools = [t for t in tools if t != "kanban"]
-    if spec.get("computer_use"):
-        # 画面を触る役。**vision と対で渡す**——スクリーンショットを撮っても、
-        # 読む手が無ければ何も分からない。
-        tools += ["computer_use", "vision"]
+    tools = _platform_tools(spec)
     cfg["platform_toolsets"] = {plat: tools for plat in ("cli", "slack")}
-
     if spec.get("gateway"):
-        # **窓口の振る舞い。** スレッドに複数人がいる前提で組む。
-        #
-        # チャンネルでもスレッドでも、**呼ばれたときだけ**答える。スレッドは
-        # 既定だと「一度参加したら以降はメンション不要」なので、人が増えると
-        # 他人あての発言にも反応する。DM は逆で、メンションは要らない
-        # （require_mention はチャンネルとスレッドにしか効かない）。
-        #
-        # **チャンネルではスレッドに返す。** 人がいる場所で平場に流すと、
-        # 他の会話に割り込む。`reply_in_thread` は DM とチャンネルを区別しない
-        # 1つのスイッチなので（Hermes の `_resolve_thread_ts` は文脈を見ない）、
-        # 人がいる側に合わせる。
-        # **役ごとに上書きできる。** 窓口が複数あるとき、振る舞いは同じとは限らない
-        # （専用ボットは特定のチャンネルだけ見る、など）。既定は下のとおりで、
-        # `slack_extra` / `slack_config` に書いた分が勝つ。
-        slack: dict = {
-                "reply_to_mode": "first",
-                "extra": {
-                    "require_mention": True,
-                    "thread_require_mention": True,
-                    # 先頭が他人あてのメンションなら、自分も呼ばれていない限り無視する
-                    "ignore_other_user_mentions": True,
-                    "reply_in_thread": True,
-                    # Slack の送受信リアクションは本体の機能を使う。実際に有効化するには
-                    # App 側の reactions:read / reactions:write scope と reaction_added /
-                    # reaction_removed event subscription も必要（オーナーが再認可する）。
-                    "reactions": True,
-                    "reaction_triggers": True,
-                },
-        }
-        slack["extra"].update(spec.get("slack_extra") or {})
-        slack.update(spec.get("slack_config") or {})
-        cfg["platforms"] = {"slack": slack}
-
+        cfg["platforms"] = {"slack": _slack_platform(spec)}
     if spec.get("hotl"):
-        # 承認プロンプトを出さない（HOTL: Human Out The Loop）。
-        #
-        # この環境には承認に応えるユーザーがいない。無人実行では承認待ちがタイムアウトして
-        # 拒否になり、ツールは再試行と迂回を禁止するので、カードはそこで永久に止まる。
-        # SOUL.md は Hermes の保護命令ファイル（AGENTS.md / CLAUDE.md と同じ扱い）で、
-        # 置き場所を問わず書き込みに承認を要求する——**それが recruiter の仕事の中核**。
-        #
-        # 緩めるのはこの役だけにする。全体を緩めると、どのエージェントも任意の命令ファイルを
-        # 書き換えられるようになる。1体に絞れば、書き換えの経路もその1体に限られる。
-        # 引き換えに、止めるものは承認ではなく SOUL の規約になる
-        # （「自分の足元を書き換えるときは止まって報告する」）。
-        cfg["approvals"] = {
-            "mode": "off",
-            "cron_mode": "approve",
-            "single_query_mode": "approve",
-            "mcp_reload_confirm": False,
-            "destructive_slash_confirm": False,
-        }
-        cfg["security"] = {"protected_instruction_files": False}
-        cfg["hooks_auto_accept"] = True
-
+        cfg.update(_hotl_settings())
     if spec.get("workspace") and spec.get("shell", True):
-        # 作業部屋（DESIGN.md の「作業部屋」）。カードごとにコンテナを立てて捨てる。
-        cfg["terminal"] = {
-            # **`backend` で書く。`env_type` では効かない。**
-            # 既定に terminal.backend: local が入っており（config_defaults.py:376）、
-            # cli.py:631 が backend を env_type より優先して上書きする。
-            # env_type だけ書くと、他の TERMINAL_* は正しく渡るのに
-            # バックエンドだけ local のまま——**気づきにくい形で箱に入らない。**
-            "backend": "docker",
-            "docker_image": WORKSPACE_IMAGE,
-            # **cwd を省けない。** ディスパッチャがカードのホスト側ワークスペース
-            # （コンテナ内に存在しないパス）を TERMINAL_CWD へ焼き込むため
-            # （kanban_db.py:10786）。担当は gateway ではなく `hermes -p <役> --cli` で
-            # 起動するので、config の値が必ず勝つ（cli.py:694 "CLI: always export"）。
-            "cwd": "/workspace",
-            # **true にする。** false だと /workspace が tmpfs になり、コマンドの合間に
-            # 部屋ごと消える。clone した成果が次の操作へ渡らず、以後の terminal が全部
-            # `No such container` で落ちる（実装カードが同じ原因で5回続けて失敗した）。
-            # 調べるだけのカードは1コマンドで完結するので落ちず、**clone を伴う実装だけ**
-            # が落ちるため、原因が作業部屋にあると気づきにくい。
-            "container_persistent": True,
-            "docker_network": True,
-            "container_cpu": WORKSPACE_CPU,
-            "container_memory": WORKSPACE_MEMORY,
-            # 部屋を捨てても残る唯一の場所。**公開パッケージと言語ランタイムだけ**が入る。
-            "docker_volumes": [
-                f"{WORKSPACE_CACHE}:/cache",
-                # 成果物を外へ出すための口。**左右同じパスにするのが要点**で、
-                # ずらすと artifacts の宣言がホスト側で解決できない。
-                f"{ARTIFACTS_ROOT}:{box_path(ARTIFACTS_ROOT)}",
-                # 受け取ったファイルと添付。**書かせない**——元の資料を担当が
-                # 書き換えると、別のカードが読む内容まで変わる。
-                f"{FILES_ROOT}:{box_path(FILES_ROOT)}:ro",
-                f"{ATTACHMENTS_ROOT}:{box_path(ATTACHMENTS_ROOT)}:ro",
-            ],
-            # ホストの値を名前で転送する。**イメージには焼かない。**
-            "docker_forward_env": [
-                "GH_TOKEN", "OPENROUTER_API_KEY",
-                # **カードの識別と成果物の置き場。** 秘密ではないが、渡さないと
-                # 規約が指す $HERMES_KANBAN_WORKSPACE が箱の中で空になり、
-                # 成果物の宣言が / 直下を指してしまう（実際に踏んだ）。
-                "HERMES_KANBAN_TASK", "HERMES_KANBAN_WORKSPACE",
-                # **AWS。値が無ければ転送されない。** Hermes は値が None のときだけ
-                # 外すので、空文字を書かないことが前提になる——`env apply` は空なら
-                # 行ごと落とすので、未設定のあいだは箱の中に現れない。
-                "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION",
-            ],
-            # 固定値。委譲先のモデルを担当に覚えさせず、ここ1箇所で決める。
-            "docker_env": {"OPENCODE_MODEL": f"{OPENCODE_PROVIDER}/{spec['model']}",
-                           # ホストと箱のパスの対応（seaos-path が読む。Windows でだけ意味を持つ）
-                           "SEAOS_PATH_MAP": path_map()},
-        }
-
+        cfg["terminal"] = _workspace_terminal(spec)
     if spec.get("plugins"):
         # 置くだけでは有効にならない（既定は無効）。配布物の側で有効にしておく。
         cfg["plugins"] = {"enabled": list(spec["plugins"]), "disabled": []}
-    servers: dict = {}
-    # **全役で同じものは1箇所に置く**（templates/shared/mcp/<名前>.yaml）。
-    # 役ごとに書き写すと、直すたびに全部を直すことになり、必ず取り残される。
-    for name in spec.get("mcp_shared") or []:
-        f = kit / "templates/shared/mcp" / f"{name}.yaml"
-        if f.exists():
-            servers.update(yaml.safe_load(f.read_text(encoding="utf-8")) or {})
-    if spec.get("mcp") and Path(spec["mcp"]).exists():
-        mcp = yaml.safe_load(Path(spec["mcp"]).read_text(encoding="utf-8")) or {}
-        # 雛形は `servers:` を頂点に持つ。**そのまま入れると1段深くなる**
-        # （mcp_servers.servers.<名前> になり、Hermes からは空に見える）。
-        # 中身が入るまで空 dict だったので、長らく露呈しなかった。
-        # 役が自分で書いたものを後にして、共通より優先させる。
-        servers.update(mcp.get("servers", mcp) if isinstance(mcp, dict) else {})
+    servers = mcp_servers_of(kit, name, spec)
     if servers:
         # **置き場のパスは機械ごとに違う**ので、雛形には `{{FILES_ROOT}}` と書いて
         # ここで埋める。`${HOME}` のような環境変数で書くと、鍵の有無で MCP を
@@ -821,6 +827,9 @@ def mcp_servers_of(kit: Path, role: str, spec: dict | None = None) -> dict:
     path = spec.get("mcp")
     if path and Path(path).exists():
         mcp = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+        # 雛形は `servers:` を頂点に持つ。**そのまま入れると1段深くなる**
+        # （mcp_servers.servers.<名前> になり、Hermes からは空に見える）。
+        # 役が自分で書いたものを後にして、共通より優先させる。
         servers.update(mcp.get("servers", mcp) if isinstance(mcp, dict) else {})
     return servers
 
