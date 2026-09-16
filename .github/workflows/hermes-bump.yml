@@ -13,6 +13,8 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  # 追従 PR の上で検査を起動する（下記）
+  actions: write
 
 jobs:
   bump:
@@ -68,3 +70,9 @@ jobs:
             # PR を作れない設定のときは、気づけるように issue にする。
             gh issue create --title "Hermes ${LATEST} が出ている（追従 PR を作れなかった）" --body "$body"
           fi
+          # **検査はここで明示的に起動する。** 既定のトークンで push / PR を作っても、
+          # GitHub は新しいワークフローを起動しない（pull_request が発火しない）。
+          # 起動しないと、追従 PR は緑にも赤にもならないまま残る。
+          # 同じコミットで走るので、結果は PR の検査欄にも出る。
+          gh workflow run hermes.yml --ref "$branch"
+          gh workflow run ci.yml --ref "$branch"
