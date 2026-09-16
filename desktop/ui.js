@@ -346,6 +346,7 @@ export default function create(deps) {
     const [ownOf, setOwnOf] = useState(null)
     const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
     const [version, setVersion] = useState(null)
+    const [machine, setMachine] = useState(null)
 
     const load = useCallback(async () => {
       setError('')
@@ -354,6 +355,8 @@ export default function create(deps) {
         setSecrets(await call(ctx, '/secrets'))
         setCheck(await call(ctx, '/validate'))
         setVersion(await call(ctx, '/version'))
+        // 道具の確認は Docker に問い合わせるぶん遅いので、画面の表示を待たせない
+        call(ctx, '/machine').then(setMachine).catch(() => setMachine(null))
       } catch (e) {
         setError(e.message)
       }
@@ -743,6 +746,62 @@ export default function create(deps) {
             )
           ]
         }),
+
+        // この PC の道具。**揃えるのは provisioner** なので、ここは見せるだけにする。
+        // provisioner を外しているときだけ、人が入れるためのコマンドを出す。
+        machine?.tools?.some((t) => t.neededBy.length || t.installed)
+          ? jsxs('section', {
+              className: 'flex flex-col',
+              children: [
+                jsx('div', { className: 'pb-1 text-xs font-medium opacity-60', children: 'この PC' }),
+                ...machine.tools
+                  .filter((t) => t.neededBy.length || t.installed)
+                  .map((t) =>
+                    jsxs(
+                      'div',
+                      {
+                        className: 'flex items-start gap-3 py-2',
+                        style: { borderBottom: BORDER },
+                        children: [
+                          jsxs('div', {
+                            className: 'min-w-0 flex-1',
+                            children: [
+                              jsx('div', { className: 'text-sm', children: t.label }),
+                              jsx('div', {
+                                className: 'text-xs opacity-60',
+                                children: t.neededBy.length ? `${t.neededBy.join('、')} が使います` : t.why
+                              }),
+                              t.missing && !machine.provisioner && t.installCommand
+                                ? jsx('div', {
+                                    className: 'mt-1 font-mono text-[0.6875rem] opacity-80',
+                                    children: t.installCommand
+                                  })
+                                : null
+                            ]
+                          }),
+                          jsx('span', {
+                            className: 'shrink-0 text-xs ' + (t.missing ? '' : MUTED),
+                            style: t.missing ? { color: WARN } : null,
+                            children: !t.missing
+                              ? t.installed
+                                ? '使えます'
+                                : '今は不要'
+                              : machine.provisioner
+                                ? t.installed
+                                  ? '停止中（provisioner が起こします）'
+                                  : '未導入（provisioner が入れます）'
+                                : t.installed
+                                  ? '停止中'
+                                  : '未導入'
+                          })
+                        ]
+                      },
+                      t.name
+                    )
+                  )
+              ]
+            })
+          : null,
 
         // 接続情報
         jsxs('section', {

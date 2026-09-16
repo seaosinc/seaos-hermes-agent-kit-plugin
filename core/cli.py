@@ -99,6 +99,15 @@ def main(argv: list[str] | None = None) -> int:
     wrm.add_argument("name")
     wrm.add_argument("--keep-profile", action="store_true", help="プロファイルは残す")
 
+    mc = sub.add_parser("machine", help="この PC に、キットが要る道具が揃っているか（揃っていなければ入れる）")
+    mcsub = mc.add_subparsers(dest="mcmd2", required=True)
+    mck = mcsub.add_parser("check", help="道具ごとの状態（足りなければ終了コード 1）")
+    mck.add_argument("--json", action="store_true", help="機械が読む形で出す")
+    mci = mcsub.add_parser("install", help="台帳にある道具を入れる（台帳に無いものは断る）")
+    mci.add_argument("tool")
+    mcs = mcsub.add_parser("start", help="入っているが止まっている道具を起こす（docker）")
+    mcs.add_argument("tool")
+
     fl = sub.add_parser("files", help="受け取ったファイルを、担当が読める場所へ置く")
     flsub = fl.add_subparsers(dest="fcmd", required=True)
     flk = flsub.add_parser("keep", help="置き場へ写し、置いた先のパスを出す（本文に書く）")
@@ -249,6 +258,41 @@ def main(argv: list[str] | None = None) -> int:
             out = worker_mod.remove(args.name, keep_profile=args.keep_profile)
             print(f"  ✓ {out['name']} を削除（プロファイル: {'削除' if out['profile_removed'] else '残置'}）")
             return 0
+
+    if args.cmd == "machine":
+        import json
+
+        import machine
+
+        try:
+            if args.mcmd2 == "check":
+                rows = machine.status()
+                if args.json:
+                    print(json.dumps(rows, ensure_ascii=False, indent=2))
+                else:
+                    for r in rows:
+                        state = ("✗ 足りない" if r["missing"] else
+                                 "✓" if r["installed"] else "- 入っていない（今は要らない）")
+                        if r["installed"] and r.get("running") is False and r["name"] == "docker":
+                            state = "✗ 止まっている" if r["missing"] else "- 止まっている"
+                        used = f"（{', '.join(r['neededBy'])} が使う）" if r["neededBy"] else ""
+                        _print(f"{r['label']:<12} {state} {used}")
+                return 1 if any(r["missing"] for r in rows) else 0
+            if args.mcmd2 == "install":
+                res = machine.install(args.tool)
+                _print(("✓ " if res["ok"] else "✗ ") + res["command"])
+                if res["output"]:
+                    print(res["output"])
+                if res["needsHuman"]:
+                    _print("人の操作が要ります（管理者の承認か、前提の道具）。上の出力を人に渡してください")
+                return 0 if res["ok"] else (3 if res["needsHuman"] else 1)
+            if args.mcmd2 == "start":
+                ok = machine.start(args.tool)
+                _print("✓ 動いています" if ok else "✗ 起動を確かめられませんでした（初回は利用規約の同意が要ることがあります）")
+                return 0 if ok else 1
+        except machine.MachineError as exc:
+            _print(f"✗ {exc}")
+            return 2
 
     if args.cmd == "files":
         import files as files_mod

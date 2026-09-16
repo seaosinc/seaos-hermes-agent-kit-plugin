@@ -279,6 +279,18 @@ def validate() -> Dict:
     return {"ok": not blocking, "blocking": blocking, "warnings": warnings}
 
 
+@router.get("/machine")
+def machine_status() -> Dict:
+    """この PC の道具。**足りないものは provisioner が揃える**ので、画面は見せるだけ。"""
+    import machine
+
+    return {
+        "tools": machine.status(),
+        # provisioner を外していると誰も揃えない。そのときだけ入れ方を見せる
+        "provisioner": "provisioner" in roles.names(),
+    }
+
+
 @router.get("/status")
 def status() -> Dict:
     """いまの状態。差分の有無まで見るので、押す前に何が起きるか分かる。"""
