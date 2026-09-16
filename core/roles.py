@@ -46,7 +46,8 @@ def names() -> List[str]:
     import selection
 
     off = set(selection.disabled())
-    return [n for n in all_specs() if n not in off or essential(n)]
+    # 配置表は1回だけ読む（all_specs は呼ぶたびに生成器を読み直す）
+    return [n for n, sp in all_specs().items() if n not in off or sp.get("essential")]
 
 
 def is_enabled(name: str) -> bool:
