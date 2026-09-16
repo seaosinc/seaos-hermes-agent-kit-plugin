@@ -38,7 +38,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("roles", help="役の一覧を出す")
+    sub.add_parser("roles", help="役の一覧を出す（無効にした役も含む）")
+    en = sub.add_parser("enable", help="役を有効にする（導入は次の update で行う）")
+    en.add_argument("name")
+    dis = sub.add_parser("disable", help="役を無効にする（反映・鍵の配布・検証から外す）")
+    dis.add_argument("name")
+    dis.add_argument("--remove-profile", action="store_true",
+                     help="プロファイルも削除する（記憶とセッションは戻せない）")
     sub.add_parser("build", help="templates/ から配布物を生成する")
     sub.add_parser("diff", help="反映せず、何が変わるかだけ見る")
     sub.add_parser("describe", help="説明文を生成器の文面に合わせる")
@@ -133,10 +139,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.cmd == "roles":
-        for name in roles.names():
+        enabled = set(roles.names())
+        for name in roles.all_names():
             board = "" if name not in roles.without_board() else "  （板に載らない）"
-            print(f"{name}{board}")
+            state = "" if name in enabled else "  （無効）"
+            print(f"{name}{state}{board}")
         return 0
+
+    if args.cmd in ("enable", "disable"):
+        import selection
+
+        try:
+            if args.cmd == "enable":
+                result = kit.enable_role(args.name, log=_print)
+            else:
+                result = kit.disable_role(args.name, remove_profile=args.remove_profile, log=_print)
+        except selection.SelectionError as exc:
+            _print(f"✗ {exc}")
+            return 1
+        return 0 if result.ok() else 1
 
     if args.cmd == "build":
         kit.build(log=_print)

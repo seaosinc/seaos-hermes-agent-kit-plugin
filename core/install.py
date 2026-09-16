@@ -161,7 +161,8 @@ def uninstall(*, remove_profiles: bool = False, log: Optional[Log] = None) -> Re
         return res
 
     say("エージェントのプロファイルを削除します")
-    for name in roles.names():
+    # 外した役でも、残したプロファイルは撤去の対象に入れる
+    for name in roles.all_names():
         if not profile_dir(name).is_dir():
             continue
         code, _out = hermes.run(["profile", "delete", name])

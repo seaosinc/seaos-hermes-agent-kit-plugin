@@ -69,6 +69,15 @@ def env_file() -> Path:
     return new_path
 
 
+def selection_file() -> Path:
+    """**どの役を入れるか**の記録。秘密と同じく、キットの外に置く。
+
+    中に置くと `hermes plugins install --force` で消え、外したはずの役が
+    次の反映で黙って戻ってくる。
+    """
+    return hermes_home() / "seaos-kit" / "roles.json"
+
+
 def hermes_bin() -> str | None:
     """`hermes` 実行ファイル。見つからなければ None。"""
     return shutil.which("hermes")

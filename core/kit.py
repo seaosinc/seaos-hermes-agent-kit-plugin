@@ -64,13 +64,24 @@ def build(out: Optional[Path] = None, log: Optional[Log] = None) -> Path:
     return target
 
 
+# 外した役に残す説明文。**プロファイルが残っている限り、分解器は担当の候補に並べる**
+# （Hermes は profiles/ にあるものを全部名簿に載せる）。説明文が唯一の入力なので、
+# ここで「選ぶな」と書く。
+DISABLED_DESCRIPTION = ("【無効】このプロファイルは使われていない。"
+                        "kanban の担当に選んではならず、どのカードも割り当ててはならない。")
+
+
 def sync_descriptions(log: Optional[Log] = None) -> Result:
-    """説明文を生成器の文面に合わせる。**振り分けの唯一の入力なので毎回やる。**"""
+    """説明文を生成器の文面に合わせる。**振り分けの唯一の入力なので毎回やる。**
+
+    外した役でプロファイルが残っているものは、選ばれないように書き換える。
+    """
     result = Result()
-    for name in roles.names():
+    enabled = set(roles.names())
+    for name in roles.all_names():
         if not hermes.profile_exists(name):
             continue
-        text = roles.describe(name)
+        text = roles.describe(name) if name in enabled else DISABLED_DESCRIPTION
         if not text:
             continue
         code, _out = hermes.set_description(name, text)
@@ -125,6 +136,70 @@ def prune_skills(log: Optional[Log] = None) -> Result:
                 continue
             shutil.rmtree(skill, ignore_errors=True)
             result.lines.append(f"{name} から {skill.name} を外しました（配られなくなったため）")
+    if log:
+        for line in result.lines:
+            log(line)
+    return result
+
+
+def enable_role(name: str, log: Optional[Log] = None) -> Result:
+    """役を入れる側に戻す。**記録するだけ**で、導入は次の反映で行う。"""
+    import selection
+
+    if name not in roles.all_names():
+        raise selection.SelectionError(f"そのエージェントはありません: {name}")
+    result = Result()
+    changed = selection.set_enabled(name, True)
+    result.lines.append(f"{name} を有効にしました（反映すると導入されます）" if changed
+                        else f"{name} は有効です")
+    if log:
+        for line in result.lines:
+            log(line)
+    return result
+
+
+def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] = None) -> Result:
+    """役を外す。以後の反映・鍵の配布・検証の対象から外れる。
+
+    **プロファイルは既定で残す**（記憶とセッションは戻せない）。残す場合は、
+    分解器に選ばれないよう説明文を書き換え、窓口なら常駐を止める——
+    残しただけでは、Hermes から見て**普通に動く役のまま**だからである。
+    """
+    import platform_ops
+    import selection
+    import worker as worker_mod
+
+    if name not in roles.all_names():
+        raise selection.SelectionError(f"そのエージェントはありません: {name}")
+    busy = worker_mod.busy_cards(name)
+    if busy:
+        raise selection.SelectionError(f"{name} は進行中のカードを {busy} 件抱えています。先に片付けてください")
+
+    result = Result()
+    selection.set_enabled(name, False, essential=roles.essential(name))
+    result.lines.append(f"{name} を無効にしました")
+
+    if (roles.all_specs().get(name) or {}).get("gateway") and platform_ops.gateway_pid(name):
+        if platform_ops.stop_gateway(name):
+            result.lines.append(f"{name} の窓口を止めました")
+        else:
+            result.failures += 1
+            result.lines.append(f"✗ {name} の窓口を止められませんでした")
+
+    if hermes.profile_exists(name):
+        if remove_profile:
+            # **`-y` が要る。** 無いと対話の確認待ちのまま黙って終わる（worker.remove と同じ）。
+            hermes.run(["profile", "delete", name, "-y"])
+            if hermes.profile_exists(name):
+                result.failures += 1
+                result.lines.append(f"✗ {name} のプロファイルを削除できませんでした")
+            else:
+                result.lines.append(f"{name} のプロファイルを削除しました")
+        else:
+            code, _ = hermes.set_description(name, DISABLED_DESCRIPTION)
+            if code != 0:
+                result.failures += 1
+                result.lines.append(f"✗ {name} の説明文を書き換えられませんでした（担当に選ばれるおそれがあります）")
     if log:
         for line in result.lines:
             log(line)

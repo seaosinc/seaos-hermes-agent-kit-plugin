@@ -119,7 +119,8 @@ def ensure_env(log: Optional[Log] = None) -> Path:
 
 def memory_roles() -> List[str]:
     """共有記憶を引く役。**ここで名簿を持たない**（持つと役を増やしたときにずれる）。"""
-    return [n for n, sp in roles.all_specs().items() if sp.get("memory")]
+    enabled = set(roles.names())
+    return [n for n, sp in roles.all_specs().items() if sp.get("memory") and n in enabled]
 
 
 def wire_one(name: str, port: str, key: str, log: Optional[Log] = None) -> bool:

@@ -32,8 +32,30 @@ def all_specs() -> Dict[str, dict]:
     return {**gen.ROLES, **gen.worker_roles(kit_root())}
 
 
-def names() -> List[str]:
+def all_names() -> List[str]:
+    """**外した役も含めた**全役。設定画面の一覧と、鍵の管理範囲に使う。"""
     return list(all_specs().keys())
+
+
+def names() -> List[str]:
+    """**入れる役だけ。** 反映・鍵の配布・検証はここを回す。
+
+    外した役を回すと、外したはずの役が反映のたびに作り直される。
+    全役が要る場面（一覧・鍵の管理範囲）は all_names() を使う。
+    """
+    import selection
+
+    off = set(selection.disabled())
+    return [n for n in all_specs() if n not in off or essential(n)]
+
+
+def is_enabled(name: str) -> bool:
+    return name in names()
+
+
+def essential(name: str) -> bool:
+    """**外せない役。** 板の仕組みそのものが前提にしている（配置表の `essential`）。"""
+    return bool((all_specs().get(name) or {}).get("essential"))
 
 
 def describe(name: str) -> str:
@@ -99,8 +121,10 @@ def own_env_vars(name: str) -> List[str]:
 
 def managed_env_vars() -> List[str]:
     """キットが管理している変数の全体。**知らない変数には触らないため**に使う。"""
+    # **外した役の鍵も管理下に置く。** 外している間に「知らない鍵」として
+    # 掃除されると、入れ直したときに鍵が消えている。
     seen: List[str] = []
-    for name in names():
+    for name in all_names():
         own = set(own_env_vars(name))
         for var, _req, _desc in env_requirements(name):
             # 自分専用の値を要る変数は、役つきの名前だけを管理する

@@ -117,6 +117,9 @@ MAX_IN_PROGRESS_PER_PROFILE = int(os.environ.get("MAX_IN_PROGRESS_PER_PROFILE", 
 ROLES: dict[str, dict] = {
     "operator": {
         "model": FAST,
+        # **外せない役。** 定期実行（kit-sync / kit-maintain / 各 guard）と
+        # 共有記憶の起動がこの役に載っている（core/selection.py）。
+        "essential": True,
         # 窓口。Slack の振る舞いはこの役の config で決まる。
         "gateway": True,
         # **Slack の鍵は役ごとに分ける。** 窓口を増やしたとき、同じトークンで
@@ -147,6 +150,9 @@ ROLES: dict[str, dict] = {
     },
     "fixer": {
         "model": SMART,
+        # **外せない役。** kanban の orchestrator_profile で、分解したカードの
+        # 親はこの役に戻る。居ないと、子が全部終わっても誰も完了を判定しない。
+        "essential": True,
         "skills": ["kanban-collaboration", "precedent-lookup"],
         # 「道具が足りない」という判断を下す役なので、道具の綴りを確かめる口を持つ
         "mcp_shared": ["context7"],

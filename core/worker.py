@@ -512,6 +512,11 @@ def remove(name: str, *, keep_profile: bool = False) -> Dict:
 
     shutil.rmtree(d)
 
+    # **外した記録も消す。** 残すと、同じ名前で作り直した役が最初から外れている。
+    import selection
+
+    selection.forget(name)
+
     import env as env_mod
 
     dropped = []

@@ -195,6 +195,27 @@ def _restart_systemd(profile: str, log: Optional[Log] = None) -> bool:
     return False
 
 
+def stop_gateway(profile: str) -> bool:
+    """止める。**止まったことを pid の消滅で確かめる**（戻り値だけでは嘘をつく）。
+
+    エージェントを外したのに窓口が残ると、外したはずの役が Slack で返事をし続ける。
+    """
+    if os_kind() == "linux":
+        hermes.run(["gateway", "stop", "-p", profile])
+    pid = gateway_pid(profile)
+    if pid:
+        _terminate(pid)
+        for _ in range(10):
+            time.sleep(1)
+            if not gateway_pid(profile):
+                break
+        stubborn = gateway_pid(profile)
+        if stubborn:
+            _kill(stubborn)
+            time.sleep(1)
+    return not gateway_pid(profile)
+
+
 def restart_gateway(profile: str, log: Optional[Log] = None) -> bool:
     """OS に合った作法で再起動する。呼ぶ側はこの1つだけ知っていればよい。"""
     n = running_cards()

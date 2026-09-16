@@ -59,14 +59,22 @@ def _orphan_profiles(rep: Report) -> None:
     ——**SOUL も規約も配られていないので、振られたカードは静かに止まる。**
     """
     rep.section("配置表に無い役が残っていないか")
-    known = set(roles.names())
+    known = set(roles.all_names())
+    enabled = set(roles.names())
     found = False
     root = profiles_dir()
     if root.is_dir():
         for d in sorted(p for p in root.iterdir() if p.is_dir()):
             # `.deleted` のような作業ディレクトリは役ではない。
             # ドット始まりを役として数えると、doctor が毎回赤くなる。
-            if d.name.startswith(".") or d.name in known or d.name == "default":
+            if d.name.startswith(".") or d.name == "default":
+                continue
+            if d.name in known and d.name not in enabled:
+                # **外した役のプロファイルは、残すと決めたもの。** 壊れてはいないが、
+                # 説明文で「選ぶな」と書いてあるだけで、担当には書けてしまう。
+                rep.note(f"{d.name} は無効にしてあるが、プロファイルは残っている（説明文で担当から外している）")
+                continue
+            if d.name in known:
                 continue
             rep.ng(f"{d.name} は配置表に無いのに実機に残っている")
             rep.lines.append("    振られたカードは静かに止まる（SOUL も規約も配られていない）")
@@ -226,7 +234,7 @@ def _assignees(rep: Report) -> None:
     except Exception:  # noqa: BLE001
         rep.note("assignees を読めなかった")
         return
-    known = set(roles.names())
+    known = set(roles.all_names())
     stale = [r["name"] for r in rows if not r.get("on_disk") and (r.get("counts") or {})]
     unknown = [r["name"] for r in rows if r.get("on_disk") and r["name"] not in known and r["name"] != "default"]
     if unknown:

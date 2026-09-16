@@ -183,7 +183,16 @@ export default function create(deps) {
    *
    * **記憶とセッションは戻せない。** 既定は残す側にして、消すほうを明示させる。
    */
-  function RemoveDialog({ role, impact, onRemove, onClose }) {
+  function RemoveDialog({
+    role,
+    impact,
+    onRemove,
+    onClose,
+    title = `${role} を削除する`,
+    lead = 'エージェントの定義を削除します。ボードの過去のカードは残ります。',
+    actionLabel = '削除',
+    workingLabel = '削除しています…'
+  }) {
     const [alsoProfile, setAlsoProfile] = useState(false)
     const [working, setWorking] = useState(false)
     const blocked = (impact?.busy || 0) > 0
@@ -196,7 +205,7 @@ export default function create(deps) {
         style: { border: BORDER, background: SURFACE },
         onClick: (e) => e.stopPropagation(),
         children: [
-          jsx('div', { className: 'text-sm font-medium', children: `${role} を削除する` }),
+          jsx('div', { className: 'text-sm font-medium', children: title }),
           blocked
             ? jsx('div', {
                 className: 'mt-3 rounded px-3 py-2 text-xs',
@@ -205,7 +214,7 @@ export default function create(deps) {
               })
             : jsx('div', {
                 className: 'mt-2 text-xs opacity-70',
-                children: 'エージェントの定義を削除します。ボードの過去のカードは残ります。'
+                children: lead
               }),
           !blocked && impact?.installed
             ? jsxs('label', {
@@ -234,7 +243,7 @@ export default function create(deps) {
             children: [
               jsx(Button, { label: 'キャンセル', onClick: onClose, disabled: working }),
               jsx(Button, {
-                label: working ? '削除しています…' : '削除',
+                label: working ? workingLabel : actionLabel,
                 disabled: working || blocked,
                 onClick: async () => {
                   setWorking(true)
@@ -294,6 +303,7 @@ export default function create(deps) {
     const [notice, setNotice] = useState('')
     const [editing, setEditing] = useState(null)
     const [removing, setRemoving] = useState(null)
+    const [disabling, setDisabling] = useState(null)
     const [ownOf, setOwnOf] = useState(null)
     const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
     const [version, setVersion] = useState(null)
@@ -376,6 +386,59 @@ export default function create(deps) {
       [ctx, load]
     )
 
+    // **有効にするのは記録だけ。** 導入は「エージェントを反映」で行うので、そう言う。
+    // 無効にするとき、プロファイルが既にあれば、残すか消すかを先に聞く
+    // （記憶とセッションは戻せない）。まだ入っていなければ、聞くことが無い。
+    const toggleRole = useCallback(
+      async (role, enabled) => {
+        setError('')
+        setNotice('')
+        try {
+          if (!enabled && role.installed) {
+            setDisabling({ name: role.name, impact: await call(ctx, `/roles/${role.name}/removal`) })
+            return
+          }
+          await call(ctx, '/roles/enabled', { method: 'POST', body: { name: role.name, enabled } })
+          setNotice(
+            enabled
+              ? `${role.name} を有効にしました。「エージェントを反映」で導入されます。`
+              : `${role.name} を無効にしました`
+          )
+          await load()
+        } catch (e) {
+          setError(e.message)
+        }
+      },
+      [ctx, load]
+    )
+
+    const doDisable = useCallback(
+      async (name, keepProfile) => {
+        setError('')
+        try {
+          const res = await call(ctx, '/roles/enabled', {
+            method: 'POST',
+            body: { name, enabled: false, removeProfile: !keepProfile },
+            timeoutMs: 60000
+          })
+          setDisabling(null)
+          if (res.ok) {
+            setNotice(
+              keepProfile
+                ? `${name} を無効にしました（プロファイルは残し、担当に選ばれないようにしています）`
+                : `${name} を無効にし、プロファイルを削除しました`
+            )
+          } else {
+            setError((res.lines || []).filter((l) => l.startsWith('✗')).join(' ') || '一部に失敗しました')
+          }
+          await load()
+        } catch (e) {
+          setError(e.message)
+        }
+      },
+      [ctx, load]
+    )
+
     // **キットへ取り込む PR を出す。** この環境で作った役は git に入らないので、
   // 共有しないと機械が飛べば消える。取り込まれたらこの環境のコピーは消すこと
   // ——残すと配布物より優先され続け、以後の更新が効かない。
@@ -419,7 +482,8 @@ export default function create(deps) {
       }
     }, [ctx])
 
-    const installed = roles.filter((r) => r.installed).length
+    const enabledRoles = roles.filter((r) => r.enabled)
+    const installed = enabledRoles.filter((r) => r.installed).length
 
     return jsxs('div', {
       className: 'mx-auto flex h-full w-full max-w-3xl flex-col gap-6 overflow-y-auto p-6',
@@ -436,7 +500,7 @@ export default function create(deps) {
                   children:
                     roles.length === 0
                       ? '読み込み中…'
-                      : `エージェント ${installed} / ${roles.length}　接続情報 ${
+                      : `エージェント ${installed} / ${enabledRoles.length}　接続情報 ${
                           secrets.filter((s) => s.configured).length
                         } / ${secrets.length}`
                 })
@@ -528,13 +592,31 @@ export default function create(deps) {
               className: 'pb-1 text-xs font-medium opacity-60',
               children: 'エージェント'
             }),
+            jsx('div', {
+              className: 'pb-1 text-xs opacity-60',
+              children: 'チェックを外したエージェントは導入・更新しません。'
+            }),
             ...roles.map((r) =>
               jsxs('div', {
                 className: 'flex items-center gap-3 py-2',
       style: { borderBottom: BORDER },
                 children: [
+                  // **入れるかどうか。** 外せない役（窓口と詰まりを解く役）は触らせない。
+                  jsx('input', {
+                    type: 'checkbox',
+                    checked: !!r.enabled,
+                    disabled: busy || r.essential,
+                    title: r.essential
+                      ? 'チームの仕組みが前提にしているため、外せません'
+                      : r.enabled
+                        ? '無効にする'
+                        : '有効にする',
+                    onChange: (e) => toggleRole(r, e.target.checked),
+                    className: 'shrink-0 disabled:opacity-40'
+                  }),
                   jsxs('div', {
                     className: 'min-w-0 flex-1',
+                    style: r.enabled ? null : { opacity: 0.5 },
                     children: [
                       jsxs('div', {
                         className: 'flex items-center gap-2 text-sm',
@@ -558,7 +640,7 @@ export default function create(deps) {
                     ]
                   }),
                   // **共有はこの環境の役だけ。** 配布物は既に入っている。
-                  r.ownSecrets?.length
+                  r.enabled && r.ownSecrets?.length
                     ? jsxs('button', {
                         type: 'button',
                         onClick: () => setOwnOf(r),
@@ -593,9 +675,15 @@ export default function create(deps) {
                       })
                     : null,
                   jsx('span', {
-                    className: 'shrink-0 text-xs ' + (r.installed ? MUTED : ''),
-                    style: r.installed ? null : { color: WARN },
-                    children: r.installed ? '導入済み' : '未導入'
+                    className: 'shrink-0 text-xs ' + (r.installed || !r.enabled ? MUTED : ''),
+                    style: r.installed || !r.enabled ? null : { color: WARN },
+                    children: !r.enabled
+                      ? r.installed
+                        ? '無効（プロファイルは残置）'
+                        : '無効'
+                      : r.installed
+                        ? '導入済み'
+                        : '未導入'
                   })
                 ]
               }, r.name)
@@ -639,6 +727,20 @@ export default function create(deps) {
               secrets: (roles.find((x) => x.name === ownOf.name) || ownOf).ownSecrets || [],
               onEdit: setEditing,
               onClose: () => setOwnOf(null)
+            })
+          : null,
+
+        disabling
+          ? jsx(RemoveDialog, {
+              role: disabling.name,
+              impact: disabling.impact,
+              onRemove: doDisable,
+              onClose: () => setDisabling(null),
+              title: `${disabling.name} を無効にする`,
+              lead:
+                '以後の反映・接続情報の配布・検証から外します。プロファイルを残す場合は、カードの担当に選ばれないよう説明文を書き換えます。',
+              actionLabel: '無効にする',
+              workingLabel: '無効にしています…'
             })
           : null,
 

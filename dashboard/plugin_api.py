@@ -43,13 +43,20 @@ def _source() -> Dict[str, str]:
 
 @router.get("/roles")
 def list_roles() -> List[Dict]:
-    """役の一覧。導入済みかどうかと、人が読む一行説明を返す。"""
+    """役の一覧。導入済みかどうかと、人が読む一行説明を返す。
+
+    **無効にした役も返す。** 画面で入れ直せないと、一度外した役が戻せない。
+    """
     out: List[Dict] = []
-    for name in roles.names():
+    enabled = set(roles.names())
+    for name in roles.all_names():
         out.append(
             {
                 "name": name,
                 "installed": profile_dir(name).is_dir(),
+                # 反映の対象か。`essential` は外せない（板の仕組みが前提にしている）
+                "enabled": name in enabled,
+                "essential": roles.essential(name),
                 "summary": roles.summary(name),
                 # **その役だけの鍵。** 共通の一覧に混ぜると、窓口の数だけ行が増えて
                 # 読めなくなる（実際にそうなった）。役の行から開く。
@@ -317,8 +324,9 @@ def removal_impact(name: str) -> Dict:
     """
     import worker as worker_mod
 
-    if roles.origin(name) != "local":
-        raise HTTPException(status_code=400, detail="配布されたエージェントはここから削除できません")
+    # **読むだけなので、配られた役にも答える。** 無効にするときも同じ確認を出す。
+    if name not in roles.all_names():
+        raise HTTPException(status_code=404, detail=f"そのエージェントはありません: {name}")
     pdir = profile_dir(name)
     memories = len(list((pdir / "memories").glob("*"))) if (pdir / "memories").is_dir() else 0
     sessions = len(list((pdir / "sessions").glob("*"))) if (pdir / "sessions").is_dir() else 0
@@ -329,6 +337,32 @@ def removal_impact(name: str) -> Dict:
         "memories": memories,
         "sessions": sessions,
     }
+
+
+class EnableIn(BaseModel):
+    name: str
+    enabled: bool
+    # 無効にするときだけ見る。**既定は残す**（記憶とセッションは戻せない）。
+    removeProfile: bool = False
+
+
+@router.post("/roles/enabled")
+def set_role_enabled(body: EnableIn) -> Dict:
+    """役を入れる／外す。
+
+    **有効にするのは記録だけ**で、導入は「エージェントを反映」で行う。
+    無効にすると、以後の反映・鍵の配布・検証から外れる。
+    """
+    import selection
+
+    try:
+        if body.enabled:
+            result = kit.enable_role(body.name)
+        else:
+            result = kit.disable_role(body.name, remove_profile=body.removeProfile)
+    except selection.SelectionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": result.ok(), "lines": result.lines}
 
 
 class RemoveIn(BaseModel):
@@ -358,8 +392,8 @@ def remove_role(body: RemoveIn) -> Dict:
 def run_update(body: Optional[UpdateIn] = None) -> Dict:
     """生成 → 全役へ反映 → 説明文 → 鍵。画面の「更新」が呼ぶ唯一の実行口。
 
-    **役は選ばせない。** 8役はチームとして設計されていて、欠けると成立しない
-    （fixer が居ないと詰まりが解けない、operator が居ないと窓口が無い）。
+    **反映の対象は、有効にしてある役だけ。** 選ぶのはこの呼び出しではなく、
+    役の行のスイッチ（/roles/enabled）で先に済ませておく。
     """
     result = kit.update(force_config=bool(body and body.forceConfig))
     return {"ok": result.ok(), "lines": result.lines}
