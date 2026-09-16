@@ -128,6 +128,35 @@ def test_doctor_finds_stolen_slack_bot():
     assert rep.failures == 0, rep.lines
 
 
+def test_doctor_finds_missing_slack_scope():
+    """窓口の Slack App に files:write が無ければ、doctor が欠けた権限と起きることを言う。"""
+    import doctor
+
+    reset()
+    (HOME / "profiles" / "operator" / ".env").write_text("SLACK_BOT_TOKEN=xoxb-scope\n", encoding="utf-8")
+    real = doctor._slack_granted_scopes
+    try:
+        doctor._slack_granted_scopes = lambda _t: set(doctor.SLACK_SCOPES) - {"files:write"}
+        rep = doctor.Report()
+        doctor._slack_scopes(rep)
+        assert rep.failures == 1, rep.lines
+        assert any("files:write" in line and "返せない" in line for line in rep.lines), rep.lines
+        assert "xoxb-scope" not in "\n".join(rep.lines), "値を出してしまった"
+
+        doctor._slack_granted_scopes = lambda _t: set(doctor.SLACK_SCOPES)
+        rep = doctor.Report()
+        doctor._slack_scopes(rep)
+        assert rep.failures == 0, rep.lines
+
+        # 確かめられないときは失敗にしない（オフラインで doctor が赤くならない）
+        doctor._slack_granted_scopes = lambda _t: None
+        rep = doctor.Report()
+        doctor._slack_scopes(rep)
+        assert rep.failures == 0, rep.lines
+    finally:
+        doctor._slack_granted_scopes = real
+
+
 if __name__ == "__main__":
     run_tests(globals())
     finish()

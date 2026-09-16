@@ -238,6 +238,65 @@ def _profiles(rep: Report) -> None:
                 rep.ng("terminal が無効 → archive/unlink できない")
 
 
+# **窓口が使う権限と、欠けたときに起きること。** Slack は欠けていても接続を拒まない。
+# 返事は届くのに、その操作のときだけ `missing_scope` で黙って失敗する
+# （files:write が無く、画像を返せなかった）。
+SLACK_SCOPES = {
+    "chat:write": "返事を書けない",
+    "app_mentions:read": "チャンネルでメンションしても反応しない",
+    "im:history": "DM が届かない",
+    "files:read": "添付されたファイルを読めない",
+    "files:write": "画像やファイルを返せない",
+}
+
+
+def _slack_granted_scopes(token: str) -> Optional[set]:
+    """トークンに付いている権限。**`auth.test` の応答ヘッダ（x-oauth-scopes）が持っている。**"""
+    import json
+    import urllib.request
+
+    req = urllib.request.Request("https://slack.com/api/auth.test", data=b"", method="POST",
+                                 headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            header = r.headers.get("x-oauth-scopes")
+            body = json.loads(r.read() or b"{}")
+    except Exception:  # noqa: BLE001
+        return None
+    if not body.get("ok") or header is None:
+        return None
+    return {s.strip() for s in header.split(",") if s.strip()}
+
+
+def _slack_scopes(rep: Report) -> None:
+    """**窓口の Slack App に、要る権限が付いているか。**
+
+    App を古い手順で作ったり、後から権限を足さなかったりすると欠ける。
+    足したら App を再インストールする（トークンは変わらない）。
+    """
+    import env as env_mod
+
+    rep.section("Slack App の権限")
+    holders = [(name, env_mod.read_env(profile_dir(name) / ".env").get("SLACK_BOT_TOKEN"))
+               for name in roles.names()]
+    holders = [(name, token) for name, token in holders if token]
+    if not holders:
+        rep.note("Slack に繋ぐ窓口が無い")
+        return
+    for name, token in holders:
+        granted = _slack_granted_scopes(token)
+        if granted is None:
+            rep.note(f"{name}: 権限を確かめられなかった（トークンが無効か、Slack に届かない）")
+            continue
+        missing = [s for s in SLACK_SCOPES if s not in granted]
+        if not missing:
+            rep.ok(f"{name}: 要る権限が揃っている")
+            continue
+        for scope in missing:
+            rep.ng(f"{name}: {scope} が無い（{SLACK_SCOPES[scope]}）")
+        rep.lines.append("    Slack App の OAuth & Permissions → Bot Token Scopes に足し、App を再インストールする")
+
+
 def _env_hint(rep: Report) -> None:
     """実測した環境が各役に載っているか。
 
@@ -293,6 +352,8 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     _orphan_secrets(rep)
     _profiles(rep)
     _slack_token_holders(rep)
+    if deep:
+        _slack_scopes(rep)
     _env_hint(rep)
     _assignees(rep)
 
