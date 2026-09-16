@@ -764,7 +764,7 @@ export default function create(deps) {
           ? jsxs('section', {
               className: 'flex flex-col',
               children: [
-                jsx('div', { className: 'pb-1 text-xs font-medium opacity-60', children: 'この PC' }),
+                jsx('div', { className: 'pb-1 text-xs font-medium opacity-60', children: 'ツール' }),
                 ...machine.tools
                   .filter((t) => t.neededBy.length || t.installed)
                   .map((t) =>
@@ -795,7 +795,7 @@ export default function create(deps) {
                             style: t.missing ? { color: WARN } : null,
                             children: !t.missing
                               ? t.installed
-                                ? '使えます'
+                                ? '導入済み'
                                 : '今は不要'
                               : machine.provisioner
                                 ? t.installed
