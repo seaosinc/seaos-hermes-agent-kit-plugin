@@ -22,11 +22,15 @@ Slack の管理画面で App を作れる権限が必要です（無ければワ
 1. [api.slack.com/apps](https://api.slack.com/apps) を開き、**Create New App** → **From an app manifest** を選ぶ
 2. ワークスペースを選び、手順 1 でコピーしたマニフェストを貼り付けて作成する
 3. **Install App**（または **OAuth & Permissions**）でワークスペースにインストールする
-4. 表示された **Bot User OAuth Token**（`xoxb-…`）をコピーしておく
-5. **Basic Information → App-Level Tokens** で **Generate Token and Scopes** を押し、
-   スコープに **`connections:write`** を付けて作成する。表示された `xapp-…` をコピーしておく
+4. 表示された **Bot User OAuth Token**（`xoxb-…`）をコピーしておく。これが `SLACK_BOT_TOKEN` です
+5. **App トークンを作る。** マニフェストでは作れないので、画面から作ります
+   1. 左メニューの **Settings → Basic Information** を開き、下の **App-Level Tokens** まで進む
+   2. **Generate Token and Scopes** を押す
+   3. **Token Name** に名前を入れる（何でもよい。例: `socket`）
+   4. **Add Scope** で **`connections:write`** を選び、**Generate** を押す
+   5. 表示された `xapp-…` をコピーしておく。これが `SLACK_APP_TOKEN` です
 
-`xapp-…` は画面からしか作れません。忘れずに作ってください。
+ユーザートークン（User OAuth Token、`xoxp-…`）は使いません。
 
 ## 3. operator に鍵を入れる
 

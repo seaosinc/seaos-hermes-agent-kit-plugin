@@ -204,6 +204,10 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
 
 `seaos-kit doctor` の「Slack App の権限」で、足りない権限を確かめられます。
 
+**App トークン（`xapp-…`）はマニフェストでは作れません。** App を作ったあと、
+**Settings → Basic Information → App-Level Tokens** で、スコープ **`connections:write`** を付けて作ってください
+（名前は何でもかまいません。例: `socket`）。手順は [Slack とつなぐ](docs/slack.md) の手順 2 にあります。
+
 Slack を使わない場合は、Hermes Desktop で **operator** を選んで話しかけてください。
 
 ## 8. 確かめる
