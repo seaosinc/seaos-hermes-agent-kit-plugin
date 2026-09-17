@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const ID = 'seaos-hermes-agent-kit-plugin'  // plugin.yaml / dashboard/manifest.json と同じ名前
 const ACCENT = '#0B6E6E'
 const DANGER = '#B4413C'
+const WARN = '#B4761F'
 // **エラーの文言は選択・コピーできるようにする。** アプリ全体で選択が止められていて、
 // 画面に出た原因を貼ることすらできなかった。
 const SELECTABLE = { userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }
@@ -62,27 +63,32 @@ const DEPS = { jsx, jsxs, useCallback, useEffect, useRef, useState, host }
  */
 function Host({ ctx }) {
   const [Page, setPage] = useState(null)
-  const [error, setError] = useState('')
+  // { message, detail, warn }。warn は「待てば直ることが多い」ものを警告色で出す印
+  const [error, setError] = useState(null)
 
   const fetchUi = useCallback(async () => {
-    setError('')
+    setError(null)
     let res
     try {
       res = await ctx.rest('/ui.js')
     } catch (e) {
-      // **理由をそのまま出す。** 何が起きても同じ案内を出していたので、
-      // 原因（無効・読み込み失敗・認証）の見当が付かなかった。
+      // **起動・更新の直後は、たいてい待てば直る。** バックエンドがプラグインを読み込み終わる前に
+      // 開くとここに来る。赤で「接続できません」と出すと致命的に見えたので、警告色で待ち方を案内し、
+      // 理由（無効・読み込み失敗など）は詳細として添える。
       const detail = e?.detail || e?.message || String(e)
-      setError(
-        `画面のバックエンドに接続できません（${detail}）。` +
-          'ターミナルで `hermes plugins enable seaos-hermes-agent-kit-plugin` を実行して、Hermes を再起動してください。' +
-          'それでも出る場合は、Hermes のログ（logs/agent.log）に seaos-hermes-agent-kit-plugin の読み込みエラーが出ています。'
-      )
+      setError({
+        warn: true,
+        message:
+          '画面の準備ができていません。Hermes を起動・更新した直後は、読み込みに少し時間がかかります。' +
+          '数秒待ってから「再読み込み」を押してください。' +
+          '何度押しても変わらないときは、画面左下からゲートウェイを再起動してください。',
+        detail
+      })
       return
     }
     const source = res?.source
     if (!source) {
-      setError('画面の内容が空でした')
+      setError({ message: '画面の内容が空でした', detail: '' })
       return
     }
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))
@@ -95,7 +101,7 @@ function Host({ ctx }) {
       const built = mod.default({ ...DEPS, ctx, reloadUi: fetchUi })
       setPage(() => built)
     } catch (e) {
-      setError(`画面を読み込めません（${e?.message || e}）`)
+      setError({ message: '画面を読み込めません', detail: String(e?.message || e) })
     } finally {
       URL.revokeObjectURL(url)
     }
@@ -106,14 +112,21 @@ function Host({ ctx }) {
   }, [fetchUi])
 
   if (error) {
+    const color = error.warn ? WARN : DANGER
+    const full = error.detail ? `${error.message}\n詳細: ${error.detail}` : error.message
     return jsxs('div', {
       className: 'mx-auto flex max-w-3xl flex-col gap-3 p-6',
       children: [
         jsx('div', { className: 'text-lg font-medium', children: 'SEAOS' }),
-        jsx('div', {
+        jsxs('div', {
           className: 'select-text break-all rounded px-3 py-2 text-xs',
-          style: { border: `1px solid ${DANGER}`, color: DANGER, ...SELECTABLE },
-          children: error
+          style: { border: `1px solid ${color}`, color, ...SELECTABLE },
+          children: [
+            jsx('div', { children: error.message }),
+            error.detail
+              ? jsx('div', { className: 'mt-1 opacity-70', style: SELECTABLE, children: `詳細: ${error.detail}` })
+              : null
+          ]
         }),
         jsxs('div', {
           className: 'flex gap-2',
@@ -127,10 +140,10 @@ function Host({ ctx }) {
             }),
             jsx('button', {
               type: 'button',
-              onClick: () => copyText(error),
+              onClick: () => copyText(full),
               className: 'rounded px-3 py-1.5 text-xs',
-              style: { background: 'transparent', color: 'inherit', border: `1px solid ${DANGER}` },
-              children: 'エラーをコピー'
+              style: { background: 'transparent', color: 'inherit', border: `1px solid ${color}` },
+              children: '詳細をコピー'
             })
           ]
         })
