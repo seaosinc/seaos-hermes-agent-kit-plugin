@@ -143,6 +143,36 @@ def _current_description(name: str) -> str:
     return " ".join(str(doc.get("description") or "").split())
 
 
+def retarget_source(dist: Path, name: str) -> bool:
+    """役が覚えている取得元を、**いまの配布物の場所へ付け替える。** 付け替えたら True。
+
+    `profile update` は、導入したときの取得元（`distribution.yaml` の `source`）から取り直す。
+    キットのフォルダが移ると（プラグインの名前をリポジトリ名に揃えたとき
+    `plugins/seaos-hermes-agent-kit` → `plugins/seaos-hermes-agent-kit-plugin`）、
+    **消えた場所を見て全役が更新できなくなった。**
+    `install --force` でも付け替わるが、config.yaml を配布物で上書きしてしまうので、
+    取得元の1行だけを直して、設定を残す update に任せる。
+    """
+    path = profile_dir(name) / "distribution.yaml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    want = str(dist.resolve())
+    lines = text.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if not line.startswith("source:"):
+            continue
+        current = line.split(":", 1)[1].strip().strip("'\"")
+        if current == want or Path(current).exists():
+            # 取得元がまだ実在するなら、利用者が意図して別の場所から入れたもの。触らない
+            return False
+        lines[i] = f"source: {want}\n"
+        path.write_text("".join(lines), encoding="utf-8")
+        return True
+    return False
+
+
 def _installed_matches(dist: Path, name: str) -> bool:
     """**配るものが、入っているものと同じか。** 同じなら profile update を飛ばす。
 
@@ -296,6 +326,8 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
                            else f"{name} を入れ直せませんでした")
             result.failures += 0 if code == 0 else 1
             continue
+        if retarget_source(dist, name):
+            notable.append(f"{name} の取得元を、いまのキットの場所へ付け替えました")
         if not force_config and _installed_matches(dist, name):
             unchanged += 1
             continue

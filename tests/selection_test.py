@@ -136,6 +136,27 @@ def test_every_enabled_role_is_wired_to_mem0():
     assert not (profile_dir("avatar") / "mem0.json").exists(), "無効にした役に鍵が残っている"
 
 
+def test_update_retargets_a_vanished_source():
+    """キットのフォルダが移ったら、役が覚えている取得元を付け替える。実在する取得元は触らない。"""
+    from paths import profile_dir
+
+    reset()
+    d = profile_dir("fixer")
+    d.mkdir(parents=True, exist_ok=True)
+    dist = HOME / "plugins" / "seaos-hermes-agent-kit-plugin" / "dist" / "fixer"
+    dist.mkdir(parents=True, exist_ok=True)
+    gone = HOME / "plugins" / "seaos-hermes-agent-kit" / "dist" / "fixer"
+    (d / "distribution.yaml").write_text(f"name: fixer\nsource: {gone}\nversion: 1\n", encoding="utf-8")
+    assert kit.retarget_source(dist, "fixer")
+    assert f"source: {dist.resolve()}\n" in (d / "distribution.yaml").read_text(encoding="utf-8")
+    assert "name: fixer" in (d / "distribution.yaml").read_text(encoding="utf-8"), "他の行を壊した"
+
+    elsewhere = HOME / "my-own-dist"
+    elsewhere.mkdir(exist_ok=True)
+    (d / "distribution.yaml").write_text(f"name: fixer\nsource: {elsewhere}\n", encoding="utf-8")
+    assert not kit.retarget_source(dist, "fixer"), "利用者が意図して入れた取得元を付け替えた"
+
+
 if __name__ == "__main__":
     run_tests(globals())
     finish()
