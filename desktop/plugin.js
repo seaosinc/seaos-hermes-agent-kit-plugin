@@ -26,6 +26,31 @@ const DANGER = '#B4413C'
 // 画面に出た原因を貼ることすらできなかった。
 const SELECTABLE = { userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }
 
+/** クリップボードへ入れる。**API が使えない環境でも入るようにする**（古い方法で予備を持つ）。 */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // 権限などで落ちたら、下の方法で入れる
+  }
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    area.remove()
+    return ok
+  } catch {
+    return false
+  }
+}
+
 /** ui.js へ渡す道具。**あちらは import を書けない**ので、ここで揃えて渡す。 */
 const DEPS = { jsx, jsxs, useCallback, useEffect, useRef, useState, host }
 
@@ -102,7 +127,7 @@ function Host({ ctx }) {
             }),
             jsx('button', {
               type: 'button',
-              onClick: () => navigator.clipboard?.writeText(error),
+              onClick: () => copyText(error),
               className: 'rounded px-3 py-1.5 text-xs',
               style: { background: 'transparent', color: 'inherit', border: `1px solid ${DANGER}` },
               children: 'エラーをコピー'
