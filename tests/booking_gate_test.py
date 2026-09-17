@@ -10,7 +10,8 @@ Slack への問い合わせは差し替える（ネットワークにも鍵に�
   * そのチャンネルの正式なメンバーだけが、1人ずつの枠に展開される
     （ボット・Slack のゲストアカウント・社外の人は入らない）
   * 展開された枠は、**そのチャンネルでの発言にだけ**効く（DM や他のチャンネルでは通さない）
-  * メンバーを取れないときは、少しのあいだ前回の一覧を使い、古ければ許可を出さない
+  * メンバーは決めた間隔でだけ取り直す（毎分の同期のたびには取りに行かない）
+  * 取り直しに失敗したら、少しのあいだ前回の一覧を使い、古ければ許可を出さない
   * 人の名前をチャンネル ID と取り違えない
 """
 
@@ -144,18 +145,45 @@ def test_gate_skips_outside_the_channel():
     assert result and result.get("action") == "skip", result
 
 
+def _age_member_cache(seconds: float) -> None:
+    cache = bs.load_identity_cache()
+    cache["_channels"][CHANNEL]["at"] = time.time() - seconds
+    bs.write_atomic(bs.IDENTITY_CACHE_PATH, json.dumps(cache))
+
+
+def test_members_are_refetched_only_after_the_interval():
+    """同期のたびには取りに行かない。間隔を過ぎたら取り直し、出入りが反映される。"""
+    reset()
+    grant_channel()
+    calls = []
+    members = [MEMBER]
+
+    def fetch(token, channel_id):
+        calls.append(channel_id)
+        return list(members)
+
+    bs.slack_channel_members = fetch
+    table()
+    table()
+    assert len(calls) == 1, f"間隔の前に取り直した: {len(calls)} 回"
+
+    members.clear()  # 抜けた
+    _age_member_cache(bs.CHANNEL_MEMBERS_REFRESH_SEC + 1)
+    assert table()["slots"] == [], "間隔を過ぎても、抜けた人が残っている"
+    assert len(calls) == 2
+
+
 def test_member_list_failure_uses_recent_then_closes():
-    """取れないときは前回の一覧を少しだけ使い、古ければ許可を出さない。"""
+    """取り直しに失敗したら前回の一覧を少しだけ使い、古ければ許可を出さない。"""
     reset()
     grant_channel()
     assert {s["slack_user_id"] for s in table()["slots"]} == {MEMBER}
 
     bs.slack_channel_members = lambda token, channel_id: None
-    assert {s["slack_user_id"] for s in table()["slots"]} == {MEMBER}, "一瞬の失敗で全員を締め出した"
+    _age_member_cache(bs.CHANNEL_MEMBERS_REFRESH_SEC + 1)
+    assert {s["slack_user_id"] for s in table()["slots"]} == {MEMBER}, "一時的な失敗で全員を締め出した"
 
-    cache = bs.load_identity_cache()
-    cache["_channels"][CHANNEL]["at"] = time.time() - bs.CHANNEL_MEMBERS_TTL_SEC - 1
-    bs.write_atomic(bs.IDENTITY_CACHE_PATH, json.dumps(cache))
+    _age_member_cache(bs.CHANNEL_MEMBERS_TTL_SEC + 1)
     assert table()["slots"] == [], "古い一覧のまま許可を出し続けた"
 
 

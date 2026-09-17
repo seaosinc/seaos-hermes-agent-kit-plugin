@@ -52,10 +52,16 @@ AUDIT_PATH = GATE_HOME / "audit.log"  # 追記専用。誰がいつ入ったか�
 IDENTITY_CACHE_PATH = GATE_HOME / "identity-cache.json"
 
 IDENTITY_TTL_SEC = 24 * 3600
-# チャンネルのメンバーを取れなかったとき、前回取れた一覧を何秒まで使うか。
-# Slack が一瞬落ちただけで、チャンネルの全員を締め出さないため。これを過ぎたら
+# チャンネルのメンバーを Slack へ取りに行く間隔。**同期そのものは1分ごと**
+# （期限切れや許可表の鮮度はそちらで見る）で、メンバーだけをこの間隔で取り直す。
+# メンバーの出入りはそう頻繁ではなく、毎分取るのは Slack への問い合わせの無駄。
+# そのぶん、チャンネルに入った人が話せるようになるまで、抜けた人が通らなくなるまで、
+# 最大でこの時間かかる（許可を出した直後は、その場で取る）。
+CHANNEL_MEMBERS_REFRESH_SEC = 8 * 3600
+# 取り直しに失敗したとき、前回の一覧をいつまで使うか（取った時刻から）。
+# Slack が一時的に落ちただけで全員を締め出さないため。これを過ぎたら
 # そのチャンネルの許可は出さない（fail-closed）。
-CHANNEL_MEMBERS_TTL_SEC = 600
+CHANNEL_MEMBERS_TTL_SEC = CHANNEL_MEMBERS_REFRESH_SEC + 3600
 SOURCE_TAG = "booking-gate"  # pairing の承認レコードに付ける印。これが無いものは触らない
 
 # カードが「まだ生きている」状態。これ以外（done / archived）になったら許可も終わる
@@ -415,15 +421,19 @@ def slack_channel_members(token: str, channel_id: str) -> list[str] | None:
 def channel_members(cfg: dict, channel_id: str, cache: dict) -> set[str] | None:
     """許可を出すチャンネルのメンバー（正式なメンバーだけ）。
 
-    取れなかったときは、**前回取れた一覧を少しのあいだだけ使う**
-    （CHANNEL_MEMBERS_TTL_SEC）。それも古ければ None（＝このチャンネルは通さない）。
+    **取り直すのは CHANNEL_MEMBERS_REFRESH_SEC ごと。** それまでは前回の一覧を使う。
+    取り直しに失敗したときは、取った時刻から CHANNEL_MEMBERS_TTL_SEC までは前回の
+    一覧を使い、それも古ければ None（＝このチャンネルは通さない）。
     """
     channels = cache.setdefault("_channels", {})
+    hit = channels.get(channel_id)
+    age = time.time() - hit.get("at", 0) if isinstance(hit, dict) else None
+    if age is not None and age < CHANNEL_MEMBERS_REFRESH_SEC:
+        return set(hit.get("members") or [])
     token = read_env_file(profile_home(cfg["profile"]) / ".env").get("SLACK_BOT_TOKEN", "")
     raw = slack_channel_members(token, channel_id) if token else None
     if raw is None:
-        hit = channels.get(channel_id)
-        if isinstance(hit, dict) and time.time() - hit.get("at", 0) < CHANNEL_MEMBERS_TTL_SEC:
+        if age is not None and age < CHANNEL_MEMBERS_TTL_SEC:
             return set(hit.get("members") or [])
         return None
     people = _eligible_people(token, cache, set(raw))
