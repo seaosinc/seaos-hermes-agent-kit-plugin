@@ -392,12 +392,13 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
             raise WorkerError(f"{name} は配布物として入っている（共有済み）")
         raise WorkerError(f"この環境に無い: {name}")
 
-    for tool in ("git", "gh"):
-        if not shutil.which(tool):
-            raise WorkerError(f"{tool} が見つからない（PR を出すのに要る）")
+    if git_bin() == "git" and not shutil.which("git"):
+        raise WorkerError("git が見つからない（PR を出すのに要る）")
+    if not shutil.which("gh"):
+        raise WorkerError("gh が見つからない（PR を出すのに要る）")
 
     code, origin = hermes.run(["--version"])  # noqa: F841  （hermes の有無は無関係）
-    proc = subprocess.run(["git", "-C", str(kit_root()), "remote", "get-url", "origin"],
+    proc = subprocess.run([git_bin(), "-C", str(kit_root()), "remote", "get-url", "origin"],
                           capture_output=True, text=True, stdin=subprocess.DEVNULL)
     if proc.returncode != 0 or not proc.stdout.strip():
         raise WorkerError("キットのリモートが分からない（git から入れていない）")
@@ -407,7 +408,7 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
     root = kit_root()
 
     def kit_git(*args: str) -> subprocess.CompletedProcess:
-        return subprocess.run(["git", "-C", str(root), *args],
+        return subprocess.run([git_bin(), "-C", str(root), *args],
                               capture_output=True, text=True, stdin=subprocess.DEVNULL)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -425,7 +426,7 @@ def share(name: str, *, log: Optional[Callable[[str], None]] = None) -> Dict:
         shutil.copytree(d, dest, ignore=shutil.ignore_patterns("__pycache__"))
 
         def git(*args: str) -> subprocess.CompletedProcess:
-            return subprocess.run(["git", "-C", str(work), *args],
+            return subprocess.run([git_bin(), "-C", str(work), *args],
                                   capture_output=True, text=True, stdin=subprocess.DEVNULL)
 
         git("switch", "-c", branch)

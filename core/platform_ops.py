@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import shutil
 import signal
 import subprocess
@@ -289,7 +290,12 @@ def _interpreter() -> str:
     venv = hermes_home() / "hermes-agent" / "venv" / "bin" / "python"
     if os_kind() == "win32":
         venv = hermes_home() / "hermes-agent" / "venv" / "Scripts" / "python.exe"
-    return str(venv) if venv.is_file() else ("python" if os_kind() == "win32" else "python3")
+    if venv.is_file():
+        return str(venv)
+    # **見つからなければ、いま動いている Python を使う。** キットは Hermes の Python で
+    # 起動されるので、ホームの場所が想定と違っても（Windows で C:\hermes など）これが正しい。
+    # PATH の python に落とすと、yaml も無い別の Python を掴む。
+    return sys.executable or ("python" if os_kind() == "win32" else "python3")
 
 
 def link_command(log: Optional[Log] = None) -> Path:

@@ -29,7 +29,7 @@ sys.path.insert(0, str(_REPO / "core"))
 import env as env_mod  # noqa: E402
 import kit  # noqa: E402
 import roles  # noqa: E402
-from paths import env_file, kit_root, os_kind, profile_dir  # noqa: E402
+from paths import env_file, git_bin, kit_root, os_kind, profile_dir  # noqa: E402
 
 router = APIRouter()
 
@@ -102,8 +102,13 @@ def _git_revision() -> str:
     root = _REPO
     if not (root / ".git").is_dir():
         return ""
-    proc = subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
-                          capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    # **読み込み時に呼ばれる。ここで例外を出すと API がまるごと載らない**
+    # （Windows で git が PATH に無く、画面が開けなくなった）。版は無くても動く。
+    try:
+        proc = subprocess.run([git_bin(), "-C", str(root), "rev-parse", "--short", "HEAD"],
+                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return ""
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
@@ -124,10 +129,13 @@ def _version() -> Dict:
     root = _REPO
     if not (root / ".git").is_dir():
         return {"revision": "", "date": ""}
-    proc = subprocess.run(
-        ["git", "-C", str(root), "log", "-1", "--format=%h\t%cd", "--date=format:%m/%d %H:%M"],
-        capture_output=True, text=True, stdin=subprocess.DEVNULL,
-    )
+    try:
+        proc = subprocess.run(
+            [git_bin(), "-C", str(root), "log", "-1", "--format=%h\t%cd", "--date=format:%m/%d %H:%M"],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {"revision": "", "date": ""}
     if proc.returncode != 0:
         return {"revision": "", "date": ""}
     parts = (proc.stdout.strip().split("\t") + ["", ""])[:2]
@@ -153,10 +161,13 @@ def self_update() -> Dict:
     root = _REPO
     if not (root / ".git").is_dir():
         raise HTTPException(status_code=400, detail="git から導入していないため、更新できません")
-    proc = subprocess.run(
-        ["git", "-C", str(root), "pull", "--ff-only"],
-        capture_output=True, text=True, stdin=subprocess.DEVNULL,
-    )
+    try:
+        proc = subprocess.run(
+            [git_bin(), "-C", str(root), "pull", "--ff-only"],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HTTPException(status_code=500, detail=f"git を実行できません: {exc}")
     out = (proc.stdout or "") + (proc.stderr or "")
     if proc.returncode != 0:
         raise HTTPException(status_code=500, detail=out.strip()[:400])

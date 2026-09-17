@@ -37,6 +37,26 @@ SMART = os.environ.get("MODEL_SMART", "openai/gpt-6-astra")
 # ROLES で明示的に指定した役だけが引く（いまは senior-developer のみ）。
 SENIOR = os.environ.get("MODEL_SENIOR", "anthropic/claude-opus-5")
 INTERVAL = int(os.environ.get("DISPATCH_INTERVAL", "15"))
+def _home() -> Path:
+    """Hermes のホーム。core/paths.py と同じ規則（単体でも読めるように、読めなければ自前で決める）。"""
+    try:
+        from paths import hermes_home
+
+        return hermes_home()
+    except ImportError:
+        home = Path(os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes"))
+        return home.parent.parent if home.parent.name == "profiles" else home
+
+
+def _git() -> str:
+    try:
+        from paths import git_bin
+
+        return git_bin()
+    except ImportError:
+        return "git"
+
+
 def _version() -> str:
     """配布物の版。**git から採る。**
 
@@ -55,9 +75,9 @@ def _version() -> str:
         return override
     root = Path(__file__).resolve().parent.parent
     try:
-        count = subprocess.run(["git", "-C", str(root), "rev-list", "--count", "HEAD"],
+        count = subprocess.run([_git(), "-C", str(root), "rev-list", "--count", "HEAD"],
                                capture_output=True, text=True, stdin=subprocess.DEVNULL)
-        sha = subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],
+        sha = subprocess.run([_git(), "-C", str(root), "rev-parse", "--short", "HEAD"],
                              capture_output=True, text=True, stdin=subprocess.DEVNULL)
         if count.returncode == 0 and sha.returncode == 0:
             return f"0.1.{count.stdout.strip()}+{sha.stdout.strip()}"
@@ -86,14 +106,14 @@ OPENCODE_PROVIDER = os.environ.get("OPENCODE_PROVIDER", "openrouter")
 # kanban_complete の artifacts がホスト側で解決できる（kanban_db.py:5647 は
 # Path().resolve() でホストを見るため、箱の中のパスでは通らない）。
 ARTIFACTS_ROOT = os.environ.get(
-    "WORKSPACE_ARTIFACTS_ROOT", str(Path.home() / ".hermes/kanban/workspaces"))
+    "WORKSPACE_ARTIFACTS_ROOT", str(_home() / "kanban" / "workspaces"))
 # **受け取ったファイルの置き場と、板の添付。** どちらも箱の中から読めないと、
 # Slack で渡された資料を実装役が開けない。**読み取り専用・左右同じパス**で渡す
 # ——本文に書かれたホストのパスが、箱の中でもそのまま通る（core/files.py）。
 FILES_ROOT = os.environ.get(
-    "WORKSPACE_FILES_ROOT", str(Path.home() / ".hermes/kanban/files"))
+    "WORKSPACE_FILES_ROOT", str(_home() / "kanban" / "files"))
 ATTACHMENTS_ROOT = os.environ.get(
-    "WORKSPACE_ATTACHMENTS_ROOT", str(Path.home() / ".hermes/kanban/attachments"))
+    "WORKSPACE_ATTACHMENTS_ROOT", str(_home() / "kanban" / "attachments"))
 
 
 def box_path(host: str) -> str:
@@ -337,10 +357,7 @@ def local_workers_root() -> Path:
 
     定期実行は HERMES_HOME がプロファイルの中を指すので、そのときは2つ上を採る。
     """
-    home = Path(os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes"))
-    if home.parent.name == "profiles":
-        home = home.parent.parent
-    return home / "seaos-kit" / "workers"
+    return _home() / "seaos-kit" / "workers"
 
 
 def worker_dirs(kit: Path) -> list[Path]:

@@ -41,9 +41,14 @@ function Host({ ctx }) {
     let res
     try {
       res = await ctx.rest('/ui.js')
-    } catch {
+    } catch (e) {
+      // **理由をそのまま出す。** 何が起きても同じ案内を出していたので、
+      // 原因（無効・読み込み失敗・認証）の見当が付かなかった。
+      const detail = e?.detail || e?.message || String(e)
       setError(
-        '画面を読み込めません。スキルとツール → プラグインで Python 側を有効にしてください。'
+        `画面のバックエンドに接続できません（${detail}）。` +
+          'ターミナルで `hermes plugins enable seaos-hermes-agent-kit` を実行して、Hermes を再起動してください。' +
+          'それでも出る場合は、Hermes のログ（logs/agent.log）に seaos-hermes-agent-kit の読み込みエラーが出ています。'
       )
       return
     }

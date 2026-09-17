@@ -53,7 +53,7 @@ def _uv_run() -> list[str] | None:
     `uv tool run` は `uvx` と同じ動き。
     """
     name = "uv.exe" if os.name == "nt" else "uv"
-    for base in (hermes_home(), Path.home() / ".hermes"):
+    for base in dict.fromkeys((hermes_home(), Path.home() / ".hermes")):
         uv = base / "bin" / name
         if uv.is_file() and os.access(uv, os.X_OK):
             return [str(uv), "tool", "run", "--from", MARKITDOWN_SPEC, "markitdown"]
@@ -93,7 +93,9 @@ def files_root() -> Path:
     指していることがあり、そこから決めると置き場が役ごとに割れる。
     """
     override = os.environ.get("WORKSPACE_FILES_ROOT")
-    return Path(override) if override else Path.home() / ".hermes" / "kanban" / "files"
+    # hermes_home() はプロファイルの中を指す HERMES_HOME から2つ上を採るので、役ごとに割れない。
+    # ~/.hermes と決め打ちしないのは、Windows では Hermes のホームが別の場所にあるため。
+    return Path(override) if override else hermes_home() / "kanban" / "files"
 
 
 def _is_received(path: Path) -> bool:

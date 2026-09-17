@@ -15,16 +15,19 @@ from typing import Callable, Optional, Tuple
 
 import doctor as doctor_mod
 import kit
-from paths import kit_root
+from paths import git_bin, kit_root
 
 Log = Callable[[str], None]
 
 
 def _git(*args: str) -> Tuple[int, str]:
-    proc = subprocess.run(
-        ["git", "-C", str(kit_root()), *args],
-        capture_output=True, text=True, stdin=subprocess.DEVNULL,
-    )
+    try:
+        proc = subprocess.run(
+            [git_bin(), "-C", str(kit_root()), *args],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 1, f"git を実行できません: {exc}"
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
