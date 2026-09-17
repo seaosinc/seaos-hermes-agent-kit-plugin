@@ -52,16 +52,15 @@ AUDIT_PATH = GATE_HOME / "audit.log"  # 追記専用。誰がいつ入ったか�
 IDENTITY_CACHE_PATH = GATE_HOME / "identity-cache.json"
 
 IDENTITY_TTL_SEC = 24 * 3600
-# チャンネルのメンバーを Slack へ取りに行く間隔。**同期そのものは1分ごと**
-# （期限切れや許可表の鮮度はそちらで見る）で、メンバーだけをこの間隔で取り直す。
-# メンバーの出入りはそう頻繁ではなく、毎分取るのは Slack への問い合わせの無駄。
-# そのぶん、チャンネルに入った人が話せるようになるまで、抜けた人が通らなくなるまで、
-# 最大でこの時間かかる（許可を出した直後は、その場で取る）。
-CHANNEL_MEMBERS_REFRESH_SEC = 8 * 3600
+# チャンネルのメンバーを Slack へ取りに行く間隔。**同期（1分ごと）のたびに取る。**
+# LLM は通らず、Slack の API を1チャンネル1回呼ぶだけなので、間を空ける理由が無い。
+# 抜けた人が1分以内に通らなくなるほうが大事。60 秒ちょうどにすると、同期の起動が
+# 数秒ずれただけで1回おきにしか取らなくなるので、少し短くしてある。
+CHANNEL_MEMBERS_REFRESH_SEC = 50
 # 取り直しに失敗したとき、前回の一覧をいつまで使うか（取った時刻から）。
 # Slack が一時的に落ちただけで全員を締め出さないため。これを過ぎたら
 # そのチャンネルの許可は出さない（fail-closed）。
-CHANNEL_MEMBERS_TTL_SEC = CHANNEL_MEMBERS_REFRESH_SEC + 3600
+CHANNEL_MEMBERS_TTL_SEC = 600
 SOURCE_TAG = "booking-gate"  # pairing の承認レコードに付ける印。これが無いものは触らない
 
 # カードが「まだ生きている」状態。これ以外（done / archived）になったら許可も終わる

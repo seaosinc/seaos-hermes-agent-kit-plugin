@@ -346,7 +346,7 @@ def cmd_add(args) -> int:
         print("✓ アクセス許可を出した")
         print("  " + describe(grant, now))
         if channel_id:
-            print("  このチャンネルのメンバーが、このチャンネルの中でだけ話せる（メンバーは8時間ごとに取り直す）")
+            print("  このチャンネルのメンバーが、このチャンネルの中でだけ話せる（メンバーは1分ごとに取り直す）")
         if end is None and not task_id:
             print("  ! 無期限。外すときは seaos-kit guest rm " + key)
     return 0
