@@ -122,6 +122,28 @@ def test_api_shows_only_plain_values():
     assert "xoxb-hidden" not in everything and "sk-hidden" not in everything, "鍵の値を画面へ返している"
 
 
+def test_owner_can_always_talk():
+    """オーナーは、話しかけてよい人に入れ忘れても、operator に配る一覧へ足される。"""
+    reset()
+    allowed = roles.env_key("operator", "SLACK_ALLOWED_USERS")
+    owner = roles.env_key("operator", "SLACK_OWNER_ID")
+
+    env_mod.set_value(allowed, "U0AAA,U0BBB")
+    env_mod.set_value(owner, "U0OWNER")
+    env_mod.apply()
+    assert profile_env("operator").get("SLACK_ALLOWED_USERS") == "U0AAA,U0BBB,U0OWNER"
+
+    # すでに入っていれば二重にしない
+    env_mod.set_value(allowed, "U0OWNER,U0AAA")
+    env_mod.apply()
+    assert profile_env("operator").get("SLACK_ALLOWED_USERS") == "U0OWNER,U0AAA"
+
+    # 一覧が空でも、オーナーだけは話せる
+    env_mod.drop_value(allowed)
+    env_mod.apply()
+    assert profile_env("operator").get("SLACK_ALLOWED_USERS") == "U0OWNER"
+
+
 def test_shared_not_required_when_all_overridden():
     import plugin_api as api
 

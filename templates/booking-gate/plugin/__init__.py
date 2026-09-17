@@ -98,7 +98,8 @@ def _env_allowlist() -> set[str]:
     見えないことがある（gateway/authz_mixin.py の _platform_gate_env と同じ理由）。
     """
     out: set[str] = set()
-    for name in ("SLACK_ALLOWED_USERS", "GATEWAY_ALLOWED_USERS"):
+    # オーナーは、話しかけてよい人に入れ忘れていても通す
+    for name in ("SLACK_ALLOWED_USERS", "GATEWAY_ALLOWED_USERS", "SLACK_OWNER_ID"):
         raw = ""
         try:
             from agent.secret_scope import get_secret

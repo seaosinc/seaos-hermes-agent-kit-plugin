@@ -221,11 +221,32 @@ def env_value(name: str, var: str, source: Dict[str, str]) -> str:
     - 上書きできる（override）: 役つきの名前に値があればそれ、無ければ共通
     - それ以外: 共通だけ
     """
+    if var == "SLACK_ALLOWED_USERS":
+        return _allowed_with_owner(name, source)
+    return _raw_env_value(name, var, source)
+
+
+def _raw_env_value(name: str, var: str, source: Dict[str, str]) -> str:
     if var in own_env_vars(name):
         return source.get(env_key(name, var), "")
     if var in override_env_vars(name):
         return source.get(env_key(name, var), "") or source.get(var, "")
     return source.get(var, "")
+
+
+def _allowed_with_owner(name: str, source: Dict[str, str]) -> str:
+    """話しかけてよい人に、**オーナーを必ず含める。**
+
+    オーナー（SLACK_OWNER_ID）は判断を仰ぐ相手なのに、SLACK_ALLOWED_USERS に入れ忘れると
+    Slack の入口で弾かれて、オーナー本人が話しかけられなかった。配るときに足す
+    （Hermes 本体の Slack もゲートも、同じ一覧を見る）。
+    """
+    allowed = [u.strip() for u in _raw_env_value(name, "SLACK_ALLOWED_USERS", source).split(",") if u.strip()]
+    declared = {var for var, _req, _desc in env_requirements(name)}
+    owner = _raw_env_value(name, "SLACK_OWNER_ID", source).strip() if "SLACK_OWNER_ID" in declared else ""
+    if owner and owner not in allowed:
+        allowed.append(owner)
+    return ",".join(allowed)
 
 
 def managed_env_vars() -> List[str]:

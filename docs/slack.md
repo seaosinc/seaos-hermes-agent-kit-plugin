@@ -40,7 +40,7 @@ SEAOS 画面の **operator の行の「設定」** を押し、次の値を入�
 |---|---|---|
 | `SLACK_BOT_TOKEN` | 手順 2-4 の `xoxb-…` | 必須 |
 | `SLACK_APP_TOKEN` | 手順 2-5 の `xapp-…` | 必須 |
-| `SLACK_ALLOWED_USERS` | 話しかけてよい人の **メンバー ID**（複数ならカンマ区切り） | 必須。**空だと誰も話しかけられません** |
+| `SLACK_ALLOWED_USERS` | 話しかけてよい人の **メンバー ID**（複数ならカンマ区切り） | 任意。`SLACK_OWNER_ID` の人は、ここに入れなくても話せます。**両方とも空だと誰も話しかけられません** |
 | `SLACK_OWNER_ID` | 判断を仰ぐ相手（ふつうは自分）のメンバー ID | 任意 |
 | `SLACK_HOME_CHANNEL` | 既定の投稿先のチャンネル ID | 任意 |
 
