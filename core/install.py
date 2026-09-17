@@ -109,8 +109,8 @@ def install(*, log: Optional[Log] = None) -> Result:
     if not missing:
         say("足りない道具はありません")
     for r in missing:
-        if r["installed"] and r.get("startCommand"):
-            say(f"! {r['label']} が止まっています。起動してください: {r['startCommand']}")
+        if r["installed"] and r.get("startHint"):
+            say(f"! {r['label']} が起動していません。{r['startHint']}")
         elif r.get("installCommand"):
             say(f"! {r['label']} が入っていません。入れてください: {r['installCommand']}")
             if r.get("note"):

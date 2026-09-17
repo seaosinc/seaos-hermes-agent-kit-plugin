@@ -47,7 +47,7 @@ class Tool:
     commands: List[str]                     # どれか1つが見つかれば「入っている」
     install: Dict[str, List[str]]           # OS -> コマンド
     after: List[str] = field(default_factory=list)   # 入れたあとにやること（seaos-kit の下位コマンド）
-    start: Dict[str, str] = field(default_factory=dict)  # OS -> 入っているが止まっているときに起こすコマンド
+    start: Dict[str, str] = field(default_factory=dict)  # OS -> 入っているが止まっているときの、起こし方の案内（文章）
     note: str = ""                                   # 入れる人への一言
 
 
@@ -63,9 +63,10 @@ CATALOG: Dict[str, Tool] = {
                       "--accept-source-agreements", "--accept-package-agreements"],
         },
         after=["machine start docker", "workspace build", "mem0 up"],
+        # **コマンドではなく文章で案内する。** exe のパスを並べても、何をすればいいのか伝わらなかった。
         start={
-            "darwin": "open -a Docker",
-            "win32": '& "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"',
+            "darwin": "Docker Desktop を起動してください（アプリケーションフォルダから開けます）",
+            "win32": "Docker Desktop を起動してください（スタートメニューから開けます）",
         },
         note="入れたあと Docker Desktop を一度起動し、利用規約に同意してください",
     ),
@@ -159,7 +160,7 @@ def status() -> List[Dict]:
             "neededBy": needed_by(tool.name),
             "installable": os_kind() in tool.install,
             "installCommand": " ".join(tool.install.get(os_kind(), [])),
-            "startCommand": tool.start.get(os_kind(), ""),
+            "startHint": tool.start.get(os_kind(), ""),
             "note": tool.note,
         }
         if tool.name == "docker":

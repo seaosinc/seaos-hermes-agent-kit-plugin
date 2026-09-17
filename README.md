@@ -110,7 +110,20 @@ Slack から話しかけるには、Slack App を作り、operator の行の「�
 手順が長いので別のページにまとめました。→ [Slack とつなぐ](docs/slack.md)
 
 App は次のマニフェストから作ります（[api.slack.com/apps](https://api.slack.com/apps) の
-**Create New App → From an app manifest** に貼り付け）。名前と説明は自由に変えてください。
+**Create New App → From an app manifest** に貼り付け）。
+
+**変えてよいのは、次の表の項目だけです。** それ以外（権限やイベントの一覧など）は変えないでください。
+変えると、話しかけても届かない、ファイルを返せない、といった動かない箇所が出ます。
+
+| マニフェストの項目 | 例 | Slack 上でどこに出るか | 決まり |
+|---|---|---|---|
+| `display_information` → `name` | `SEAOS` | **アプリの名前。** サイドバーの「アプリ」、アプリのプロフィール、インストール画面、Slack App の管理画面に出ます | 35文字まで。日本語も使えます |
+| `display_information` → `description` | `チームのエージェントへの窓口` | アプリのプロフィールに出る、短い説明 | 140文字まで |
+| `features` → `bot_user` → `display_name` | `seaos` | **ボットの名前。** チャンネルで `@seaos` と**メンションするときの名前**で、ボットが投稿したメッセージの送り主としても出ます | 80文字まで。**半角の英小文字・数字・`-`・`_`・`.` だけ**（大文字・空白・日本語は使えません） |
+| `features` → `assistant_view` → `assistant_description` | `チームのエージェントに頼みごとができます` | Slack の AI アシスタントの画面で、このアプリを開いたときに出る説明 | |
+
+例えば、アプリの名前を「FAQ エージェント」、メンションを `@faq-agent` にしたいなら、
+`display_information` の `name` を `FAQ エージェント`、`bot_user` の `display_name` を `faq-agent` にします。
 
 <details>
 <summary>Slack App のマニフェスト</summary>
@@ -132,7 +145,7 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
       "messages_tab_read_only_enabled": false
     },
     "bot_user": {
-      "display_name": "SEAOS",
+      "display_name": "seaos",
       "always_online": true
     },
     "assistant_view": {

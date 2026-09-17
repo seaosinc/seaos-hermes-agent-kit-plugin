@@ -98,8 +98,10 @@ def test_status_shows_how_to_install_or_start():
     """足りない道具には、この OS での入れ方（Docker は起こし方も）を持たせる。"""
     rows = {r["name"]: r for r in machine.status()}
     for name in ("docker", "node"):
-        assert "installCommand" in rows[name] and "startCommand" in rows[name], rows[name]
+        assert "installCommand" in rows[name] and "startHint" in rows[name], rows[name]
     assert machine.CATALOG["docker"].start, "Docker の起こし方が無い"
+    for hint in machine.CATALOG["docker"].start.values():
+        assert "Docker Desktop" in hint and ":\\" not in hint, "起こし方をパスで出している"
 
 
 if __name__ == "__main__":

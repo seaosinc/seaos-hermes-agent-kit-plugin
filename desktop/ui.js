@@ -839,8 +839,11 @@ export default function create(deps) {
                             className: 'min-w-0 flex-1',
                             children: [
                               jsx('div', { className: 'text-sm', children: t.label }),
-                              t.missing && t.installed && t.startCommand
-                                ? jsx(CommandCopy, { command: t.startCommand })
+                              t.missing && t.installed && t.startHint
+                                ? jsx('div', {
+                                    className: 'mt-1 text-xs opacity-80',
+                                    children: `${t.startHint}${t.note ? `。初めて起動するときは、利用規約への同意が必要です` : ''}`
+                                  })
                                 : null,
                               t.missing && !t.installed && t.installCommand
                                 ? jsx(CommandCopy, { command: t.installCommand })
@@ -858,7 +861,7 @@ export default function create(deps) {
                                 ? '導入済み'
                                 : '今は不要'
                               : t.installed
-                                ? '停止中'
+                                ? '起動していません'
                                 : '未導入'
                           })
                         ]
