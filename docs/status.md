@@ -36,10 +36,10 @@
 
 ```
 hermes plugins install file:///Users/t-adachi/Hermes/kit.git
-hermes plugins enable seaos-hermes-agent-kit
+hermes plugins enable seaos-hermes-agent-kit-plugin
 ```
 
-`~/.hermes/plugins/seaos-hermes-agent-kit/` に **1フォルダで全部**入る。
+`~/.hermes/plugins/seaos-hermes-agent-kit-plugin/` に **1フォルダで全部**入る。
 
 ## 分かったこと（踏んだもの）
 

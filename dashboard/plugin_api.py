@@ -1,6 +1,6 @@
 """Agent Kit — バックエンド。
 
-`/api/plugins/seaos-hermes-agent-kit/` にマウントされる。
+`/api/plugins/seaos-hermes-agent-kit-plugin/` にマウントされる。
 
 **この層は薄い。** すべてのハンドラは `core/` の関数を呼ぶだけで、判断も分岐も
 持たない。CLI（`core/cli.py`）と GUI がまったく同じ関数を通るので、片方を直したら

@@ -86,6 +86,23 @@ def test_plugin_is_enabled():
     assert "booking-gate" in ((c.get("plugins") or {}).get("enabled") or []), "有効になっていない"
 
 
+def test_plugin_name_matches_repository_name():
+    """プラグインの名前は、リポジトリ名・画面のマニフェスト・画面の皮で同じ。
+
+    `hermes plugins install <GitHub の URL>` はリポジトリ名でフォルダを作り、有効もその名前で
+    記録する。画面のバックエンドを通すかは manifest の名前で判定するので、ずれると
+    README どおりに入れた環境で「Plugin not found」になる。
+    """
+    import json
+    import re
+
+    want = "seaos-hermes-agent-kit-plugin"
+    plugin = yaml.safe_load((ROOT / "plugin.yaml").read_text(encoding="utf-8"))["name"]
+    manifest = json.loads((ROOT / "dashboard/manifest.json").read_text(encoding="utf-8"))["name"]
+    shell = re.search(r"const ID = '([^']+)'", (ROOT / "desktop/plugin.js").read_text(encoding="utf-8")).group(1)
+    assert plugin == manifest == shell == want, (plugin, manifest, shell)
+
+
 def test_runtime_floor_on_every_role():
     """カードの上限を直すプラグインは、カードを作れる全役に載って有効になっている。"""
     for d in sorted(x for x in OUT.iterdir() if (x / "config.yaml").exists()):

@@ -12,7 +12,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-PLUGIN_ID = "seaos-hermes-agent-kit"
+PLUGIN_ID = "seaos-hermes-agent-kit-plugin"
+# 名前をリポジトリ名に揃える前に入れた環境は、フォルダがこの名前のまま残っている
+LEGACY_PLUGIN_IDS = ("seaos-hermes-agent-kit",)
 
 # `hermes` の実体。cron の PATH は痩せているので、見つからなければ定番の置き場。
 HERMES = os.environ.get("HERMES_BIN") or shutil.which("hermes") \
@@ -38,9 +40,10 @@ def kit_root() -> Path | None:
     そこと既定の `~/.hermes` の両方を見る。
     """
     for base in (hermes_home(), Path.home() / ".hermes"):
-        root = base / "plugins" / PLUGIN_ID
-        if (root / "core" / "cli.py").is_file():
-            return root
+        for name in (PLUGIN_ID, *LEGACY_PLUGIN_IDS):
+            root = base / "plugins" / name
+            if (root / "core" / "cli.py").is_file():
+                return root
     return None
 
 

@@ -5,7 +5,11 @@
 # （plugins_cmd.py の _SUPPORTED_MANIFEST_VERSION）が 1 までしか受け付けない。**
 # v2 を宣言すると install の時点で弾かれる。入口に合わせること。
 manifest_version: 1
-name: seaos-hermes-agent-kit
+# **名前はリポジトリ名と同じにする。** `hermes plugins install <GitHub の URL>` はリポジトリ名で
+# フォルダを作り、`plugins enable` はフォルダ名で有効を記録する。一方、設定画面の
+# バックエンドを通すかどうかは、ここ（と dashboard/manifest.json）の名前で判定する。
+# ずれていると、README どおりに入れた環境で画面が「Plugin not found」になった。
+name: seaos-hermes-agent-kit-plugin
 version: 0.0.0
 description: SEAOS のエージェント役一式を、GUI から導入・更新・検査するキット
 author: seaos

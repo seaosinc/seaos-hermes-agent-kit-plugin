@@ -1,5 +1,5 @@
 {
-  "name": "seaos-hermes-agent-kit",
+  "name": "seaos-hermes-agent-kit-plugin",
   "label": "SEAOS",
   "description": "SEAOS のエージェント役一式を導入・更新・検査する",
   "icon": "Users",

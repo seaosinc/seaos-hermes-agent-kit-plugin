@@ -61,7 +61,7 @@
 | `seaos-kit uninstall` | このキットがコマンドや共有の記憶として置いたものを外します。エージェントは残ります |
 | `seaos-kit uninstall --profiles` | エージェントも（記憶ごと）消します。**戻せません** |
 
-プラグインそのものを消すには、そのあとで `hermes plugins remove seaos-hermes-agent-kit` を実行します。
+プラグインそのものを消すには、そのあとで `hermes plugins remove seaos-hermes-agent-kit-plugin` を実行します。
 
 ---
 

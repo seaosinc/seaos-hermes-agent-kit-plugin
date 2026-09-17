@@ -19,7 +19,7 @@ import { ROUTES_AREA, SIDEBAR_NAV_AREA, PALETTE_AREA, host } from '@hermes/plugi
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-const ID = 'seaos-hermes-agent-kit'
+const ID = 'seaos-hermes-agent-kit-plugin'  // plugin.yaml / dashboard/manifest.json と同じ名前
 const ACCENT = '#0B6E6E'
 const DANGER = '#B4413C'
 
@@ -47,8 +47,8 @@ function Host({ ctx }) {
       const detail = e?.detail || e?.message || String(e)
       setError(
         `画面のバックエンドに接続できません（${detail}）。` +
-          'ターミナルで `hermes plugins enable seaos-hermes-agent-kit` を実行して、Hermes を再起動してください。' +
-          'それでも出る場合は、Hermes のログ（logs/agent.log）に seaos-hermes-agent-kit の読み込みエラーが出ています。'
+          'ターミナルで `hermes plugins enable seaos-hermes-agent-kit-plugin` を実行して、Hermes を再起動してください。' +
+          'それでも出る場合は、Hermes のログ（logs/agent.log）に seaos-hermes-agent-kit-plugin の読み込みエラーが出ています。'
       )
       return
     }

@@ -41,7 +41,7 @@ export default function create(deps) {
       if (/404|not found|ECONNREFUSED|failed to fetch/i.test(detail)) {
         throw new Error(
           `バックエンドに接続できません（${detail}）。` +
-            'ターミナルで `hermes plugins enable seaos-hermes-agent-kit` を実行して、Hermes を再起動してください。'
+            'ターミナルで `hermes plugins enable seaos-hermes-agent-kit-plugin` を実行して、Hermes を再起動してください。'
         )
       }
       throw new Error(detail)
