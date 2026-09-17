@@ -157,6 +157,46 @@ def test_update_retargets_a_vanished_source():
     assert not kit.retarget_source(dist, "fixer"), "利用者が意図して入れた取得元を付け替えた"
 
 
+def test_update_retires_removed_role_and_cron():
+    """廃止した役（キットが配ったもの）と定期実行を外す。利用者が自分で作った同名の役には触らない。"""
+    import hermes
+    from paths import profile_dir
+
+    reset()
+    d = profile_dir("provisioner")
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "distribution.yaml").write_text("name: provisioner\nauthor: seaos-hermes-agent-collab-kit\n", encoding="utf-8")
+    listing = ("  aaaaaaaaaaaa [active]\n    Name:      booking-sync\n"
+               "  eacea6d3d309 [active]\n    Name:      machine-guard\n    Schedule:  17 * * * *\n")
+    calls = []
+
+    def fake_run(args):
+        calls.append(args)
+        if args[-2:] == ["cron", "list"]:
+            return 0, listing
+        if args[:2] == ["profile", "delete"]:
+            import shutil
+            shutil.rmtree(profile_dir(args[2]))
+        return 0, ""
+
+    real = hermes.run
+    hermes.run = fake_run
+    try:
+        res = kit.retire()
+        assert ["profile", "delete", "provisioner", "-y"] in calls, calls
+        assert any(c[-3:] == ["cron", "remove", "eacea6d3d309"] for c in calls), calls
+        assert not any(c[-1:] == ["aaaaaaaaaaaa"] for c in calls), "残す定期実行まで外した"
+        assert res.failures == 0, res.lines
+
+        calls.clear()
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "distribution.yaml").write_text("name: provisioner\nauthor: someone-else\n", encoding="utf-8")
+        kit.retire()
+        assert not any(c[:2] == ["profile", "delete"] for c in calls), "利用者が作った同名の役を消した"
+    finally:
+        hermes.run = real
+
+
 if __name__ == "__main__":
     run_tests(globals())
     finish()

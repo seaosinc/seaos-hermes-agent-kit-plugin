@@ -17,7 +17,7 @@
 | `core/worker.py` | 業務別ワーカーの CRUD と共有（PR） |
 | `core/workspace.py` | 作業部屋（CA / build / warm / verify / gc / shell） |
 | `core/files.py` | 受け取ったファイルの置き場（Office / PDF の変換を含む） |
-| `core/machine.py` | この PC の道具の台帳と導入（provisioner の手） |
+| `core/machine.py` | この PC の道具の台帳と、OS ごとの入れ方・起こし方 |
 | `core/mem0.py` | 共有記憶（起動・接続・切り離し） |
 | `core/booking.py` | アクセスゲートの検証とゲスト操作 |
 | `core/hotl.py` | HOTL 設定の検証 |
@@ -224,25 +224,23 @@ AWS の箱（Ubuntu）でキットを動かす想定のため。このリポジ�
   （`templates/shared/mcp/files.yaml`）。見えるのは置き場と板の添付だけで、書く道具は載せない
 - 箱のマウントは config.yaml にあるので、**既存の環境では `update --force-config` が要る**
 
-## この PC の道具は provisioner が揃える
+## この PC の道具は人が入れる（provisioner は廃止）
 
 Hermes もキットも持ってこない道具がある。無くても導入は通り、**使う最初のカードで落ちる。**
 
-| 道具 | 要る役 | 自動で揃えるか |
-|---|---|---|
-| Docker | 箱を持つ役（developer / senior-developer）、共有記憶（operator） | する（入れる → 起こす → 作業部屋を建てる） |
-| Node.js | `npx` で起動する MCP を持つ役（handler） | する |
-| uv | 変換（files） | 要らない。Hermes が `~/.hermes/bin/uv` を持っている |
+| 道具 | 要る役 |
+|---|---|
+| Docker | 箱を持つ役（developer / senior-developer）、共有記憶 |
+| Node.js | `npx` で起動する MCP を持つ役（handler） |
+| uv | 要らない。Hermes が `~/.hermes/bin/uv` を持っている |
 
-- **台帳は `core/machine.py` の `CATALOG`。** `seaos-kit machine install` は台帳に無い名前を断る。
-  provisioner は Slack 由来のカードで動くので、任意のパッケージを入れる口にしない
-- **人が意識しなくても動く。** `seaos-kit install` の最後と、operator の定期実行
-  `machine-guard`（毎時）が、足りない道具ごとに provisioner へカードを立てる。
-  開いているカードがあれば立てず、閉じたあとも足りなければ週が変わってから立て直す
-- **管理者の承認だけは人が押す**（macOS のパスワード、Windows の UAC、Docker の利用規約）。
-  `install` が終了コード 3 を返したら、provisioner は needs_input で止まり、何をどこで押すかを書く
-- 設定画面の「ツール」に状態が出る。provisioner を外しているときだけ、入れるコマンドを見せる
-- 既存の環境では `seaos-kit install`（冪等）で machine-guard が登録され、その場で確認が走る
+- **台帳は `core/machine.py` の `CATALOG`。** OS ごとの入れ方（`install`）と、Docker の起こし方（`start`）を持つ
+- 設定画面の「ツール」と `seaos-kit install` の出力に、足りないものの**コマンドを出すだけ**。入れるのは人
+- **以前は provisioner（役）と operator の定期実行 `machine-guard`（毎時）が自動で入れていた。**
+  入れるのはコマンド1本で済み、管理者の承認（macOS のパスワード、Windows の UAC、Docker の利用規約）は
+  どのみち人にしか押せず、カード→承認待ち→Slack で知らせる、という遠回りにしかならなかったので廃止した
+- 入っている環境からは、`seaos-kit update` が `kit.retire` で provisioner のプロファイルと
+  `machine-guard` の定期実行を外す（配置表の `RETIRED_ROLES` / `RETIRED_CRONS`）
 
 ## 変えていない前提
 

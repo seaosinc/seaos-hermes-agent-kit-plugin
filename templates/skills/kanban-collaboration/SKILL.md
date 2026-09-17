@@ -25,9 +25,6 @@ SOUL に差し込まれている共通ブロックにある。ここはボード
 <!-- if-role: broker -->
 | `broker` | 外部エージェントとの連絡係。ローカル CLI もリモート A2A も |
 <!-- end-if-role -->
-<!-- if-role: provisioner -->
-| `provisioner` | **この PC に道具を入れる**（Docker、Node.js など。台帳にあるものだけ） |
-<!-- end-if-role -->
 | 業務別ワーカー | 実務。役ごとに責任が違う。`hermes profile list` の説明文で分かる |
 <!-- if-role: recruiter -->
 | `recruiter` | **エージェントそのものを作る**業務別ワーカー |

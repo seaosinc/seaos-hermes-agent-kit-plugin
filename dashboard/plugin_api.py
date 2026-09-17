@@ -303,14 +303,10 @@ def validate() -> Dict:
 
 @router.get("/machine")
 def machine_status() -> Dict:
-    """この PC の道具。**足りないものは provisioner が揃える**ので、画面は見せるだけ。"""
+    """この PC の道具。足りないものは、OS ごとの入れ方（起こし方）を画面に出す。入れるのは人。"""
     import machine
 
-    return {
-        "tools": machine.status(),
-        # provisioner を外していると誰も揃えない。そのときだけ入れ方を見せる
-        "provisioner": "provisioner" in roles.names(),
-    }
+    return {"tools": machine.status()}
 
 
 @router.get("/status")

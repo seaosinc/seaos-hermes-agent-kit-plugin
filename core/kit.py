@@ -262,6 +262,53 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
     return result
 
 
+def retire(log: Optional[Log] = None) -> Result:
+    """**廃止した役と定期実行を、入っている環境から外す。**
+
+    配置表から消しただけでは、プロファイルは担当として選べるまま残り、定期実行は
+    消えたスクリプトを毎回呼び続ける。キットが配った役（distribution.yaml の author が
+    このキット）だけを消し、利用者が同じ名前で自分で作ったプロファイルには触らない。
+    """
+    import re
+
+    result = Result()
+    gen = roles.generator()
+    for name in getattr(gen, "RETIRED_ROLES", ()):
+        pdir = profile_dir(name)
+        try:
+            dist = yaml.safe_load((pdir / "distribution.yaml").read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            continue
+        if "seaos" not in str(dist.get("author", "")):
+            continue
+        code, _out = hermes.run(["profile", "delete", name, "-y"])
+        result.lines.append(f"廃止した {name} を外しました" if code == 0 and not pdir.exists()
+                            else f"廃止した {name} を外せませんでした（hermes profile delete {name}）")
+        result.failures += 0 if code == 0 and not pdir.exists() else 1
+
+    retired_crons = set(getattr(gen, "RETIRED_CRONS", ()))
+    if retired_crons:
+        import booking
+
+        profile = booking.gate_profile()
+        code, listing = hermes.run(["-p", profile, "cron", "list"])
+        if code == 0:
+            job = None
+            for line in listing.splitlines():
+                m = re.match(r"^\s*([0-9a-f]{8,})\s*(\[|$)", line)
+                if m:
+                    job = m.group(1)
+                    continue
+                n = re.match(r"^\s*Name:\s*(\S+)", line)
+                if n and job and n.group(1) in retired_crons:
+                    rc, _o = hermes.run(["-p", profile, "cron", "remove", job])
+                    result.lines.append(f"廃止した定期実行 {n.group(1)} を外しました" if rc == 0
+                                        else f"廃止した定期実行 {n.group(1)} を外せませんでした")
+                    result.failures += 0 if rc == 0 else 1
+                    job = None
+    return result
+
+
 def enable_plugins() -> Result:
     """配布物で有効にしたプラグインを、**実際の設定でも有効にする。**
 
@@ -371,6 +418,10 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     import mem0
 
     mem0.rewire(log=result.lines.append)
+
+    retired = retire()
+    result.lines.extend(retired.lines)
+    result.failures += retired.failures
 
     enabled = enable_plugins()
     result.lines.extend(enabled.lines)

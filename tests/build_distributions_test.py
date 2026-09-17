@@ -617,14 +617,13 @@ def test_roles_that_write_spellings_can_look_them_up():
 
     窓口（operator）と連絡係（broker）は綴りを書かないので対象外。
     画面を触る役（avatar）も、書くのは座標とキー入力なので対象外。
-    道具を揃える役（provisioner）も、叩くのは台帳の決まったコマンドだけなので対象外。
     """
     specs = dict(bd.ROLES)
     specs.update(bd.worker_roles(ROOT))
     for name, spec in specs.items():
         cfg = bd.build_config(ROOT, name, spec)
         servers = cfg.get("mcp_servers") or {}
-        if name in ("operator", "broker", "provisioner") or spec.get("computer_use"):
+        if name in ("operator", "broker") or spec.get("computer_use"):
             continue
         assert "context7" in servers, f"{name} が綴りを引けない"
         assert servers["context7"].get("url"), f"{name}/context7 に url が無い"

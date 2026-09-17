@@ -19,7 +19,7 @@ Slack（または Hermes Desktop）で窓口のエージェントに頼むと、
 | OpenRouter の API キー | 必須 | エージェントが使う AI モデルの鍵です。[openrouter.ai/keys](https://openrouter.ai/keys) で作れます |
 | Slack のワークスペース | 任意 | Slack から話しかけたいときだけ。Hermes Desktop だけでも使えます |
 
-Docker や Node.js などの道具は、**足りなければエージェントが自分で入れます**（途中で管理者の承認を求められることがあります）。
+Docker や Node.js などの道具は、足りなければ SEAOS 画面の **「ツール」** に、この PC で入れるためのコマンドが出ます（→ [ツールを揃える](docs/agents.md#ツールを揃える)）。
 
 ---
 
@@ -75,7 +75,6 @@ OpenRouter の API キーを貼り付けて保存します。
 | developer | 実装・検証・PR 作成。CI とレビュー指摘の解消まで | ○ |
 | senior-developer | 難度の高い実装。セキュリティと品質も見る | ○ |
 | handler | 外部サービスの読み書き（GitHub / Backlog ほか） | ○ |
-| provisioner | この PC に、チームが使う道具（Docker など）を揃える | ○ |
 | recruiter | エージェントそのものを新設・改修する | ○ |
 | broker | 外部エージェントとの連携 | ○ |
 | avatar | この PC の画面を操作する・スクショを撮る | ○ |

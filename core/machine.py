@@ -8,13 +8,11 @@
 無くても導入は通り、**最初にその道具を使うカードで初めて落ちる。** 設定画面にも
 出ないので、利用者からは「なぜか実装を頼むと失敗する」としか見えない。
 
-ここは**入れてよいものの台帳**でもある。provisioner はこの台帳にある道具しか
-入れない（`install` は台帳に無い名前を断る）。provisioner は Slack 経由の依頼で
-動くことがあり、**他人の文章に書かれた任意のパッケージを入れる口にしない**ため。
+ここは**入れてよいものの台帳**でもある（`install` は台帳に無い名前を断る）。
 
 入れ方は OS ごとの定番に寄せる（macOS は Homebrew、Windows は winget）。
-**管理者の承認が要るものは、人に押してもらうしかない**（macOS のパスワード、
-Windows の UAC）。そこは失敗として返し、provisioner がカードで人へ渡す。
+**入れるのは人である。** 設定画面の「ツール」に OS ごとのコマンドを出し、人がそれを実行する。
+管理者の承認（macOS のパスワード、Windows の UAC）は、どのみち人にしか押せない。
 """
 
 from __future__ import annotations
@@ -30,7 +28,7 @@ import roles
 from paths import os_kind
 
 # cron やゲートウェイから呼ばれると PATH が痩せている。**入っているのに「無い」と
-# 判定する**と、入れ直しのカードが立ち続けるので、定番の置き場も見る。
+# 判定する**と、画面が入れ直しを案内し続けるので、定番の置き場も見る。
 _EXTRA_DIRS = {
     "darwin": ["/opt/homebrew/bin", "/usr/local/bin",
                "/Applications/Docker.app/Contents/Resources/bin",
@@ -49,6 +47,8 @@ class Tool:
     commands: List[str]                     # どれか1つが見つかれば「入っている」
     install: Dict[str, List[str]]           # OS -> コマンド
     after: List[str] = field(default_factory=list)   # 入れたあとにやること（seaos-kit の下位コマンド）
+    start: Dict[str, str] = field(default_factory=dict)  # OS -> 入っているが止まっているときに起こすコマンド
+    note: str = ""                                   # 入れる人への一言
 
 
 CATALOG: Dict[str, Tool] = {
@@ -63,6 +63,11 @@ CATALOG: Dict[str, Tool] = {
                       "--accept-source-agreements", "--accept-package-agreements"],
         },
         after=["machine start docker", "workspace build", "mem0 up"],
+        start={
+            "darwin": "open -a Docker",
+            "win32": '& "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe"',
+        },
+        note="入れたあと Docker Desktop を一度起動し、利用規約に同意してください",
     ),
     "node": Tool(
         name="node",
@@ -115,7 +120,7 @@ def _docker_running() -> bool:
         return False
 
 
-# 役ではなく、全役が使う仕組み。画面と provisioner のカードに、役名と並べて出す。
+# 役ではなく、全役が使う仕組み。画面とコマンドの出力に、役名と並べて出す。
 SHARED_MEMORY = "共有の記憶（mem0）"
 
 
@@ -154,6 +159,8 @@ def status() -> List[Dict]:
             "neededBy": needed_by(tool.name),
             "installable": os_kind() in tool.install,
             "installCommand": " ".join(tool.install.get(os_kind(), [])),
+            "startCommand": tool.start.get(os_kind(), ""),
+            "note": tool.note,
         }
         if tool.name == "docker":
             row["running"] = _docker_running() if path else False

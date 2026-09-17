@@ -819,8 +819,8 @@ export default function create(deps) {
           ]
         }),
 
-        // この PC の道具。**揃えるのは provisioner** なので、ここは見せるだけにする。
-        // provisioner を外しているときだけ、人が入れるためのコマンドを出す。
+        // この PC の道具。**入れるのは人。** 足りなければ OS ごとのコマンドを出す
+        // （止まっているだけなら起こすコマンド）。入っていれば「導入済み」。
         machine?.tools?.some((t) => t.neededBy.length || t.installed)
           ? jsxs('section', {
               className: 'flex flex-col',
@@ -839,8 +839,14 @@ export default function create(deps) {
                             className: 'min-w-0 flex-1',
                             children: [
                               jsx('div', { className: 'text-sm', children: t.label }),
-                              t.missing && !machine.provisioner && t.installCommand
+                              t.missing && t.installed && t.startCommand
+                                ? jsx(CommandCopy, { command: t.startCommand })
+                                : null,
+                              t.missing && !t.installed && t.installCommand
                                 ? jsx(CommandCopy, { command: t.installCommand })
+                                : null,
+                              t.missing && !t.installed && t.note
+                                ? jsx('div', { className: 'mt-1 text-xs opacity-60', children: t.note })
                                 : null
                             ]
                           }),
@@ -851,13 +857,9 @@ export default function create(deps) {
                               ? t.installed
                                 ? '導入済み'
                                 : '今は不要'
-                              : machine.provisioner
-                                ? t.installed
-                                  ? '停止中（provisioner が起こします）'
-                                  : '未導入（provisioner が入れます）'
-                                : t.installed
-                                  ? '停止中'
-                                  : '未導入'
+                              : t.installed
+                                ? '停止中'
+                                : '未導入'
                           })
                         ]
                       },

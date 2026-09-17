@@ -190,8 +190,8 @@ Hermes Desktop を起動したときに Hermes 本体が Slack に繋がり、op
 コードを書くエージェントは Docker を使います。
 
 1. `seaos-kit machine check` で Docker が「✓」か確認する
-2. 「足りない」「止まっている」なら、provisioner が自動で直しに行きます。管理者の承認を求められたら応じてください
-3. provisioner を外している場合は、`seaos-kit machine install docker` → `seaos-kit machine start docker` → `seaos-kit install` の順に実行してください
+2. 「未導入」「停止中」なら、SEAOS 画面の「ツール」に出ているコマンドで入れる（起動する）。管理者の承認を求められたら応じてください
+3. 入れ終わったら `seaos-kit install` を実行して、作業部屋を用意してください
 4. 実装で GitHub を触るので、`GH_TOKEN` も入っているか確認してください
 
 ### Notion や Backlog を読めないと言われる

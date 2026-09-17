@@ -180,7 +180,7 @@ ROLES: dict[str, dict] = {
         "skills": ["kanban-collaboration", "guest-access"],
         "plugins": ["booking-gate"],
         "hooks": ["mem0-up"],
-        "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard", "machine-guard",
+        "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard",
                  "container-guard",
                  "kit-sync", "kit-maintain"],
         "env": [
@@ -248,29 +248,6 @@ ROLES: dict[str, dict] = {
         "describe": ("人間の分身としてこの PC の画面を操作する役。クリック・キー入力・スクリーンショット。"
                      "例:「この PC の画面のスクショを撮って送る」「このアプリの設定画面を開いて値を確かめる」。"
                      "CLI や API で済む作業、Web ページのスクショ（developer が作業部屋で撮る）は扱わない。"),
-    },
-    # **この PC に道具を揃える役。** Docker や Node.js のように、Hermes もキットも
-    # 持ってこない道具を入れる。ホストに直接入れるので箱には入れない。
-    #
-    # 入れてよい道具は core/machine.py の台帳に限る（`seaos-kit machine install` が
-    # 台帳に無い名前を断る）。この役は Slack 由来のカードで動くことがあり、
-    # **任意のパッケージを入れる口にしない。**
-    #
-    # 人が意識しなくても動くように、足りないものは operator の定期実行
-    # （machine-guard）がこの役へのカードとして立てる。
-    "provisioner": {
-        "model": FAST,
-        "no_delegation": True,
-        "workspace": False,
-        "skills": ["kanban-collaboration"],
-        "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
-        "summary": "この PC に、チームが使う道具（Docker など）を揃える",
-        "desc": "エージェントが使う道具のうち、Hermes もキットも持ってこないもの（Docker、Node.js など）をこの PC に入れて使える状態にする役。",
-        "describe": ("この PC に、エージェントが動くための道具を入れて使える状態にする役。"
-                     "対象はキットの台帳にある道具（Docker、Node.js）だけ。"
-                     "例:「Docker を入れる」「Docker が止まっているので起こす」「Node.js を入れる」。"
-                     "**リポジトリの開発環境（言語やパッケージ）はここではない**——それは作業部屋の中で"
-                     "コードを書く役が揃える。"),
     },
     "developer": {
         "model": FAST,
@@ -731,9 +708,6 @@ CRON_JOBS = {
     # **毎分。** 存在しない・無効にした役に振られたカードは、ready のまま誰にも
     # 起動されず、親は永久に待つ。規約から名前を落としても、外す前のカードは残る。
     "assignee-guard": ("* * * * *",   "assignee_guard.py"),
-    # **毎時。** 道具が足りなければ provisioner へのカードを立てる。人が気づく前に揃える。
-    # 道具の有無は分単位で変わらないので、毎分は要らない。
-    "machine-guard": ("17 * * * *",  "machine_guard.py"),
     # **毎分。** 親が SIGKILL されると作業部屋は running のまま残り、
     # Hermes の回収係（status=exited しか見ない）は一生届かない。1つ 4GB。
     "container-guard": ("* * * * *",  "container_guard.py"),
@@ -777,6 +751,16 @@ def copy_skills(kit: Path, d: Path, spec: dict) -> None:
     if own and Path(own).exists():
         for src in sorted(p for p in Path(own).glob("*") if p.is_dir()):
             shutil.copytree(src, d / "skills" / src.name, ignore=IGNORE)
+
+
+# **廃止した役と定期実行。** 配置表から消しただけでは、入っている環境に残り続ける
+# （プロファイルは担当として選べてしまい、定期実行は消えたスクリプトを毎回呼ぶ）。
+# `seaos-kit update` が見つけ次第、外す（kit.retire）。
+#   provisioner / machine-guard: 道具（Docker、Node.js）はコマンド1本で入り、管理者の承認は
+#     結局人が押すので、エージェントに任せる意味が無かった。設定画面の「ツール」に
+#     OS ごとのコマンドを出す形に置き換えた。
+RETIRED_ROLES = ("provisioner",)
+RETIRED_CRONS = ("machine-guard",)
 
 
 # **全役に載せるプラグイン。** AI の判断に任せられないものを、道具の手前で機械的に直す。
