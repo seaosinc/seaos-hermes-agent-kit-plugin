@@ -86,6 +86,33 @@ def test_plugin_is_enabled():
     assert "booking-gate" in ((c.get("plugins") or {}).get("enabled") or []), "有効になっていない"
 
 
+def test_runtime_floor_on_every_role():
+    """カードの上限を直すプラグインは、カードを作れる全役に載って有効になっている。"""
+    for d in sorted(x for x in OUT.iterdir() if (x / "config.yaml").exists()):
+        c = yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8")) or {}
+        assert (d / "plugins/runtime-floor/plugin.yaml").exists(), f"{d.name}: runtime-floor が無い"
+        assert "runtime-floor" in ((c.get("plugins") or {}).get("enabled") or []), \
+            f"{d.name}: runtime-floor が有効になっていない"
+
+
+def test_runtime_floor_raises_short_limits_before_the_card_is_made():
+    """0 や短い上限は、kanban_create が動く前に 1800 へ直る。長い値と未指定は触らない。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "runtime_floor", ROOT / "templates/plugins/runtime-floor/__init__.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    hook = mod._on_pre_tool_call
+    for bad in (0, "0", 15, 300, 1799, "abc"):
+        got = hook(tool_name="kanban_create", args={"title": "x", "max_runtime_seconds": bad})
+        assert got == {"action": "modify", "args": {"max_runtime_seconds": 1800}}, (bad, got)
+    for fine in (1800, 7200, "3600"):
+        assert hook(tool_name="kanban_create", args={"max_runtime_seconds": fine}) is None, fine
+    assert hook(tool_name="kanban_create", args={"title": "x"}) is None, "未指定まで触った"
+    assert hook(tool_name="kanban_comment", args={"max_runtime_seconds": 0}) is None, "他の道具まで触った"
+
+
 def test_gate_ships_complete():
     """ゲートはプラグイン・ポーラー・スクリプトが揃って初めて動く。"""
     o = OUT / "operator"

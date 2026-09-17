@@ -1,0 +1,6 @@
+name: runtime-floor
+version: 0.1.0
+description: カードを作るときに渡された実行時間の上限が短すぎたら、作る前に既定（30分）へ直す
+author: seaos-hermes-agent-collab-kit
+hooks:
+  - pre_tool_call

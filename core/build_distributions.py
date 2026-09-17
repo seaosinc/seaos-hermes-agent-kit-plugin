@@ -676,9 +676,9 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         cfg.update(_hotl_settings())
     if spec.get("workspace") and spec.get("shell", True):
         cfg["terminal"] = _workspace_terminal(spec)
-    if spec.get("plugins"):
-        # 置くだけでは有効にならない（既定は無効）。配布物の側で有効にしておく。
-        cfg["plugins"] = {"enabled": list(spec["plugins"]), "disabled": []}
+    # 置くだけでは有効にならない（既定は無効）。配布物の側で有効にしておく。
+    # 全役に載せるもの（UNIVERSAL_PLUGINS）があるので、どの役も plugins を持つ。
+    cfg["plugins"] = {"enabled": plugins_of(spec), "disabled": []}
     servers = mcp_servers_of(kit, name, spec)
     if servers:
         # **置き場のパスは機械ごとに違う**ので、雛形には `{{FILES_ROOT}}` と書いて
@@ -762,15 +762,30 @@ def copy_skills(kit: Path, d: Path, spec: dict) -> None:
             shutil.copytree(src, d / "skills" / src.name, ignore=IGNORE)
 
 
+# **全役に載せるプラグイン。** AI の判断に任せられないものを、道具の手前で機械的に直す。
+#   runtime-floor: カードの実行時間の上限が短すぎたら、作る前に 30分へ引き上げる
+#                  （0 を「無制限」のつもりで渡し、15秒で死ぬカードが繰り返し作られた）
+UNIVERSAL_PLUGINS = ("runtime-floor",)
+
+
+def plugins_of(spec: dict) -> list[str]:
+    """その役に載せるプラグイン。役の指定に、全役共通のものを足す。"""
+    names = list(spec.get("plugins") or [])
+    return names + [p for p in UNIVERSAL_PLUGINS if p not in names]
+
+
 def copy_runtime(kit: Path, d: Path, spec: dict) -> list[str]:
     """プラグイン・フック・スクリプト。載せたものを distribution_owned として返す。"""
     owned: list[str] = []
-    for name in spec.get("plugins", []):
+    for name in plugins_of(spec):
         # A2A は Hermes の組み込みプラグインで、キット固有のファイルは持たない。
         if name == "a2a-platform":
             continue
-        shutil.copytree(kit / "templates/booking-gate/plugin", d / "plugins" / name, ignore=IGNORE)
-        owned.append("plugins/")
+        # ゲートはスクリプト（同期）と同じ場所で版管理しているので、置き場が違う
+        src = kit / ("templates/booking-gate/plugin" if name == "booking-gate" else f"templates/plugins/{name}")
+        shutil.copytree(src, d / "plugins" / name, ignore=IGNORE)
+        if "plugins/" not in owned:
+            owned.append("plugins/")
 
     for name in spec.get("hooks", []):
         shutil.copytree(kit / "templates/hooks" / name, d / "hooks" / name, ignore=IGNORE)
