@@ -31,7 +31,8 @@ from _harness import finish, run_tests  # noqa: E402
 
 def test_refuses_unlisted_tool():
     """台帳に無い道具は入れない（Slack 由来の依頼で任意のパッケージを入れさせない）。"""
-    for bad in ("curl", "docker; rm -rf /", "openssh"):
+    # 台帳の名前に余計なものを継ぎ足した指定も、台帳に無い名前として断る
+    for bad in ("curl", "docker && echo injected", "openssh"):
         try:
             machine.install(bad)
         except machine.MachineError:

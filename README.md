@@ -27,12 +27,8 @@ Docker や Node.js などの道具は、**足りなければエージェント�
 
 **[Hermes のダウンロードページ](https://hermes-agent.nousresearch.com/)** から **Hermes Desktop** を入れてください。
 
-コマンドで入れる場合は、次の1行を実行します。
-
-| OS | 実行する場所 | コマンド |
-|---|---|---|
-| macOS | ターミナル | `curl -fsSL https://hermes-agent.nousresearch.com/install.sh \| bash` |
-| Windows | PowerShell | `iex (irm https://hermes-agent.nousresearch.com/install.ps1)` |
+コマンドで入れる場合は、ダウンロードページに載っているインストール用の1行を、
+macOS はターミナル、Windows は PowerShell で実行します。
 
 入れたら一度 Hermes Desktop を起動し、Hermes 自体が動くことを確かめておいてください。
 

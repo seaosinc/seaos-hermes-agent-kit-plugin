@@ -66,7 +66,7 @@ def _package_manager() -> str:
         return f"- Homebrew は `{Path(brew).parent.parent}`"
     for name in ("apt-get", "dnf", "yum", "apk", "pacman"):
         if shutil.which(name):
-            return f"- パッケージは `{name}`（導入には `sudo` が要る）"
+            return f"- パッケージは `{name}`（導入には管理者権限が要る）"
     return "- パッケージマネージャは見つからなかった"
 
 

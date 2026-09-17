@@ -194,8 +194,11 @@ def install(name: str, *, timeout: int = 1800) -> Dict:
     text = ((proc.stdout or "") + (proc.stderr or "")).strip()
     ok = proc.returncode == 0 and any(find(c) for c in tool.commands)
     # **パスワードや承認で止まった。** 無人では進められない。
+    # 手がかりは、パスワードを求める文言、管理者（権限の昇格）を求める文言、
+    # Windows の承認画面（UAC）と、winget が承認を得られなかったときの終了コード。
+    # macOS の Homebrew が権限を求めるときも「Administrator」を含むので、ここで拾える。
     human = not ok and any(w in text.lower() for w in
-                           ("password", "sudo", "administrator", "elevat", "uac", "0x8a150056"))
+                           ("password", "administrator", "elevat", "uac", "0x8a150056"))
     return {"ok": ok, "needsHuman": human, "command": command, "output": text[-1500:]}
 
 

@@ -56,6 +56,25 @@ jobs:
           hermes --version
           echo "Hermes: $(hermes --version | head -1)" >> "$GITHUB_STEP_SUMMARY"
 
+      # **導入時のセキュリティ検査が SAFE であること。** CAUTION（HIGH の指摘がある）だと、
+      # Hermes Desktop の画面から入れたとき確認を聞く手段が無く、本体の導入が黙って失敗し、
+      # 画面の皮だけが入る（どの OS でも）。禁止を書くときも、検査に掛かる書き方を避ける。
+      - name: 導入時のセキュリティ検査（SAFE であること）
+        run: |
+          "$RUNNER_TEMP/hermes/.venv/bin/python" - "$GITHUB_WORKSPACE" <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, ".")  # working-directory は Hermes の置き場
+          from tools.plugin_guard import scan_plugin
+          r = scan_plugin(Path(sys.argv[1]), source="ci")
+          print(f"verdict: {r.verdict}（{len(r.findings)} 件）")
+          high = [f for f in r.findings if f.severity in ("high", "critical")]
+          for f in high:
+              print(f"  {f.severity} {f.category} {f.file}:{f.line} | {(f.match or '')[:100]}")
+          sys.exit(0 if r.verdict == "safe" else 1)
+          PY
+        working-directory: ${{ runner.temp }}/hermes
+
       # 今は参考のみ。プラグインの入口に register() が無いため、この検査だけが落ちる
       # （他の項目は通る）。register() を足したら continue-on-error を外し、
       # 続けて `hermes plugins doctor . --ci` も必須にする。
