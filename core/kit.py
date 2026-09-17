@@ -232,6 +232,39 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
     return result
 
 
+def enable_plugins() -> Result:
+    """配布物で有効にしたプラグインを、**実際の設定でも有効にする。**
+
+    `profile update` は config.yaml を上書きしない（利用者の設定を守る Hermes の仕様）。
+    そのため、配布物の config に plugins.enabled を書いても、**すでに入っている役では
+    有効にならない**——全役に runtime-floor を足したとき、置かれただけで全役
+    「not enabled」だった。公式の `plugins enable` で足す（既に有効なら触らない）。
+    """
+    result = Result()
+    gen = roles.generator()
+    specs = roles.all_specs()
+    for name in roles.names():
+        cfg_path = profile_dir(name) / "config.yaml"
+        if not cfg_path.is_file():
+            continue
+        try:
+            cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            continue
+        have = set(((cfg.get("plugins") or {}).get("enabled")) or [])
+        for plugin in gen.plugins_of(specs.get(name) or {}):
+            if plugin in have:
+                continue
+            # 道具の上書きは求めない。聞かれると対話待ちで止まる
+            code, _out = hermes.run(["-p", name, "plugins", "enable", plugin, "--no-allow-tool-override"])
+            if code == 0:
+                result.lines.append(f"{name} で {plugin} を有効にしました")
+            else:
+                result.lines.append(f"{name} で {plugin} を有効にできませんでした")
+                result.failures += 1
+    return result
+
+
 def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     """templates/ → 配布物 → 各プロファイル → 説明文。
 
@@ -306,6 +339,10 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     import mem0
 
     mem0.rewire(log=result.lines.append)
+
+    enabled = enable_plugins()
+    result.lines.extend(enabled.lines)
+    result.failures += enabled.failures
 
     # **この PC の事実を書き直す。** config.yaml ごと入れ替わると消えるので、
     # 反映のたびに置く（実際に全役から消えていた）。

@@ -196,6 +196,15 @@ def _profiles(rep: Report) -> None:
         else:
             rep.ng("toolsets に kanban が無い → カードを扱えない")
 
+        # **置いただけでは動かない。** 既存の役は update で config が上書きされないので、
+        # 配布物で有効にしたつもりでも無効のまま残りうる（kit.enable_plugins が直す）
+        enabled = set(((cfg.get("plugins") or {}).get("enabled")) or [])
+        for plugin in roles.generator().plugins_of(specs.get(name) or {}):
+            if plugin in enabled:
+                rep.ok(f"プラグイン {plugin} が有効")
+            else:
+                rep.ng(f"プラグイン {plugin} が無効 → seaos-kit update")
+
         soul = d / "SOUL.md"
         if soul.is_file() and soul.stat().st_size and "SHARED:BEGIN" in soul.read_text(encoding="utf-8"):
             rep.ok("SOUL.md（共通ブロック込み）")
