@@ -34,19 +34,25 @@ macOS はターミナル、Windows は PowerShell で実行します。
 
 ## 2. このプラグインを入れる
 
-ターミナル（Windows は PowerShell）で次を実行します。
+Hermes Desktop の画面だけで入れられます。
 
-```
-hermes plugins install https://github.com/seaosinc/seaos-hermes-agent-kit-plugin --enable
-```
+1. Hermes Desktop の **スキルとツール** を開き、**プラグイン（Plugins）** のタブで **Git からインストール** を押す
+2. 次の URL を貼り付けて、**リポジトリを確認** を押す
+   ```
+   https://github.com/seaosinc/seaos-hermes-agent-kit-plugin
+   ```
+3. 入れるものに **エージェント側（agent）とデスクトップ側（desktop）の両方** が選ばれていること、
+   **インストール後に有効にする** がオンになっていることを確かめて、インストールする
+4. **Hermes Desktop を完全に終了して、起動し直す**（macOS はメニューの「終了」、Windows はウィンドウを閉じる）
 
-GitHub の認証を求められたら、ブラウザでログインして許可してください
-（`gh auth login` を済ませておくと聞かれません）。
+> **4 の再起動は必ず行ってください。** プラグインは、Hermes が起動するときに読み込まれます。
+> 再起動しないまま SEAOS を開くと、「画面のバックエンドに接続できません」と表示されます。
 
-入れたら **Hermes Desktop を再起動**し、プラグインの一覧で **SEAOS のスイッチを入れます**。
-スイッチは**2つ**（Python 側とデスクトップ側）あり、どちらも最初はオフです。両方オンにしてください。
+起動し直したあと、サイドバーに **SEAOS** が出て、開くと「接続情報」や「エージェント」の一覧が表示されれば成功です。
 
-サイドバーに **SEAOS** が出ていれば成功です。
+GitHub の認証を求められたら、閲覧権限のあるアカウントでログインしてください（このリポジトリは非公開です）。
+
+うまくいかないときは → [困ったとき：セットアップ中](docs/troubleshooting.md#セットアップ中)
 
 ## 3. 接続情報を入れる
 
