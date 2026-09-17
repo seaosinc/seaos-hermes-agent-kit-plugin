@@ -166,9 +166,9 @@ ROLES: dict[str, dict] = {
         "env": [
             ("SLACK_BOT_TOKEN", "Slack の Bot トークン。窓口を Slack にするなら要る（Hermes Desktop から使うなら不要）", False),
             ("SLACK_APP_TOKEN", "Slack の App トークン（Socket Mode）。BOT トークンとセットで要る", False),
-            ("SLACK_ALLOWED_USERS", "常に話せる Slack ユーザー ID（カンマ区切り）。Slack を使うなら要る——空だと誰も話せない", False),
-            ("SLACK_OWNER_ID", "判断を仰ぐ相手の Slack ユーザー ID", False),
-            ("SLACK_HOME_CHANNEL", "既定の投稿先チャンネル", False),
+            ("SLACK_ALLOWED_USERS", "常に話せる人の Slack メンバー ID（U で始まる。複数はカンマ区切り）。Slack を使うなら要る——空だと誰も話せない", False),
+            ("SLACK_OWNER_ID", "判断を仰ぐ相手の Slack メンバー ID（U で始まる）", False),
+            ("SLACK_HOME_CHANNEL", "既定の投稿先チャンネルの ID（C で始まる。#general のような名前ではない）", False),
             ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
         ],
         "summary": "ユーザーとの窓口。依頼を受けて結果を報告する",

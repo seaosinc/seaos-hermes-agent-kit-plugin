@@ -67,6 +67,7 @@ def list_roles() -> List[Dict]:
                         "label": var,
                         "description": desc,
                         "configured": bool(source.get(roles.env_key(name, var))),
+                        **_plain_fields(var, source.get(roles.env_key(name, var), "")),
                     }
                     for var, _req, desc in roles.env_requirements(name)
                     if var in set(roles.own_env_vars(name))
@@ -87,6 +88,11 @@ def list_roles() -> List[Dict]:
             }
         )
     return out
+
+
+def _plain_fields(var: str, value: str) -> Dict:
+    """**秘密ではない値だけ**、画面に値を返す（roles.PLAIN_ENV）。鍵は有無だけ。"""
+    return {"plain": True, "value": value} if roles.is_plain(var) else {}
 
 
 def _git_revision() -> str:
@@ -215,6 +221,9 @@ def version() -> Dict:
 def list_secrets() -> List[Dict]:
     """鍵の**名前と充足状況だけ**。値は返さない。
 
+    例外は秘密ではない値（Slack の ID やドメイン。roles.PLAIN_ENV）で、
+    これだけは値も返す。伏せると、入っている値を確かめながら直せない。
+
     `required` は「**無いとキット自体が成り立たない**」ものだけに付ける
     （いまは OPENROUTER_API_KEY ひとつ）。それ以外は空でも動くので任意にし、
     代わりに `disables` で「入れないと何が使えなくなるか」を返す。
@@ -239,6 +248,7 @@ def list_secrets() -> List[Dict]:
             entry["usedBy"].append(name)
     for var, entry in seen.items():
         entry["configured"] = bool(source.get(var))
+        entry.update(_plain_fields(var, source.get(var, "")))
         # **全員が自分の値を持っていれば、共通は無くても動く。** 必須のまま
         # 赤く出すと、埋める必要の無い欄を埋めさせることになる。
         if entry["required"] and not entry["configured"] and _all_overridden(var, entry["usedBy"], source):

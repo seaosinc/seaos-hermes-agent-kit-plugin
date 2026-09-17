@@ -101,6 +101,27 @@ def test_api_clears_only_overrides():
         raise AssertionError("共通のモデルの鍵を空にできてしまった")
 
 
+def test_api_shows_only_plain_values():
+    """設定画面へ値を返すのは、秘密ではない項目（ID やドメイン）だけ。鍵は有無だけ。"""
+    import plugin_api as api
+
+    reset()
+    env_mod.set_value(roles.env_key("operator", "SLACK_ALLOWED_USERS"), "U0AAA,U0BBB")
+    env_mod.set_value(roles.env_key("operator", "SLACK_BOT_TOKEN"), "xoxb-hidden")
+    env_mod.set_value(KEY, "sk-hidden")
+
+    operator = next(r for r in api.list_roles() if r["name"] == "operator")
+    own = {s["label"]: s for s in operator["ownSecrets"]}
+    assert own["SLACK_ALLOWED_USERS"].get("plain") is True
+    assert own["SLACK_ALLOWED_USERS"].get("value") == "U0AAA,U0BBB"
+    assert "value" not in own["SLACK_BOT_TOKEN"] and not own["SLACK_BOT_TOKEN"].get("plain")
+
+    shared = {s["name"]: s for s in api.list_secrets()}
+    assert "value" not in shared[KEY]
+    everything = repr(api.list_roles()) + repr(api.list_secrets())
+    assert "xoxb-hidden" not in everything and "sk-hidden" not in everything, "鍵の値を画面へ返している"
+
+
 def test_shared_not_required_when_all_overridden():
     import plugin_api as api
 

@@ -195,6 +195,18 @@ def own_env_vars(name: str) -> List[str]:
 OVERRIDABLE_ENV = ("OPENROUTER_API_KEY",)
 
 
+# **秘密ではない値。** 設定画面で伏せ字にせず、入っている値も見せる。
+# ID の一覧やドメインを伏せると、カンマ区切りの入力を見ながら直せず、
+# 何が入っているかも確かめられない。**迷ったら入れない**——伏せるほうが安全側。
+PLAIN_ENV = ("SLACK_ALLOWED_USERS", "SLACK_OWNER_ID", "SLACK_HOME_CHANNEL",
+             "AWS_REGION", "BACKLOG_DOMAIN")
+
+
+def is_plain(var: str) -> bool:
+    """画面で値を見せてよい変数か。"""
+    return var in PLAIN_ENV
+
+
 def override_env_vars(name: str) -> List[str]:
     """**その役が、共通の値を役つきの値で上書きできる変数。**"""
     declared = [var for var, _req, _desc in env_requirements(name)]

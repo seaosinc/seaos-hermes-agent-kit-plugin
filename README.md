@@ -107,6 +107,103 @@ OpenRouter の API キーを貼り付けて保存します。
 Slack から話しかけるには、Slack App を作り、operator の行の「設定」から鍵を入れます。
 手順が長いので別のページにまとめました。→ [Slack とつなぐ](docs/slack.md)
 
+App は次のマニフェストから作ります（[api.slack.com/apps](https://api.slack.com/apps) の
+**Create New App → From an app manifest** に貼り付け）。名前と説明は自由に変えてください。
+
+<details>
+<summary>Slack App のマニフェスト</summary>
+
+```json
+{
+  "_metadata": {
+    "major_version": 1,
+    "minor_version": 1
+  },
+  "display_information": {
+    "name": "SEAOS",
+    "description": "チームのエージェントへの窓口"
+  },
+  "features": {
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
+    "bot_user": {
+      "display_name": "SEAOS",
+      "always_online": true
+    },
+    "assistant_view": {
+      "assistant_description": "チームのエージェントに頼みごとができます"
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "assistant:write",
+        "channels:history",
+        "channels:read",
+        "groups:history",
+        "groups:read",
+        "im:history",
+        "im:read",
+        "im:write",
+        "mpim:history",
+        "mpim:read",
+        "chat:write",
+        "files:read",
+        "files:write",
+        "reactions:read",
+        "reactions:write",
+        "users:read",
+        "users:read.email"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": [
+        "app_mention",
+        "message.channels",
+        "message.groups",
+        "message.im",
+        "message.mpim",
+        "assistant_thread_started",
+        "assistant_thread_context_changed",
+        "reaction_added",
+        "reaction_removed"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}
+```
+
+</details>
+
+**要る設定はこの3つです。** 既にある App を使う場合は、足りないものを足して再インストールしてください
+（トークンは変わりません）。
+
+| 設定 | 値 | 無いと |
+|---|---|---|
+| Socket Mode | 有効 | Slack とつながらない |
+| Bot Token Scopes | `app_mentions:read` `channels:history` `channels:read` `groups:history` `groups:read` `im:history` `im:read` `mpim:history` `mpim:read` | 話しかけても届かない |
+| | `chat:write` | 返事を書けない |
+| | `files:read` | 添付したファイルを読めない |
+| | `files:write` `im:write` | 画像やファイル、頼んだ作業の結果（スクショなど）が返ってこない |
+| | `assistant:write` | 「入力中…」の表示が出ない |
+| | `reactions:read` `reactions:write` | リアクションで操作できない |
+| | `users:read` `users:read.email` | 相手の名前やメールアドレスからゲストを引けない |
+| Event Subscriptions（bot events） | `app_mention` `message.channels` `message.groups` `message.im` `message.mpim` `assistant_thread_started` `assistant_thread_context_changed` `reaction_added` `reaction_removed` | メッセージやリアクションに反応しない |
+
+`seaos-kit doctor` の「Slack App の権限」で、足りない権限を確かめられます。
+
 Slack を使わない場合は、Hermes Desktop で **operator** を選んで話しかけてください。
 
 ## 8. 確かめる

@@ -77,7 +77,10 @@ export default function create(deps) {
         ? 'この役だけ、共通とは別の値を使っています'
         : '未設定なら共通の値を使います'
       : secret.configured
-      ? ''
+      ? // 秘密ではない値は、入っている値をそのまま見せる
+        secret.plain
+        ? secret.value
+        : ''
       : secret.disables?.length
         ? `未設定の間は ${secret.disables.join('、')} を無効にします`
         : secret.description || ''
@@ -98,7 +101,12 @@ export default function create(deps) {
                   : null
               ]
             }),
-            note ? jsx('div', { className: 'text-xs opacity-60', children: note }) : null
+            note
+              ? jsx('div', {
+                  className: 'text-xs opacity-60' + (secret.plain && secret.configured ? ' break-all font-mono' : ''),
+                  children: note
+                })
+              : null
           ]
         }),
         jsx('span', {
@@ -170,12 +178,15 @@ export default function create(deps) {
             className: 'mt-1 text-xs opacity-60',
             children: secret.description || ''
           }),
+          // **秘密ではない値は伏せない。** カンマ区切りの ID を伏せ字で打つと、
+          // どこまで入れたか見えない。今の値を入れた状態で開き、足し引きできるようにする。
           jsx('input', {
             ref: inputRef,
-            type: 'password',
+            type: secret.plain ? 'text' : 'password',
+            defaultValue: secret.plain ? secret.value || '' : undefined,
             autoComplete: 'off',
             spellCheck: false,
-            placeholder: '値を貼り付けてください',
+            placeholder: secret.plain ? '値を入力してください' : '値を貼り付けてください',
             className:
               'mt-4 w-full rounded px-2 py-1.5 text-sm focus:outline-none',
           style: { border: BORDER, background: SURFACE_2, color: 'inherit' },
@@ -184,10 +195,12 @@ export default function create(deps) {
               if (e.key === 'Escape') onClose()
             }
           }),
-          jsx('div', {
-            className: 'mt-2 text-xs opacity-60',
-            children: '保存後は表示されません。変更する場合は入力し直してください。'
-          }),
+          secret.plain
+            ? null
+            : jsx('div', {
+                className: 'mt-2 text-xs opacity-60',
+                children: '保存後は表示されません。変更する場合は入力し直してください。'
+              }),
           jsxs('div', {
             className: 'mt-4 flex justify-end gap-2',
             children: [

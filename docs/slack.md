@@ -7,15 +7,15 @@ Slack の管理画面で App を作れる権限が必要です（無ければワ
 
 ---
 
-## 1. App の設定（マニフェスト）を作る
+## 1. App の設定（マニフェスト）を用意する
 
-ターミナル（Windows は PowerShell）で実行します。名前と説明は自由に変えてください。
+[README の「Slack から使う」](../README.md#7-slack-から使う任意) にある **Slack App のマニフェスト** を開き、全部コピーしておきます。
+名前（`SEAOS`）と説明は自由に変えてください。
 
-```
-hermes slack manifest --name "SEAOS" --description "チームのエージェントへの窓口"
-```
-
-`{` から始まる長い文字列（マニフェスト）が表示されるので、全部コピーしておきます。
+> `hermes slack manifest` でもマニフェストを作れますが、キットが使う `reactions:write` と
+> `users:read.email` が入りません。README のものを使ってください。
+> Slack のスラッシュコマンド（`/new` など）も使いたい場合だけ、`hermes slack manifest` の
+> `slash_commands` と `commands` スコープを足します。
 
 ## 2. Slack App を作る
 
@@ -86,5 +86,5 @@ DM ならメンションは要りません。
 | 返事が来ない | `SLACK_ALLOWED_USERS` に自分のメンバー ID が入っているか。App をチャンネルに招待したか。メンションしたか |
 | まったく反応しない | `seaos-kit gateway status` で pid が出ているか。出ていなければ `seaos-kit gateway restart operator` |
 | operator 以外が返事をしているようだ | `seaos-kit doctor` を実行。「Slack の窓口が奪われていないか」に ✗ が出ていたら、案内どおりに直す（→ [困ったとき](troubleshooting.md)） |
-| 添付したファイルを読めないと言われる | Slack App に `files:read` の権限があるか（手順 1 のマニフェストで作れば入っています） |
+| 添付したファイルを読めないと言われる | Slack App に `files:read` の権限があるか（README のマニフェストで作れば入っています） |
 | 画像やファイルが返ってこない（「送れなかった」と言われる） | Slack App に `files:write` の権限があるか。頼んだ作業の結果（スクショなど）が DM に返ってこないなら `im:write` も。`seaos-kit doctor` の「Slack App の権限」に ✗ が出ます。**OAuth & Permissions → Bot Token Scopes** に足して App を再インストールする（トークンは変わりません） |
