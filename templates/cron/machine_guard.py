@@ -78,7 +78,7 @@ def main() -> int:
         state = "止まっている" if r.get("installed") else "入っていない"
         body = (
             f"{r['label']} が{state}。{r['why']}。\n"
-            f"使う役: {', '.join(r.get('neededBy') or [])}\n\n"
+            f"使うもの: {', '.join(r.get('neededBy') or [])}\n\n"
             "完了条件: `seaos-kit machine check` で足りないものとして出なくなっていること。"
         )
         c = subprocess.run(

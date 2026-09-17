@@ -48,6 +48,52 @@ export default function create(deps) {
     }
   }
 
+  /** コマンドを1行で見せ、クリップボードへコピーできるようにする。
+   *
+   * **手で選択させない。** 長いコマンドは折り返して選びにくく、取りこぼすと
+   * 途中までしか貼られない。コピーに失敗する環境（権限が無いなど）では、
+   * 選択できる状態のまま残すので、手でコピーすればよい。 */
+  function CommandCopy({ command }) {
+    const [copied, setCopied] = useState(false)
+
+    const copy = async () => {
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(command)
+        } else {
+          const area = document.createElement('textarea')
+          area.value = command
+          document.body.appendChild(area)
+          area.select()
+          document.execCommand('copy')
+          area.remove()
+        }
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      } catch {
+        setCopied(false)
+      }
+    }
+
+    return jsxs('div', {
+      className: 'mt-1 flex items-start gap-2',
+      children: [
+        jsx('code', {
+          className: 'min-w-0 flex-1 select-all break-all rounded px-1.5 py-0.5 font-mono text-[0.6875rem] opacity-80',
+          style: { background: SURFACE_2 },
+          children: command
+        }),
+        jsx('button', {
+          type: 'button',
+          onClick: copy,
+          className: 'shrink-0 text-xs hover:underline',
+          style: { color: ACCENT },
+          children: copied ? 'コピーしました' : 'コピー'
+        })
+      ]
+    })
+  }
+
   /** 主ボタン。**配色はトークン任せにしない**——アクセント上の文字色が解決されず、
    *  青地に黒文字になる環境があった。 */
   function Button({ label, onClick, disabled, primary }) {
@@ -796,10 +842,7 @@ export default function create(deps) {
                                 children: t.neededBy.length ? `${t.neededBy.join('、')} が使います` : t.why
                               }),
                               t.missing && !machine.provisioner && t.installCommand
-                                ? jsx('div', {
-                                    className: 'mt-1 font-mono text-[0.6875rem] opacity-80',
-                                    children: t.installCommand
-                                  })
+                                ? jsx(CommandCopy, { command: t.installCommand })
                                 : null
                             ]
                           }),

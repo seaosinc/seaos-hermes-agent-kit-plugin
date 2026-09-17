@@ -43,6 +43,9 @@ def test_needed_by_follows_selection():
     """Docker を要る役は、箱を持つ有効な役。外せば要らなくなる。"""
     selection.selection_file().unlink(missing_ok=True)
     assert "developer" in machine.needed_by("docker")
+    # mem0 を起こすのは operator のフックだが、使うのは全役。役名では出さない
+    assert "operator" not in machine.needed_by("docker"), machine.needed_by("docker")
+    assert machine.SHARED_MEMORY in machine.needed_by("docker")
     assert "handler" in machine.needed_by("node"), machine.needed_by("node")
     selection.set_enabled("handler", False)
     assert "handler" not in machine.needed_by("node")

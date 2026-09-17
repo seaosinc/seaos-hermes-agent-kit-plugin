@@ -115,15 +115,26 @@ def _docker_running() -> bool:
         return False
 
 
+# 役ではなく、全役が使う仕組み。画面と provisioner のカードに、役名と並べて出す。
+SHARED_MEMORY = "共有の記憶（mem0）"
+
+
 def needed_by(tool: str) -> List[str]:
-    """**有効な役のうち**、その道具が無いと働かないもの。空なら今は要らない。"""
+    """**有効な役のうち**、その道具が無いと働かないもの。空なら今は要らない。
+
+    Docker は、作業部屋を持つ役と、共有の記憶（mem0 はコンテナで動く）が使う。
+    mem0 を起こすフックは operator が持っているが、**使うのは全役**なので、
+    operator の名前ではなく `SHARED_MEMORY` として出す（「operator が使う」は誤解を招いた）。
+    """
     specs = roles.all_specs()
     out: List[str] = []
     for name in roles.names():
         spec = specs.get(name) or {}
         if tool == "docker":
-            if (spec.get("workspace") and spec.get("shell", True)) or spec.get("hooks"):
-                out.append(name)   # hooks は operator の mem0 起動（Docker で動く）
+            if spec.get("workspace") and spec.get("shell", True):
+                out.append(name)
+            elif spec.get("hooks") and SHARED_MEMORY not in out:
+                out.append(SHARED_MEMORY)
         elif tool == "node":
             servers = roles.mcp_servers(name)
             if any(str((s or {}).get("command", "")) in ("npx", "node") for s in servers.values()):
