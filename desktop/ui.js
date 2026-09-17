@@ -837,10 +837,6 @@ export default function create(deps) {
                             className: 'min-w-0 flex-1',
                             children: [
                               jsx('div', { className: 'text-sm', children: t.label }),
-                              jsx('div', {
-                                className: 'text-xs opacity-60',
-                                children: t.neededBy.length ? `${t.neededBy.join('、')} が使います` : t.why
-                              }),
                               t.missing && !machine.provisioner && t.installCommand
                                 ? jsx(CommandCopy, { command: t.installCommand })
                                 : null
