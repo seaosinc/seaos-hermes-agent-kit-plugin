@@ -23,6 +23,8 @@ export default function create(deps) {
   const BORDER = '1px solid var(--ui-border, rgba(127,127,127,.3))'
   const SURFACE = 'var(--ui-surface, Canvas)'
   const SURFACE_2 = 'var(--ui-surface-2, rgba(127,127,127,.08))'
+  // **エラーや案内の文言は選択・コピーできるようにする。** アプリ全体で選択が止められている。
+  const SELECTABLE = { userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }
 
   /** バックエンドを呼ぶ。
    *
@@ -662,8 +664,8 @@ export default function create(deps) {
 
         error
           ? jsx('div', {
-              className: 'rounded px-3 py-2 text-xs',
-              style: { border: `1px solid ${DANGER}`, color: DANGER },
+              className: 'select-text break-all rounded px-3 py-2 text-xs',
+              style: { border: `1px solid ${DANGER}`, color: DANGER, ...SELECTABLE },
               children: error
             })
           : null,
@@ -671,7 +673,7 @@ export default function create(deps) {
         notice
           ? jsx('div', {
               className: 'rounded px-3 py-2 text-xs',
-              style: { border: `1px solid ${ACCENT}`, color: ACCENT },
+              style: { border: `1px solid ${ACCENT}`, color: ACCENT, ...SELECTABLE },
               children: notice
             })
           : null,
@@ -697,7 +699,7 @@ export default function create(deps) {
       check.blocking.length
           ? jsx('div', {
               className: 'rounded px-3 py-2 text-xs',
-              style: { border: `1px solid ${DANGER}`, color: DANGER },
+              style: { border: `1px solid ${DANGER}`, color: DANGER, ...SELECTABLE },
               children: `${check.blocking.join('、')} が未設定です。これが無いと動作しません。`
             })
           : null,
@@ -705,7 +707,7 @@ export default function create(deps) {
         ...check.warnings.map((w, i) =>
           jsx('div', {
             className: 'rounded px-3 py-2 text-xs',
-            style: { border: `1px solid ${WARN}`, color: WARN },
+            style: { border: `1px solid ${WARN}`, color: WARN, ...SELECTABLE },
             children: w
           }, `warn${i}`)
         ),

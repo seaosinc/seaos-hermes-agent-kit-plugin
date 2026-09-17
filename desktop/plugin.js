@@ -22,6 +22,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const ID = 'seaos-hermes-agent-kit-plugin'  // plugin.yaml / dashboard/manifest.json と同じ名前
 const ACCENT = '#0B6E6E'
 const DANGER = '#B4413C'
+// **エラーの文言は選択・コピーできるようにする。** アプリ全体で選択が止められていて、
+// 画面に出た原因を貼ることすらできなかった。
+const SELECTABLE = { userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }
 
 /** ui.js へ渡す道具。**あちらは import を書けない**ので、ここで揃えて渡す。 */
 const DEPS = { jsx, jsxs, useCallback, useEffect, useRef, useState, host }
@@ -83,16 +86,28 @@ function Host({ ctx }) {
       children: [
         jsx('div', { className: 'text-lg font-medium', children: 'SEAOS' }),
         jsx('div', {
-          className: 'rounded px-3 py-2 text-xs',
-          style: { border: `1px solid ${DANGER}`, color: DANGER },
+          className: 'select-text break-all rounded px-3 py-2 text-xs',
+          style: { border: `1px solid ${DANGER}`, color: DANGER, ...SELECTABLE },
           children: error
         }),
-        jsx('button', {
-          type: 'button',
-          onClick: fetchUi,
-          className: 'self-start rounded px-3 py-1.5 text-xs',
-          style: { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` },
-          children: '再読み込み'
+        jsxs('div', {
+          className: 'flex gap-2',
+          children: [
+            jsx('button', {
+              type: 'button',
+              onClick: fetchUi,
+              className: 'rounded px-3 py-1.5 text-xs',
+              style: { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` },
+              children: '再読み込み'
+            }),
+            jsx('button', {
+              type: 'button',
+              onClick: () => navigator.clipboard?.writeText(error),
+              className: 'rounded px-3 py-1.5 text-xs',
+              style: { background: 'transparent', color: 'inherit', border: `1px solid ${DANGER}` },
+              children: 'エラーをコピー'
+            })
+          ]
         })
       ]
     })
