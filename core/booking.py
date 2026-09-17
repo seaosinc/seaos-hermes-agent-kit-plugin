@@ -197,12 +197,16 @@ def check(log: Optional[Log] = None) -> bool:
     except Exception:  # noqa: BLE001
         grants = []
     for g in grants:
+        # 人の許可なら U…、チャンネルの許可なら C…（そのメンバー全員に展開される）
+        key = g.get("slack_user_id") or g.get("slack_channel_id") or "?"
+        if g.get("slack_channel_id"):
+            key = f"#{g.get('channel_name') or key} のメンバー"
         tid = (g.get("task_id") or "").strip()
         if tid:
             # **archive されるまで切れない。** 切るのは人の判断なので止めはしないが、見せる。
             if _card_status(tid) == "done":
                 say(
-                    f"! done のまま畳まれていないカードの許可: {g['slack_user_id']} "
+                    f"! done のまま畳まれていないカードの許可: {key} "
                     f"{g.get('label', '')}（{tid}） → 話が終わっているなら archive"
                 )
             continue
@@ -210,10 +214,10 @@ def check(log: Optional[Log] = None) -> bool:
             continue
         who = g.get("requested_by") or "不明"
         if g.get("unlimited"):
-            say(f"! 無期限のアクセス許可: {g['slack_user_id']} {g.get('label', '')}（指示: {who}）")
+            say(f"! 無期限のアクセス許可: {key} {g.get('label', '')}（指示: {who}）")
         else:
             # 終わり方が無い＝いつまでも残る。**意図された無期限とは別に扱う。**
-            say(f"✗ 終わり方の無いアクセス許可: {g['slack_user_id']} {g.get('label', '')}")
+            say(f"✗ 終わり方の無いアクセス許可: {key} {g.get('label', '')}")
             ok = False
 
     # 承認の残骸: このゲート由来なのに、いまの枠に居ない人

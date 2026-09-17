@@ -52,6 +52,10 @@ AUDIT_PATH = GATE_HOME / "audit.log"  # 追記専用。誰がいつ入ったか�
 IDENTITY_CACHE_PATH = GATE_HOME / "identity-cache.json"
 
 IDENTITY_TTL_SEC = 24 * 3600
+# チャンネルのメンバーを取れなかったとき、前回取れた一覧を何秒まで使うか。
+# Slack が一瞬落ちただけで、チャンネルの全員を締め出さないため。これを過ぎたら
+# そのチャンネルの許可は出さない（fail-closed）。
+CHANNEL_MEMBERS_TTL_SEC = 600
 SOURCE_TAG = "booking-gate"  # pairing の承認レコードに付ける印。これが無いものは触らない
 
 # カードが「まだ生きている」状態。これ以外（done / archived）になったら許可も終わる
@@ -222,9 +226,11 @@ def guest_slots(cfg: dict, now: datetime) -> list[dict]:
         + int(cfg.get("notice_window_minutes", 10))
     )
     out = []
+    cache: dict | None = None
     for g in load_guests():
         uid = str(g.get("slack_user_id") or "").strip()
-        if not uid:
+        channel_id = str(g.get("slack_channel_id") or "").strip()
+        if not uid and not channel_id:
             continue
         end = g.get("end")  # None = 期限なし（カード紐付けか無期限）
         if end:
@@ -242,18 +248,35 @@ def guest_slots(cfg: dict, now: datetime) -> list[dict]:
                 continue
             if st not in OPEN_STATUSES:
                 continue
-        out.append(
-            {
-                "slack_user_id": uid,
-                "email": g.get("email", ""),
-                "start": g.get("start") or now.isoformat(),
-                "end": end,
-                "event_id": "",
-                "summary": g.get("label") or g.get("note") or "手で出したアクセス許可",
-                "task_id": task_id,
-                "source": "guest",
-            }
-        )
+        slot = {
+            "email": g.get("email", ""),
+            "start": g.get("start") or now.isoformat(),
+            "end": end,
+            "event_id": "",
+            "summary": g.get("label") or g.get("note") or "手で出したアクセス許可",
+            "task_id": task_id,
+            "source": "guest",
+        }
+        if not channel_id:
+            out.append({"slack_user_id": uid, **slot})
+            continue
+        # **チャンネルの許可は、いまのメンバー1人ずつの枠に展開する。**
+        # ゲートも Hermes の承認（pairing）も人単位で見るので、ここで人に直せば
+        # どちらにも手を入れずに済む。枠に channel_id を付け、ゲートが
+        # 「そのチャンネルでの発言だけ」を通す。
+        if cache is None:
+            cache = load_identity_cache()
+        members = channel_members(cfg, channel_id, cache)
+        if members is None:
+            log(f"{channel_id} のメンバーを取れない → このチャンネルの許可は出さない")
+            continue
+        for member in sorted(members):
+            out.append({"slack_user_id": member, "channel_id": channel_id, **slot})
+    if cache is not None:
+        try:
+            write_atomic(IDENTITY_CACHE_PATH, json.dumps(cache, indent=2, ensure_ascii=False))
+        except OSError as e:
+            log(f"キャッシュを書けない: {e}")
     return out
 
 
@@ -296,8 +319,19 @@ def slack_directory(token: str, cache: dict) -> dict:
     hit = cache.get("_directory")
     if isinstance(hit, dict) and time.time() - hit.get("at", 0) < 3600:
         return hit.get("names") or {}
+    names, _people = _fetch_directory(token, cache)
+    return names
 
+
+def _fetch_directory(token: str, cache: dict) -> tuple[dict, list]:
+    """``users.list`` を引き直し、名前の対応表と「許可してよい人」をキャッシュへ置く。
+
+    **許可してよい人は、ワークスペースの正式なメンバーだけ。** ボット、削除済み、
+    Slack のゲストアカウント（restricted / ultra_restricted）は外す。共有チャンネル越しの
+    社外の人は、そもそもこの一覧に出てこない。
+    """
     names: dict[str, str] = {}
+    people: list[str] = []
     cursor = ""
     for _ in range(20):  # 200 × 20 = 4000 人まで
         url = "https://slack.com/api/users.list?" + urllib.parse.urlencode(
@@ -316,6 +350,9 @@ def slack_directory(token: str, cache: dict) -> dict:
         for u in data.get("members", []):
             if u.get("deleted") or u.get("is_bot"):
                 continue
+            if not (u.get("is_restricted") or u.get("is_ultra_restricted")
+                    or u.get("is_app_user") or u.get("id") == "USLACKBOT"):
+                people.append(u["id"])
             prof = u.get("profile") or {}
             for key in (u.get("name"), prof.get("display_name"), prof.get("real_name")):
                 if key:
@@ -325,8 +362,77 @@ def slack_directory(token: str, cache: dict) -> dict:
             break
 
     if names:
-        cache["_directory"] = {"names": names, "at": time.time()}
-    return names
+        cache["_directory"] = {"names": names, "people": sorted(people), "at": time.time()}
+    return names, people
+
+
+def _eligible_people(token: str, cache: dict, unknown: set[str]) -> set[str] | None:
+    """許可してよい人。**知らない人が混じっていれば、一覧を引き直す**（最短10分おき）。
+
+    入ったばかりの人は1時間のキャッシュに載っていない。引き直しても載らない人は、
+    社外の人か、取得に失敗しているかのどちらかなので、どちらでも通さない。
+    """
+    hit = cache.get("_directory")
+    fresh = isinstance(hit, dict) and time.time() - hit.get("at", 0) < 3600
+    people = set(hit.get("people") or []) if isinstance(hit, dict) else set()
+    # 「許可してよい人」を持たない古いキャッシュ（この仕組みの前に作られたもの）は引き直す
+    retry_ok = (not isinstance(hit, dict) or "people" not in hit
+                or time.time() - hit.get("at", 0) > 600)
+    if not fresh or (unknown - people and retry_ok):
+        _names, fetched = _fetch_directory(token, cache)
+        if fetched:
+            people = set(fetched)
+    return people or None
+
+
+def slack_channel_members(token: str, channel_id: str) -> list[str] | None:
+    """``conversations.members``。取れなければ None。"""
+    members: list[str] = []
+    cursor = ""
+    for _ in range(50):  # 200 × 50 = 1万人まで
+        url = "https://slack.com/api/conversations.members?" + urllib.parse.urlencode(
+            {"channel": channel_id, "limit": 200, **({"cursor": cursor} if cursor else {})}
+        )
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, ValueError) as e:
+            log(f"{channel_id} のメンバーを取れない: {e}")
+            return None
+        if not data.get("ok"):
+            err = data.get("error")
+            hint = "（非公開チャンネルなら App を招待すること）" if err in ("channel_not_found", "not_in_channel") else ""
+            log(f"{channel_id} のメンバーを取れない: {err}{hint}")
+            return None
+        members.extend(data.get("members") or [])
+        cursor = (data.get("response_metadata") or {}).get("next_cursor") or ""
+        if not cursor:
+            return members
+    return members
+
+
+def channel_members(cfg: dict, channel_id: str, cache: dict) -> set[str] | None:
+    """許可を出すチャンネルのメンバー（正式なメンバーだけ）。
+
+    取れなかったときは、**前回取れた一覧を少しのあいだだけ使う**
+    （CHANNEL_MEMBERS_TTL_SEC）。それも古ければ None（＝このチャンネルは通さない）。
+    """
+    channels = cache.setdefault("_channels", {})
+    token = read_env_file(profile_home(cfg["profile"]) / ".env").get("SLACK_BOT_TOKEN", "")
+    raw = slack_channel_members(token, channel_id) if token else None
+    if raw is None:
+        hit = channels.get(channel_id)
+        if isinstance(hit, dict) and time.time() - hit.get("at", 0) < CHANNEL_MEMBERS_TTL_SEC:
+            return set(hit.get("members") or [])
+        return None
+    people = _eligible_people(token, cache, set(raw))
+    if people is None:
+        log("ワークスペースのメンバー一覧を取れない → チャンネルの許可は出さない")
+        return None
+    members = {m for m in raw if m in people}
+    channels[channel_id] = {"members": sorted(members), "at": time.time()}
+    return members
 
 
 # ------------------------------------------------------------------ 書き出し

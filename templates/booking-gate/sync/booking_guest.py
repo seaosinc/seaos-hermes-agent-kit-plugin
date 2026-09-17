@@ -145,6 +145,79 @@ def resolve_target(target: str, cfg: dict) -> tuple[str, str]:
     raise SystemExit(f"✗ 「{name}」に一致する Slack ユーザーが見つからない（ID を直接渡してもよい）")
 
 
+def _looks_like_channel_id(text: str) -> bool:
+    """チャンネル ID（C… / G…）か。**大文字に直してから見ない。**
+
+    「christina」を大文字にすると C で始まる英字の並びになり、ID と区別できない。
+    Slack の ID は大文字と数字だけで、数字を含む。
+    """
+    return bool(re.fullmatch(r"[CG][A-Z0-9]{8,}", text)) and any(c.isdigit() for c in text)
+
+
+def is_channel_target(target: str) -> bool:
+    """相手の指定がチャンネルか。``#名前`` / ``<#C…|名前>`` / ``C…``。"""
+    raw = target.strip()
+    return raw.startswith("#") or raw.startswith("<#") or _looks_like_channel_id(raw)
+
+
+def resolve_channel(target: str, cfg: dict) -> tuple[str, str]:
+    """チャンネルの指定を (チャンネル ID, 名前) に直す。
+
+    名前から引くのは ``conversations.list``。**非公開チャンネルは App が招待されて
+    いないと見えない**——見えないチャンネルのメンバーは取れないので、ここで止める。
+    """
+    raw = target.strip()
+    m = re.match(r"^<#([CG][A-Z0-9]+)(?:\|([^>]*))?>$", raw)
+    if m:
+        return (m.group(1), m.group(2) or "")
+    if _looks_like_channel_id(raw):
+        return (raw, "")
+    name = raw.lstrip("#").strip().lower()
+    if not name:
+        raise SystemExit("✗ チャンネルが指定されていない")
+    token = _token(cfg)
+    if not token:
+        raise SystemExit("✗ SLACK_BOT_TOKEN が無いので名前から引けない。チャンネル ID（C…）を渡すこと")
+    cursor = ""
+    for _ in range(50):
+        params = {"types": "public_channel,private_channel", "exclude_archived": "true", "limit": 200}
+        if cursor:
+            params["cursor"] = cursor
+        url = "https://slack.com/api/conversations.list?" + bs.urllib.parse.urlencode(params)
+        req = bs.urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+        try:
+            with bs.urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            raise SystemExit(f"✗ チャンネル一覧を取れない: {e}")
+        if not data.get("ok"):
+            raise SystemExit(f"✗ チャンネル一覧を取れない: {data.get('error')}")
+        for ch in data.get("channels") or []:
+            if str(ch.get("name", "")).lower() == name:
+                return (ch["id"], ch.get("name", name))
+        cursor = (data.get("response_metadata") or {}).get("next_cursor") or ""
+        if not cursor:
+            break
+    raise SystemExit(
+        f"✗ #{name} が見つからない（非公開チャンネルなら、先に App を招待する。チャンネル ID を直接渡してもよい）"
+    )
+
+
+def grant_key(g: dict) -> str:
+    """アクセス許可を指す鍵。人なら U…、チャンネルなら C…。"""
+    return str(g.get("slack_channel_id") or g.get("slack_user_id") or "")
+
+
+def channel_member_count(channel_id: str) -> int | None:
+    """いまの許可表に、そのチャンネルのメンバーが何人入っているか。"""
+    try:
+        table = json.loads(bs.RESERVATIONS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return len({s["slack_user_id"] for s in table.get("slots") or []
+                if s.get("channel_id") == channel_id})
+
+
 # ------------------------------------------------------------------ 表示
 
 
@@ -161,7 +234,7 @@ def is_live(g: dict, now: datetime) -> bool:
 
 def find_grant(data: dict, uid: str, now: datetime) -> dict | None:
     for g in data["grants"]:
-        if g.get("slack_user_id") != uid or not is_live(g, now):
+        if grant_key(g) != uid or not is_live(g, now):
             continue
         if datetime.fromisoformat(g["start"]) > now:
             continue
@@ -186,7 +259,13 @@ def describe(g: dict, now: datetime) -> str:
             mins = int(left.total_seconds() // 60)
             span = f"{dt.strftime('%m/%d %H:%M')} まで（あと{mins//60}時間{mins%60}分）"
     label = g.get("label") or g.get("email") or ""
-    return f"{g['slack_user_id']:<12} {span:<34} {label}"
+    channel_id = g.get("slack_channel_id")
+    if channel_id:
+        count = channel_member_count(channel_id)
+        who = f"#{g.get('channel_name') or channel_id} のメンバー"
+        who += f"（{count}人・このチャンネルの中だけ）" if count is not None else "（このチャンネルの中だけ）"
+        label = f"{who} {label}".strip()
+    return f"{grant_key(g):<12} {span:<34} {label}"
 
 
 # ------------------------------------------------------------------ サブコマンド
@@ -195,7 +274,12 @@ def describe(g: dict, now: datetime) -> str:
 def cmd_add(args) -> int:
     cfg = bs.load_config()
     now = now_local()
-    uid, email = resolve_target(args.target, cfg)
+    channel_id = channel_name = ""
+    if is_channel_target(args.target):
+        channel_id, channel_name = resolve_channel(args.target, cfg)
+        uid, email = "", ""
+    else:
+        uid, email = resolve_target(args.target, cfg)
 
     task_id = (args.task or "").strip()
     if task_id:
@@ -230,10 +314,12 @@ def cmd_add(args) -> int:
         end = start + timedelta(hours=1)  # 既定は1時間。無期限を既定にはしない
 
     data = load()
-    # 同じ人のアクセス許可は1件にまとめる（重ねると期限も範囲も読めなくなる）
-    data["grants"] = [g for g in data["grants"] if g.get("slack_user_id") != uid]
+    key = channel_id or uid
+    # 同じ人（同じチャンネル）のアクセス許可は1件にまとめる（重ねると期限も範囲も読めなくなる）
+    data["grants"] = [g for g in data["grants"] if grant_key(g) != key]
     grant = {
-        "slack_user_id": uid,
+        **({"slack_channel_id": channel_id, "channel_name": channel_name}
+           if channel_id else {"slack_user_id": uid}),
         "email": email,
         "label": args.label or "",
         "start": start.isoformat(),
@@ -248,7 +334,8 @@ def cmd_add(args) -> int:
     }
     data["grants"].append(grant)
     save(data)
-    bs.audit("guest_add", slack_user_id=uid, label=grant["label"] or None,
+    bs.audit("guest_add", slack_user_id=uid or None, slack_channel_id=channel_id or None,
+             label=grant["label"] or None,
              until=grant["end"], task_id=task_id or None,
              requested_by=args.by or None)
     apply_now()
@@ -258,8 +345,10 @@ def cmd_add(args) -> int:
     else:
         print("✓ アクセス許可を出した")
         print("  " + describe(grant, now))
+        if channel_id:
+            print("  このチャンネルのメンバーが、このチャンネルの中でだけ話せる（1分ごとにメンバーを取り直す）")
         if end is None and not task_id:
-            print("  ! 無期限。外すときは seaos-kit guest rm " + uid)
+            print("  ! 無期限。外すときは seaos-kit guest rm " + key)
     return 0
 
 
@@ -285,13 +374,18 @@ def cmd_list(args) -> int:
 def cmd_rm(args) -> int:
     cfg = bs.load_config()
     data = load()
-    uid, _ = resolve_target(args.target, cfg)
+    if is_channel_target(args.target):
+        uid, _name = resolve_channel(args.target, cfg)
+        fields = {"slack_channel_id": uid}
+    else:
+        uid, _ = resolve_target(args.target, cfg)
+        fields = {"slack_user_id": uid}
     before = len(data["grants"])
-    data["grants"] = [g for g in data["grants"] if g["slack_user_id"] != uid]
+    data["grants"] = [g for g in data["grants"] if grant_key(g) != uid]
     removed = before - len(data["grants"])
     save(data)
     if removed:
-        bs.audit("guest_rm", slack_user_id=uid, requested_by=args.by or None,
+        bs.audit("guest_rm", **fields, requested_by=args.by or None,
                  reason=args.reason or None)
     apply_now()
     print(f"✓ {uid} のアクセス許可を {removed} 件外した" if removed else f"= {uid} のアクセス許可は無かった")
@@ -306,7 +400,8 @@ def cmd_prune(args) -> int:
     data["grants"] = [g for g in data["grants"] if is_live(g, now)]
     save(data)
     for g in dropped:
-        bs.audit("guest_prune", slack_user_id=g.get("slack_user_id"), label=g.get("label") or None)
+        bs.audit("guest_prune", slack_user_id=g.get("slack_user_id"),
+                 slack_channel_id=g.get("slack_channel_id"), label=g.get("label") or None)
     apply_now()
     print(f"✓ 終わったアクセス許可を {len(dropped)} 件消した")
     return 0
@@ -390,7 +485,8 @@ def cmd_log(args) -> int:
             extra.append(f"[{r['kind']}]")
         if r.get("reason"):
             extra.append(f"理由: {r['reason']}")
-        print(f"  {when}  {r['event']:<13} {r.get('slack_user_id', ''):<12}"
+        who = r.get("slack_user_id") or r.get("slack_channel_id") or ""
+        print(f"  {when}  {r['event']:<13} {who:<12}"
               f" {r.get('actor', ''):<9} {' '.join(extra)}")
     return 0
 
@@ -418,7 +514,8 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("add", help="アクセス許可を出す")
-    a.add_argument("target", help="Slack ユーザー ID（U…）またはメールアドレス")
+    a.add_argument("target", help="相手（@表示名 / U… / メールアドレス）か、チャンネル（#名前 / C…）。"
+                                  "チャンネルなら、そのメンバーがそのチャンネルの中でだけ話せる")
     a.add_argument("--until", help="いつまで（16:00 / 2026-09-02T16:00）")
     a.add_argument("--for", dest="duration", help="どれだけ（90m / 2h / 1d）")
     a.add_argument("--from", dest="start", help="いつから（既定: いま）")
@@ -435,7 +532,7 @@ def main() -> int:
     l.set_defaults(func=cmd_list)
 
     r = sub.add_parser("rm", help="外す")
-    r.add_argument("target", help="Slack ユーザー ID またはメールアドレス")
+    r.add_argument("target", help="相手（@表示名 / U… / メールアドレス）か、チャンネル（#名前 / C…）")
     r.add_argument("--by", help="誰の指示か（監査ログに残す）。operator の判断なら operator と書く")
     r.add_argument("--reason", help="なぜ外したか（監査ログに残す）")
     r.set_defaults(func=cmd_rm)

@@ -7,6 +7,7 @@
 
   1. オーナー           → 通す（カレンダーを見ない。ここが最後の砦）
   2. アクセス許可表に有効なスロット     → 通す
+     （チャンネルの許可から来た枠は、**そのチャンネルでの発言だけ**）
   3. それ以外                   → 落とす（skip）＋ 案内を1回返す
 
 Hermes 標準の認可（pairing）と2枚重ねで運用する。どちらが落ちても
@@ -160,13 +161,22 @@ def _my_profile(cfg: dict) -> str:
     return (os.environ.get("HERMES_PROFILE") or cfg.get("profile") or "operator").strip()
 
 
-def _find_slot(table: dict, cfg: dict, user_id: str, now: datetime) -> dict | None:
-    """いま有効な枠。人と話す窓口は operator ひとつなので、何も絞り込まない。"""
+def _find_slot(table: dict, cfg: dict, user_id: str, now: datetime,
+               chat_ids: set[str] | None = None) -> dict | None:
+    """いま有効な枠。人と話す窓口は operator ひとつなので、役では絞り込まない。
+
+    **チャンネルの許可から来た枠（channel_id 付き）は、そのチャンネルでの発言にだけ効く。**
+    DM や他のチャンネルからは通さない。``chat_ids`` はいまの発言の場所
+    （スレッドなら親チャンネルも含む）。None なら場所を問わない枠だけを探す。
+    """
     grace = cfg.get("grace") or {}
     before = timedelta(minutes=int(grace.get("before_minutes", 5)))
     after = timedelta(minutes=int(grace.get("after_minutes", 5)))
     for s in table.get("slots") or []:
         if s.get("slack_user_id") != user_id:
+            continue
+        channel = s.get("channel_id")
+        if channel and channel not in (chat_ids or set()):
             continue
         try:
             start = datetime.fromisoformat(s["start"]) - before
@@ -243,8 +253,24 @@ def _finish_if_expired(user_id: str, session_store) -> None:
         logger.warning("[booking-gate] セッションを畳めなかった: %s", e)
 
 
-def _notice_text(table: dict | None, user_id: str, now: datetime) -> str:
+def _channel_elsewhere(table: dict | None, cfg: dict, user_id: str, now: datetime) -> str | None:
+    """別のチャンネルでなら話せる人か。話せるなら、そのチャンネル ID を返す。"""
+    if not table:
+        return None
+    channels = {s.get("channel_id") for s in table.get("slots") or []
+                if s.get("slack_user_id") == user_id and s.get("channel_id")}
+    for channel in sorted(c for c in channels if c):
+        if _find_slot(table, cfg, user_id, now, {channel}):
+            return channel
+    return None
+
+
+def _notice_text(table: dict | None, user_id: str, now: datetime, cfg: dict | None = None) -> str:
     base = "いまは会話できる時間ではありません。"
+    channel = _channel_elsewhere(table, cfg or {}, user_id, now)
+    if channel:
+        # Slack がチャンネル名のリンクに直して見せる
+        return f"ここでは話せません。<#{channel}> の中で話しかけてください。"
     if table:
         nxt = _next_slot(table, user_id, now)
         if nxt:
@@ -322,7 +348,9 @@ def gate(event, gateway=None, session_store=None, **kwargs):
         logger.warning("[booking-gate] アクセス許可表が無い/古い → %s を拒否", user_id)
         return {"action": "skip", "reason": "booking-table-unavailable"}
 
-    slot = _find_slot(table, cfg, user_id, now)
+    chat_ids = {c for c in (getattr(source, "chat_id", None),
+                            getattr(source, "parent_chat_id", None)) if c}
+    slot = _find_slot(table, cfg, user_id, now, chat_ids)
     if slot:
         over = _over_rate_limit(user_id, cfg)
         if over is not None:
@@ -337,7 +365,7 @@ def gate(event, gateway=None, session_store=None, **kwargs):
         return None
 
     _finish_if_expired(user_id, session_store)
-    _send_notice(gateway, source, _notice_text(table, user_id, now), reply_to)
+    _send_notice(gateway, source, _notice_text(table, user_id, now, cfg), reply_to)
     return {"action": "skip", "reason": "outside-booking"}
 
 
