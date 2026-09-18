@@ -27,10 +27,9 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "core"))
 
 import env as env_mod  # noqa: E402
-import hermes  # noqa: E402
 import kit  # noqa: E402
 import roles  # noqa: E402
-from paths import env_file, git_bin, kit_root, os_kind, profile_dir  # noqa: E402
+from paths import env_file, git_bin, kit_root, os_kind, profile_dir, profiles_dir  # noqa: E402
 
 router = APIRouter()
 
@@ -43,6 +42,21 @@ def _source() -> Dict[str, str]:
 
 
 @router.get("/roles")
+def _installed(name: str) -> bool:
+    """本体から見て、その役が「ある」か。
+
+    **`core/hermes.py` を import しない。** このコードは Hermes 本体のプロセスの中で
+    動き、本体のパッケージ名も `hermes` である。`import hermes` はすでに読み込まれて
+    いる本体を返すので、こちらの関数が見つからず 500 になった（実際に踏んだ）。
+
+    判定は `hermes.profile_exists` と同じ——削除済みの印（`profiles/.deleted/<役>`）が
+    あればフォルダが実在しても「無い」。
+    """
+    if (profiles_dir() / ".deleted" / name).exists():
+        return False
+    return profile_dir(name).is_dir()
+
+
 def list_roles() -> List[Dict]:
     """役の一覧。導入済みかどうかと、人が読む一行説明を返す。
 
@@ -58,7 +72,7 @@ def list_roles() -> List[Dict]:
                 # **フォルダの有無ではなく、本体から見えるかを聞く。** 削除済みの印
                 # （profiles/.deleted/<役>）が残っていると、フォルダがあっても本体は
                 # 存在しないものとして扱う。画面だけ「残置」と出て食い違っていた。
-                "installed": hermes.profile_exists(name),
+                "installed": _installed(name),
                 # 反映の対象か。`essential` は外せない（板の仕組みが前提にしている）
                 "enabled": name in enabled,
                 "essential": roles.essential(name),
@@ -402,7 +416,7 @@ def removal_impact(name: str) -> Dict:
         # **どのカードかを画面に出す。** 件数だけでは、板のどれを片付ければ
         # よいのか分からない（分からず無効化できない、という報告が出た）。
         "busyReason": worker_mod.busy_reason(name),
-        "installed": hermes.profile_exists(name),
+        "installed": _installed(name),
         "memories": memories,
         "sessions": sessions,
     }

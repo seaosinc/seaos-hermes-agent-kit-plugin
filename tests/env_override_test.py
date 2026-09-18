@@ -141,6 +141,22 @@ def test_deleted_profile_is_not_shown_as_residual():
         marker.unlink()
 
 
+def test_api_does_not_import_names_the_host_owns():
+    """画面の API は、本体と同じ名前のモジュールを import しない。
+
+    このコードは Hermes 本体のプロセスの中で動く。本体のパッケージ名も `hermes` なので、
+    `import hermes` はすでに読み込まれている本体を返す。こちらの関数は見つからず、
+    画面は 500 で開けなくなる（実際に踏んだ）。
+    """
+    src = (ROOT / "dashboard" / "plugin_api.py").read_text(encoding="utf-8")
+    for line in src.splitlines():
+        head = line.strip()
+        assert head != "import hermes" and not head.startswith("import hermes "), \
+            "本体と同じ名前を import している（画面が 500 になる）"
+        assert not head.startswith("from hermes import"), \
+            "本体と同じ名前から import している（画面が 500 になる）"
+
+
 def test_owner_can_always_talk():
     """オーナーは、話しかけてよい人に入れ忘れても、operator に配る一覧へ足される。"""
     reset()
