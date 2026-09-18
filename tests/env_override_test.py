@@ -157,6 +157,30 @@ def test_api_does_not_import_names_the_host_owns():
             "本体と同じ名前から import している（画面が 500 になる）"
 
 
+def test_routes_point_at_the_intended_handlers():
+    """飾り（@router.get）の直下に別の関数を差し込んでいないか。
+
+    `@router.get("/roles")` のすぐ下へ補助関数を入れてしまい、一覧の口がその関数に
+    結び付いた。画面は「name が必要」と 422 を返し、設定画面ごと開けなくなった。
+    経路と処理の対応を、名前で固定する。
+    """
+    import plugin_api as api
+
+    want = {
+        ("/roles", "GET"): "list_roles",
+        ("/secrets", "GET"): "list_secrets",
+        ("/machine", "GET"): "machine_status",
+        ("/status", "GET"): "status",
+        ("/validate", "GET"): "validate",
+        ("/version", "GET"): "version",
+        ("/ui.js", "GET"): "ui_source",
+    }
+    got = {(r.path, m): r.endpoint.__name__
+           for r in api.router.routes for m in (r.methods or set())}
+    for key, name in want.items():
+        assert got.get(key) == name, f"{key} が {got.get(key)} に繋がっている（期待: {name}）"
+
+
 def test_owner_can_always_talk():
     """オーナーは、話しかけてよい人に入れ忘れても、operator に配る一覧へ足される。"""
     reset()

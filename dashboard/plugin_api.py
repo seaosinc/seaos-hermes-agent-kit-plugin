@@ -41,7 +41,6 @@ def _source() -> Dict[str, str]:
     return env_mod.read_env(env_file())
 
 
-@router.get("/roles")
 def _installed(name: str) -> bool:
     """本体から見て、その役が「ある」か。
 
@@ -57,6 +56,7 @@ def _installed(name: str) -> bool:
     return profile_dir(name).is_dir()
 
 
+@router.get("/roles")
 def list_roles() -> List[Dict]:
     """役の一覧。導入済みかどうかと、人が読む一行説明を返す。
 
