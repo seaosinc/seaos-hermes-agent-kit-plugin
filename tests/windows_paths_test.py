@@ -76,6 +76,49 @@ def test_home_is_inferred_from_the_running_hermes_python():
             os.environ["HERMES_HOME"] = saved_home
 
 
+def test_windows_command_is_put_on_path():
+    """Windows では、コマンドを置くだけでなくユーザーの PATH にも足す。
+
+    置くだけだと、エージェントの端末から `seaos-kit` が見つからない。実際に、
+    窓口がアクセス許可を出せず「seaos-kit も利用できない」と答えた。
+    """
+    import types
+
+    import platform_ops
+
+    target = Path(r"C:\Users\t\AppData\Local\Programs\seaos-kit")
+    stored = {"Path": r"C:\Windows;C:\Windows\System32"}
+
+    class _Key:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    fake = types.SimpleNamespace(
+        HKEY_CURRENT_USER=0, KEY_READ=1, KEY_WRITE=2, REG_EXPAND_SZ=2,
+        OpenKey=lambda *a, **k: _Key(),
+        QueryValueEx=lambda _k, name: (stored[name], 2),
+        SetValueEx=lambda _k, name, _r, _t, value: stored.__setitem__(name, value),
+    )
+    saved = sys.modules.get("winreg")
+    sys.modules["winreg"] = fake
+    saved_path = os.environ.get("PATH", "")
+    try:
+        assert platform_ops._win_add_to_path(target) is True, "PATH に足していない"
+        assert str(target) in stored["Path"], stored["Path"]
+        # 二度目は足さない（同じ場所が並ばない）
+        assert platform_ops._win_add_to_path(target) is False, "同じ場所を二重に足した"
+        assert stored["Path"].count(str(target)) == 1, stored["Path"]
+    finally:
+        os.environ["PATH"] = saved_path
+        if saved is None:
+            sys.modules.pop("winreg", None)
+        else:
+            sys.modules["winreg"] = saved
+
+
 if __name__ == "__main__":
     run_tests(globals())
     finish()

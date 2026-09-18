@@ -298,6 +298,50 @@ def _interpreter() -> str:
     return sys.executable or ("python" if os_kind() == "win32" else "python3")
 
 
+def _win_add_to_path(target: Path, log: "Optional[Log]" = None) -> bool:
+    """Windows のユーザー環境変数 PATH に、コマンドの置き場を足す。足したら True。
+
+    **置くだけでは呼べない。** 以前は「PATH に足すこと」とログへ書くだけだったので、
+    エージェントの端末から `seaos-kit` が見つからず、アクセス許可を出す手が無い状態に
+    なっていた（実際に踏んだ）。macOS / Linux は `~/.local/bin` が最初から通っている。
+
+    **書くのは利用者のユーザー環境変数だけ**（HKCU\Environment）。管理者権限も要らず、
+    機械全体の設定には触らない。`setx` は 1024 文字で切り捨てるので使わない。
+
+    反映は新しく起動したプロセスから。**いま動いているゲートウェイには届かない**ので、
+    呼び手には再起動を案内させる。
+    """
+    try:
+        import winreg  # noqa: PLC0415  （Windows でだけ import する）
+    except ImportError:
+        return False
+    want = str(target)
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0,
+                            winreg.KEY_READ | winreg.KEY_WRITE) as key:
+            try:
+                current, kind = winreg.QueryValueEx(key, "Path")
+            except FileNotFoundError:
+                current, kind = "", winreg.REG_EXPAND_SZ
+            # **区切りは `;` で固定する。** レジストリの PATH は Windows の形式なので、
+            # 走っている OS の `os.pathsep` に任せない（検査が別の OS でも通るように）。
+            parts = [p for p in str(current).split(";") if p.strip()]
+            if any(os.path.normcase(p.rstrip("\\")) == os.path.normcase(want.rstrip("\\"))
+                   for p in parts):
+                return False
+            parts.append(want)
+            winreg.SetValueEx(key, "Path", 0, kind or winreg.REG_EXPAND_SZ, ";".join(parts))
+    except OSError as exc:
+        if log:
+            log(f"  PATH に {target} を足せませんでした（手で足してください）: {exc}")
+        return False
+    # 走っているプロセスにも入れておく。**この回の処理で続けて呼べるように。**
+    os.environ["PATH"] = os.environ.get("PATH", "") + os.pathsep + want
+    if log:
+        log(f"  PATH に {target} を足しました（反映は再起動後）")
+    return True
+
+
 def link_command(log: Optional[Log] = None) -> Path:
     """PATH から叩けるようにする。
 
@@ -314,7 +358,8 @@ def link_command(log: Optional[Log] = None) -> Path:
         path.write_text(f'@echo off\r\n"{python}" "{entry}" %*\r\n', encoding="utf-8")
         if log:
             log(f"+ {path}")
-            log(f"  PATH に {target} を足すこと")
+        # **置くだけでは呼べない。** PATH に無いと、エージェントの端末から叩けない。
+        _win_add_to_path(target, log)
         return path
 
     path = target / COMMAND
