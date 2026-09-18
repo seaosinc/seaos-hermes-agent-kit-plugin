@@ -148,6 +148,9 @@ def _parser() -> argparse.ArgumentParser:
     pg.add_argument("--older-than", type=int, default=0, metavar="日数",
                     help="この日数より古いものだけ。0 なら archived すべて")
 
+    tm = sub.add_parser("timing", help="カードがどこで待たされたかを板の記録から出す")
+    tm.add_argument("-n", "--limit", type=int, default=10, help="見る枚数（既定 10）")
+
     sub.add_parser("maintain", help="日次の保守一式（反映 → 掃除 → 検証）")
 
     return parser
@@ -378,6 +381,12 @@ def _cmd_purge(args: argparse.Namespace) -> int:
     return 0 if res.ok() else 1
 
 
+def _cmd_timing(args: argparse.Namespace) -> int:
+    import timing
+
+    return timing.report(limit=args.limit, log=_print)
+
+
 def _cmd_maintain(args: argparse.Namespace) -> int:
     res = maintain_mod.maintain(log=_print)
     for line in res.lines:
@@ -413,6 +422,7 @@ HANDLERS = {
     "install": _cmd_install,
     "uninstall": _cmd_uninstall,
     "purge": _cmd_purge,
+    "timing": _cmd_timing,
     "maintain": _cmd_maintain,
     "guest": _cmd_guest,
 }
