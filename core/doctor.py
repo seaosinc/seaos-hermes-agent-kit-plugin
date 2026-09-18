@@ -254,6 +254,10 @@ SLACK_SCOPES = {
     # 通知の宛先はユーザー ID で届く。文章はそのまま送れるが、ファイルは
     # DM を開いて（conversations.open）チャンネル ID に直さないと送れない。
     "im:write": "カードの成果物（スクショなど）を DM へ返せない",
+    # 絵文字での操作。**配る設定は reactions / reaction_triggers を有効にしている**ので、
+    # App 側に権限が無いと「効くはずなのに無反応」になる（原因が見えない）。
+    "reactions:read": "人が付けた絵文字に反応できない",
+    "reactions:write": "受け取った印（絵文字）を返せない",
 }
 
 
