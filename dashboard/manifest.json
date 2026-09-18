@@ -3,6 +3,6 @@
   "label": "SEAOS",
   "description": "SEAOS のエージェント役一式を導入・更新・検査する",
   "icon": "Users",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "api": "plugin_api.py"
 }

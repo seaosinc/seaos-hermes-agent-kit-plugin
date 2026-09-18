@@ -10,7 +10,10 @@ manifest_version: 1
 # バックエンドを通すかどうかは、ここ（と dashboard/manifest.json）の名前で判定する。
 # ずれていると、README どおりに入れた環境で画面が「Plugin not found」になった。
 name: seaos-hermes-agent-kit-plugin
-version: 0.0.0
+# **プラグインとしての版。** ここは滅多に動かさない。配る役の版は git から採っていて
+# （`0.1.<コミット数>+<sha>`）、更新が届いたかはそちらで判定する。この数字を見て
+# 何かが決まる場面は無いので、コミットのたびに機械が書き換えることはしない。
+version: 1.0.0
 description: SEAOS のエージェント役一式を、GUI から導入・更新・検査するキット
 author: seaos
 
