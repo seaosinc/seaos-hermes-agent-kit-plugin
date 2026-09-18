@@ -672,7 +672,7 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         cfg["terminal"] = _workspace_terminal(spec)
     # 置くだけでは有効にならない（既定は無効）。配布物の側で有効にしておく。
     # 全役に載せるもの（UNIVERSAL_PLUGINS）があるので、どの役も plugins を持つ。
-    cfg["plugins"] = {"enabled": plugins_of(spec), "disabled": []}
+    cfg["plugins"] = {"enabled": plugins_of(spec, with_self=True), "disabled": []}
     servers = mcp_servers_of(kit, name, spec)
     if servers:
         # **置き場のパスは機械ごとに違う**ので、雛形には `{{FILES_ROOT}}` と書いて
@@ -768,11 +768,25 @@ RETIRED_CRONS = ("machine-guard",)
 #                  （0 を「無制限」のつもりで渡し、15秒で死ぬカードが繰り返し作られた）
 UNIVERSAL_PLUGINS = ("runtime-floor",)
 
+# **キット自身（このプラグイン）も、各役の設定で有効にする。**
+# 設定画面のバックエンドは、**いま選んでいるプロファイルの config.yaml** を見て
+# 「そのプラグインが有効か」を判定する。役をデスクトップの既定にすると、
+# その役の設定に名前が無く、画面が毎回「Plugin not found」になった。
+# 名前は plugin.yaml / dashboard/manifest.json と同じにする（テストで縛る）。
+SELF_PLUGIN = "seaos-hermes-agent-kit-plugin"
 
-def plugins_of(spec: dict) -> list[str]:
-    """その役に載せるプラグイン。役の指定に、全役共通のものを足す。"""
+
+def plugins_of(spec: dict, *, with_self: bool = False) -> list[str]:
+    """その役に載せるプラグイン。役の指定に、全役共通のものを足す。
+
+    `with_self` は設定（config.yaml の plugins.enabled）向け。**配るファイルは無い**
+    ——キット自身はプラグインとして既に入っているので、copy_runtime では足さない。
+    """
     names = list(spec.get("plugins") or [])
-    return names + [p for p in UNIVERSAL_PLUGINS if p not in names]
+    names += [p for p in UNIVERSAL_PLUGINS if p not in names]
+    if with_self and SELF_PLUGIN not in names:
+        names.append(SELF_PLUGIN)
+    return names
 
 
 def copy_runtime(kit: Path, d: Path, spec: dict) -> list[str]:

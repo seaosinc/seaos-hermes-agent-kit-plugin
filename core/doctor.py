@@ -199,7 +199,7 @@ def _profiles(rep: Report) -> None:
         # **置いただけでは動かない。** 既存の役は update で config が上書きされないので、
         # 配布物で有効にしたつもりでも無効のまま残りうる（kit.enable_plugins が直す）
         enabled = set(((cfg.get("plugins") or {}).get("enabled")) or [])
-        for plugin in roles.generator().plugins_of(specs.get(name) or {}):
+        for plugin in roles.generator().plugins_of(specs.get(name) or {}, with_self=True):
             if plugin in enabled:
                 rep.ok(f"プラグイン {plugin} が有効")
             else:

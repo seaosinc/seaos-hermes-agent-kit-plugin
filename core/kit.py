@@ -329,7 +329,7 @@ def enable_plugins() -> Result:
         except (OSError, yaml.YAMLError):
             continue
         have = set(((cfg.get("plugins") or {}).get("enabled")) or [])
-        for plugin in gen.plugins_of(specs.get(name) or {}):
+        for plugin in gen.plugins_of(specs.get(name) or {}, with_self=True):
             if plugin in have:
                 continue
             # 道具の上書きは求めない。聞かれると対話待ちで止まる

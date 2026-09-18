@@ -103,6 +103,22 @@ def test_plugin_name_matches_repository_name():
     assert plugin == manifest == shell == want, (plugin, manifest, shell)
 
 
+def test_kit_plugin_enabled_on_every_role():
+    """キット自身も各役の設定で有効にする。
+
+    設定画面のバックエンドは、いま選んでいるプロファイルの config.yaml で「有効か」を見る。
+    役をデスクトップの既定にすると、その役の設定に名前が無く、画面が毎回 Plugin not found になった。
+    """
+    import json
+
+    want = json.loads((ROOT / "dashboard/manifest.json").read_text(encoding="utf-8"))["name"]
+    assert bd.SELF_PLUGIN == want, (bd.SELF_PLUGIN, want)
+    for d in sorted(x for x in OUT.iterdir() if (x / "config.yaml").exists()):
+        c = yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8")) or {}
+        assert want in ((c.get("plugins") or {}).get("enabled") or []), f"{d.name}: キット自身が有効になっていない"
+        assert not (d / "plugins" / want).exists(), f"{d.name}: キット自身を配布物として配っている"
+
+
 def test_runtime_floor_on_every_role():
     """カードの上限を直すプラグインは、カードを作れる全役に載って有効になっている。"""
     for d in sorted(x for x in OUT.iterdir() if (x / "config.yaml").exists()):
