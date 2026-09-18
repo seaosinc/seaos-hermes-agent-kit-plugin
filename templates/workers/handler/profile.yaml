@@ -18,7 +18,7 @@ description: >-
 summary: "外部サービスの読み書き（GitHub / Backlog ほか）"
 
 # 出典を突き合わせて要約する仕事なので、速さより読解を採る。
-model: "openai/gpt-5.6-sol"
+model: "mid"
 
 # **コマンドを実行しない。** 外部サービスを触る手段は MCP と web に限る。
 #

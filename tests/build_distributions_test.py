@@ -459,12 +459,13 @@ def test_workspace_roles_declare_gh_token():
 def test_recruiter_is_not_on_the_cheap_model():
     # **役を作る役の出来は、作った役の数だけ後から効く。** 安い模型では担当範囲の
     # 切り方が粗く、既存と重なる役や誰も引けない description ができた。
-    assert cfg("recruiter")["model"]["default"] == bd.SMART, "recruiter が安い模型のまま"
+    assert cfg("recruiter")["model"]["default"] == bd.MID, "recruiter が安い模型のまま"
 
 
 def test_model_tier_names_follow_replacements():
     # profile.yaml に段の名前で書けること。生の名前を固定すると、モデルを
     # 入れ替えたときにその役だけ古いまま取り残される。
+    assert bd.model_of("mid") == bd.MID
     assert bd.model_of("smart") == bd.SMART
     assert bd.model_of("senior") == bd.SENIOR
     assert bd.model_of("") == bd.FAST and bd.model_of(None) == bd.FAST

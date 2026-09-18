@@ -32,14 +32,17 @@ from pathlib import Path
 import yaml
 
 FAST = os.environ.get("MODEL_FAST", "openai/gpt-5.6-luna")
+# 速い模型と上位の間。**文章の良し悪しが仕事の質になる役**に充てる。
+MID = os.environ.get("MODEL_MID", "openai/gpt-5.6-sol")
 SMART = os.environ.get("MODEL_SMART", "openai/gpt-6-astra")
 # 難度の高い実装だけに充てる上位モデル。**単価が高いので既定では使わない**——
 # ROLES で明示的に指定した役だけが引く（いまは senior-developer のみ）。
 SENIOR = os.environ.get("MODEL_SENIOR", "anthropic/claude-opus-5")
 # profile.yaml の model には、生のモデル名のほかに段の名前（fast / smart / senior）を
-# 書ける。**段で書けば、MODEL_SMART などの差し替えに追従する**——生の名前を
+# 書ける（fast / mid / smart / senior）。**段で書けば、MODEL_MID などの
+# 差し替えに追従する**——生の名前を
 # 固定すると、モデルを入れ替えたときにその役だけ古いまま取り残される。
-TIERS = {"fast": FAST, "smart": SMART, "senior": SENIOR}
+TIERS = {"fast": FAST, "mid": MID, "smart": SMART, "senior": SENIOR}
 
 
 def model_of(value: str | None) -> str:

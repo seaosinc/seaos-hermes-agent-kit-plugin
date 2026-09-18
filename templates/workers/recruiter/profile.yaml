@@ -20,14 +20,14 @@ description: >-
 # **人が読む一行。** 設定画面の一覧に出る（description は decomposer 向けの長文）。
 summary: "エージェントそのものを新設・改修する"
 
-# **上位（smart）を充てる。** この役の仕事は「どんな役が要るかを決め、description を
+# **中間（mid）を充てる。** この役の仕事は「どんな役が要るかを決め、description を
 # 書く」ことで、書いた文章が decomposer の振り分けをそのまま左右する。安い模型では
 # 担当範囲の切り方が粗く、既存の役と重なる役や、誰も引けない説明文ができた（実測）。
 # **ここは出来の悪さが、作った役の数だけ後から効いてくる。**
 #
-# fast / smart / senior と書けば、MODEL_FAST などの差し替えに追従する。
+# fast / mid / smart / senior と書けば、MODEL_MID などの差し替えに追従する。
 # 生のモデル名を書いて固定することもできる。空なら fast。
-model: "smart"
+model: "mid"
 
 # SOUL.md の {{EXTRA}} に差し込まれる業務固有の指示（省略可）
 extra: ""
