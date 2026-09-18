@@ -401,16 +401,9 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
             continue
         if not hermes.profile_exists(name):
             code, out = hermes.install(dist)
-            # **入ったかどうかは、終了コードではなく実物で見る。** 導入そのものは
-            # 済んでいるのに後段が非ゼロで返ることがあり、それを失敗として報告して
-            # いた（画面に「導入できませんでした」と出たまま、実物は入っていた）。
-            if hermes.profile_exists(name):
-                notable.append(f"{name} を新しく導入しました"
-                               if code == 0 else
-                               f"{name} を導入しました（本体は警告を返しています: {_reason(out)}）")
-            else:
-                notable.append(f"{name} を導入できませんでした: {_reason(out)}")
-                result.failures += 1
+            notable.append(f"{name} を新しく導入しました" if code == 0
+                           else f"{name} を導入できませんでした: {_reason(out)}")
+            result.failures += 0 if code == 0 else 1
             continue
         if not hermes.is_distribution(name):
             # 旧方式で作られたプロファイル。一度だけ配布物として入れ直す
