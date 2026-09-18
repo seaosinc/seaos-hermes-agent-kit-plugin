@@ -157,6 +157,28 @@ def test_update_retargets_a_vanished_source():
     assert not kit.retarget_source(dist, "fixer"), "利用者が意図して入れた取得元を付け替えた"
 
 
+def test_deleted_profile_is_not_treated_as_present():
+    """削除済みの印が残っている役は「無い」扱いにする。
+
+    `hermes profile delete` は profiles/.deleted/<役> に印を置き、以後フォルダが
+    実在しても本体は存在しないものとして扱う。フォルダだけを見ていたせいで、
+    無効化のときに説明文を書きにいって「プロファイルがありません」で失敗した。
+    """
+    import hermes
+
+    d = HOME / "profiles" / "recruiter"
+    d.mkdir(parents=True, exist_ok=True)
+    assert hermes.profile_exists("recruiter")
+
+    marker = HOME / "profiles" / ".deleted" / "recruiter"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("", encoding="utf-8")
+    try:
+        assert not hermes.profile_exists("recruiter"), "削除済みの印を見ていない"
+    finally:
+        marker.unlink()
+
+
 def test_update_retires_removed_role_and_cron():
     """廃止した役（キットが配ったもの）と定期実行を外す。利用者が自分で作った同名の役には触らない。"""
     import hermes

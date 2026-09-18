@@ -49,7 +49,16 @@ def run(args: List[str], *, stdin_empty: bool = True) -> Tuple[int, str]:
 
 
 def profile_exists(name: str) -> bool:
+    """本体から見て、その役が「ある」か。
+
+    **フォルダの有無だけでは足りない。** `hermes profile delete` が置く
+    `profiles/.deleted/<役>` の印が残っていると、フォルダが実在しても本体は
+    存在しないものとして扱う（`clear_tombstone` の説明を見よ）。印を見ずに
+    説明文を書きにいって、「プロファイルがありません」で失敗した。
+    """
     from paths import profile_dir
+    if (profiles_dir() / ".deleted" / name).exists():
+        return False
     return profile_dir(name).is_dir()
 
 
