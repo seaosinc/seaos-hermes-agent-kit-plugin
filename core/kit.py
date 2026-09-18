@@ -400,16 +400,16 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         if not dist.is_dir():
             continue
         if not hermes.profile_exists(name):
-            code, _ = hermes.install(dist)
+            code, out = hermes.install(dist)
             notable.append(f"{name} を新しく導入しました" if code == 0
-                           else f"{name} を導入できませんでした")
+                           else f"{name} を導入できませんでした: {_reason(out)}")
             result.failures += 0 if code == 0 else 1
             continue
         if not hermes.is_distribution(name):
             # 旧方式で作られたプロファイル。一度だけ配布物として入れ直す
-            code, _ = hermes.install(dist, force=True)
+            code, out = hermes.install(dist, force=True)
             notable.append(f"{name} を配布物として入れ直しました" if code == 0
-                           else f"{name} を入れ直せませんでした")
+                           else f"{name} を入れ直せませんでした: {_reason(out)}")
             result.failures += 0 if code == 0 else 1
             continue
         if retarget_source(dist, name):
@@ -417,11 +417,11 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         if not force_config and _installed_matches(dist, name):
             unchanged += 1
             continue
-        code, _ = hermes.update(name, force_config=force_config)
+        code, out = hermes.update(name, force_config=force_config)
         if code == 0:
             updated += 1
         else:
-            notable.append(f"{name} を更新できませんでした")
+            notable.append(f"{name} を更新できませんでした: {_reason(out)}")
             result.failures += 1
 
     if updated:
