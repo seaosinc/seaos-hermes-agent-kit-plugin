@@ -21,7 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "core"))
 
+import envhint  # noqa: E402
 import paths  # noqa: E402
+import shutil  # noqa: E402
 
 from _harness import finish, run_tests  # noqa: E402
 
@@ -117,6 +119,36 @@ def test_windows_command_is_put_on_path():
             sys.modules.pop("winreg", None)
         else:
             sys.modules["winreg"] = saved
+
+
+def test_command_path_is_told_to_the_agents():
+    """PATH に無いときは、絶対パスで呼べと各役へ書く。
+
+    環境変数は変更後に起動したプロセスにしか届かないので、PATH だけに頼ると
+    起動しっぱなしのゲートウェイからは見つからないままになる。
+    """
+    import shutil
+
+    import envhint
+    import platform_ops
+
+    saved_which = shutil.which
+    saved_target = platform_ops.command_target
+    target = Path(tempfile.mkdtemp(prefix="cmd-target-"))
+    (target / f"{platform_ops.COMMAND}.cmd").write_text("@echo off\r\n", encoding="utf-8")
+    try:
+        shutil.which = lambda name, *a, **k: None       # PATH には無い
+        platform_ops.command_target = lambda: target
+        line = envhint._seaos_kit_line()
+        assert "PATH に無い" in line and str(target) in line, line
+
+        shutil.which = lambda name, *a, **k: "/usr/local/bin/" + name
+        line = envhint._seaos_kit_line()
+        assert "PATH から呼べる" in line, line
+    finally:
+        shutil.which = saved_which
+        platform_ops.command_target = saved_target
+        shutil.rmtree(target, ignore_errors=True)
 
 
 if __name__ == "__main__":

@@ -82,6 +82,32 @@ def _python_line() -> str:
     )
 
 
+def _seaos_kit_line() -> str:
+    """`seaos-kit` の呼び方。**PATH に無くても呼べるよう、絶対パスを書く。**
+
+    Windows はコマンドを `%LOCALAPPDATA%\\Programs\\seaos-kit` に置く。PATH への
+    追記は反映のたびに行うが、**環境変数は変更後に起動したプロセスにしか届かない**
+    ——起動しっぱなしのゲートウェイからは見つからないままになる。実際に、窓口が
+    アクセス許可を出せず「seaos-kit が利用できない」と答えた。
+    """
+    import platform_ops
+
+    found = shutil.which(platform_ops.COMMAND)
+    path = Path(found) if found else None
+    if path is None:
+        target = platform_ops.command_target()
+        for name in (f"{platform_ops.COMMAND}.cmd", platform_ops.COMMAND):
+            if (target / name).is_file():
+                path = target / name
+                break
+    if path is None:
+        return f"- `{platform_ops.COMMAND}` は見つからなかった（反映をやり直すと置かれる）"
+    if found:
+        return f"- `{platform_ops.COMMAND}` → `{path}`（PATH から呼べる）"
+    return (f"- **`{platform_ops.COMMAND}` は PATH に無い。`{path}` を絶対パスで呼ぶこと。**"
+            " そのまま叩くと `command not found` になる")
+
+
 def _os_name() -> str:
     if platform.system() == "Darwin":
         return _run("sw_vers", "-productName") or "macOS"
@@ -120,6 +146,7 @@ def measure() -> Dict[str, str]:
         "REPO_DIRS": str(len(dirs)),
         "REPO_GITS": str(len(gits)),
         "PKGMGR_LINE": _package_manager(),
+        "SEAOS_KIT_LINE": _seaos_kit_line(),
         "PYTHON_LINE": _python_line(),
         "NODE_LINE": _tool_line("node"),
         "CLAUDE_LINE": _tool_line(
