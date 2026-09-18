@@ -215,6 +215,48 @@ def test_channel_targets_are_not_confused_with_names():
     assert guest.resolve_channel("<#C0C1L6ESPR8|faq>", {}) == ("C0C1L6ESPR8", "faq")
 
 
+def test_channel_is_found_by_either_spelling():
+    """Slack が持つ2つの綴り（name / name_normalized）のどちらでも引ける。
+
+    日本語を含むチャンネル名ではこの2つが食い違い、画面に出ている綴りで指定しても
+    「見つからない」になった（実際に踏んだ。ID を渡すと通った）。
+    """
+    import io
+    import json as _json
+
+    listing = {
+        "ok": True,
+        "channels": [
+            {"id": "C0AAA", "name": "del_faq_グンゼメディカル",
+             "name_normalized": "del_faq_gunze"},
+            {"id": "C0BBB", "name": "general", "name_normalized": "general"},
+        ],
+    }
+
+    class _Res:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return _json.dumps(listing).encode("utf-8")
+
+    saved_open = bs.urllib.request.urlopen
+    saved_token = guest._token
+    bs.urllib.request.urlopen = lambda *a, **k: _Res()
+    guest._token = lambda cfg: "xoxb-test"
+    try:
+        cfg = {"profile": "operator"}
+        assert guest.resolve_channel("#del_faq_グンゼメディカル", cfg)[0] == "C0AAA"
+        assert guest.resolve_channel("#del_faq_gunze", cfg)[0] == "C0AAA", "正規化された綴りで引けない"
+        assert guest.resolve_channel("#general", cfg)[0] == "C0BBB"
+    finally:
+        bs.urllib.request.urlopen = saved_open
+        guest._token = saved_token
+
+
 if __name__ == "__main__":
     run_tests(globals())
     finish()

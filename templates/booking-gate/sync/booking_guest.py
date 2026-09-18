@@ -193,7 +193,11 @@ def resolve_channel(target: str, cfg: dict) -> tuple[str, str]:
         if not data.get("ok"):
             raise SystemExit(f"✗ チャンネル一覧を取れない: {data.get('error')}")
         for ch in data.get("channels") or []:
-            if str(ch.get("name", "")).lower() == name:
+            # **`name` と `name_normalized` の両方を見る。** 日本語を含む名前では
+            # この2つが食い違い、画面に出ている綴りで引けなかった（実際に踏んだ）。
+            spellings = {str(ch.get("name", "")).lower(),
+                         str(ch.get("name_normalized", "")).lower()}
+            if name in spellings:
                 return (ch["id"], ch.get("name", name))
         cursor = (data.get("response_metadata") or {}).get("next_cursor") or ""
         if not cursor:
