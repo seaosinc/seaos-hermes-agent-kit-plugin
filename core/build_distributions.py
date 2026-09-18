@@ -194,7 +194,10 @@ ROLES: dict[str, dict] = {
         # 役つきの名前だけを見る（roles.own_env_vars）。
         "env_own": ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_ALLOWED_USERS",
                     "SLACK_OWNER_ID", "SLACK_HOME_CHANNEL"],
-        "skills": ["kanban-collaboration", "guest-access"],
+        # **場面ごとの手順はスキルへ出す。** SOUL に積むと毎回読ませることになり、
+        # 守ってほしい原則が薄まる。SOUL に残すのはいつでも効くものだけ。
+        "skills": ["kanban-collaboration", "guest-access", "request-intake",
+                   "file-handoff", "slack-reactions", "handoff-and-report"],
         "plugins": ["booking-gate"],
         "hooks": ["mem0-up"],
         "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard",
@@ -220,7 +223,8 @@ ROLES: dict[str, dict] = {
         # **外せない役。** kanban の orchestrator_profile で、分解したカードの
         # 親はこの役に戻る。居ないと、子が全部終わっても誰も完了を判定しない。
         "essential": True,
-        "skills": ["kanban-collaboration", "precedent-lookup"],
+        "skills": ["kanban-collaboration", "precedent-lookup",
+                   "completion-judgement", "unblocking"],
         # 「道具が足りない」という判断を下す役なので、道具の綴りを確かめる口を持つ
         "mcp_shared": ["context7"],
         # **前例の引き方（precedent-lookup）を持つのは判断する役だけ。** 前例を
