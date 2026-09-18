@@ -391,25 +391,27 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     件数で言い、**いつもと違うこと（新設・移行・失敗）だけ名前を出す。**
     """
     result = Result()
-    out = build(log=log)
+    # **配布物の置き場。** ループの中で本体の出力を受ける変数と取り違えないよう、
+    # 役割の分かる名前にしておく（`out` で受けて上書きし、2周目で壊した）。
+    dist_root = build(log=log)
 
     updated = unchanged = 0
     notable: List[str] = []
     for name in roles.names():
-        dist = out / name
+        dist = dist_root / name
         if not dist.is_dir():
             continue
         if not hermes.profile_exists(name):
-            code, out = hermes.install(dist)
+            code, said = hermes.install(dist)
             notable.append(f"{name} を新しく導入しました" if code == 0
-                           else f"{name} を導入できませんでした: {_reason(out)}")
+                           else f"{name} を導入できませんでした: {_reason(said)}")
             result.failures += 0 if code == 0 else 1
             continue
         if not hermes.is_distribution(name):
             # 旧方式で作られたプロファイル。一度だけ配布物として入れ直す
-            code, out = hermes.install(dist, force=True)
+            code, said = hermes.install(dist, force=True)
             notable.append(f"{name} を配布物として入れ直しました" if code == 0
-                           else f"{name} を入れ直せませんでした: {_reason(out)}")
+                           else f"{name} を入れ直せませんでした: {_reason(said)}")
             result.failures += 0 if code == 0 else 1
             continue
         if retarget_source(dist, name):
@@ -417,11 +419,11 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         if not force_config and _installed_matches(dist, name):
             unchanged += 1
             continue
-        code, out = hermes.update(name, force_config=force_config)
+        code, said = hermes.update(name, force_config=force_config)
         if code == 0:
             updated += 1
         else:
-            notable.append(f"{name} を更新できませんでした: {_reason(out)}")
+            notable.append(f"{name} を更新できませんでした: {_reason(said)}")
             result.failures += 1
 
     if updated:

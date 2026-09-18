@@ -179,6 +179,20 @@ def test_deleted_profile_is_not_treated_as_present():
         marker.unlink()
 
 
+def test_update_survives_more_than_one_role():
+    """反映が2役目で落ちないこと。
+
+    本体の出力を受ける変数で、配布物の置き場を上書きしていた。1役目は通り、
+    2役目で `str / str` になって 500 で落ちた（画面の「反映」が失敗した）。
+    """
+    import inspect
+
+    src = inspect.getsource(kit.update)
+    assert "dist_root = build(" in src, "置き場の変数が変わった。取り違えていないか見ること"
+    for bad in ("code, out = hermes.install", "code, out = hermes.update"):
+        assert bad not in src, f"置き場の変数を上書きしている: {bad}"
+
+
 def test_update_retires_removed_role_and_cron():
     """廃止した役（キットが配ったもの）と定期実行を外す。利用者が自分で作った同名の役には触らない。"""
     import hermes
