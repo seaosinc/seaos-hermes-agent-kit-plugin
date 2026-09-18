@@ -337,9 +337,29 @@ def _win_add_to_path(target: Path, log: "Optional[Log]" = None) -> bool:
         return False
     # 走っているプロセスにも入れておく。**この回の処理で続けて呼べるように。**
     os.environ["PATH"] = os.environ.get("PATH", "") + os.pathsep + want
+    _win_broadcast_env()
     if log:
         log(f"  PATH に {target} を足しました（反映は再起動後）")
     return True
+
+
+def _win_broadcast_env() -> None:
+    """環境変数が変わったことを OS へ知らせる（WM_SETTINGCHANGE）。
+
+    **レジストリに書くだけでは、すでに動いているアプリに伝わらない。** 新しく起こす
+    プロセスは親の環境を引き継ぐので、通知が無いと Explorer から起動したアプリは
+    古い PATH のままになる——「反映したのに見つからない」がこれで起きる。
+    届かなくても害は無いので、失敗は黙って諦める。
+    """
+    try:
+        import ctypes  # noqa: PLC0415
+
+        HWND_BROADCAST, WM_SETTINGCHANGE, SMTO_ABORTIFHUNG = 0xFFFF, 0x001A, 0x0002
+        ctypes.windll.user32.SendMessageTimeoutW(  # type: ignore[attr-defined]
+            HWND_BROADCAST, WM_SETTINGCHANGE, 0, ctypes.c_wchar_p("Environment"),
+            SMTO_ABORTIFHUNG, 5000, None)
+    except Exception:  # noqa: BLE001  （通知は補助。失敗しても PATH は書けている）
+        pass
 
 
 def link_command(log: Optional[Log] = None) -> Path:
