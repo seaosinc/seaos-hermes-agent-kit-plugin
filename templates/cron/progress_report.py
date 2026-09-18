@@ -43,7 +43,9 @@ MAX_LINES = 5
 # 同じカードについて実況する回数の上限。**繰り返すほど価値が下がる。**
 MAX_TIMES = int(os.environ.get("PROGRESS_MAX_TIMES", "3"))
 
-# 状態ごとの、人に伝わる言い方。**板の用語をそのまま出さない。**
+# 状態ごとの、人に伝わる言い方。**板の用語も役の名前も出さない。**
+# ユーザーから見ると相手は一人なので、「誰が担当か」は存在しない情報である
+# （役名を出すと、仕事を他人に渡したように聞こえる）。
 SAYING = {
     "running": "作業中",
     "ready": "順番待ち",
@@ -97,7 +99,7 @@ def main() -> int:
 
     lines = []
     live = set()
-    for cid, title, assignee, status, created, started in rows:
+    for cid, title, _assignee, status, created, started in rows:
         cid = str(cid)
         live.add(cid)
         elapsed = now - int(started or created or now)
@@ -108,8 +110,7 @@ def main() -> int:
             continue
         if int(times) >= MAX_TIMES:
             continue
-        who = f"{assignee} が" if assignee else ""
-        lines.append(f"・{str(title or cid)[:60]}（{who}{SAYING.get(str(status), status)}・{minutes(elapsed)}経過）")
+        lines.append(f"・{str(title or cid)[:60]}（{SAYING.get(str(status), status)}・{minutes(elapsed)}経過）")
         said[cid] = [now, int(times) + 1]
         if len(lines) >= MAX_LINES:
             break
