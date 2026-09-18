@@ -20,37 +20,11 @@ import { jsx, jsxs } from 'react/jsx-runtime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 const ID = 'seaos-hermes-agent-kit-plugin'  // plugin.yaml / dashboard/manifest.json と同じ名前
-const ACCENT = '#0B6E6E'
 const DANGER = '#B4413C'
 const WARN = '#B4761F'
 // **エラーの文言は選択・コピーできるようにする。** アプリ全体で選択が止められていて、
 // 画面に出た原因を貼ることすらできなかった。
 const SELECTABLE = { userSelect: 'text', WebkitUserSelect: 'text', cursor: 'text' }
-
-/** クリップボードへ入れる。**API が使えない環境でも入るようにする**（古い方法で予備を持つ）。 */
-async function copyText(text) {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      return true
-    }
-  } catch {
-    // 権限などで落ちたら、下の方法で入れる
-  }
-  try {
-    const area = document.createElement('textarea')
-    area.value = text
-    area.style.position = 'fixed'
-    area.style.opacity = '0'
-    document.body.appendChild(area)
-    area.select()
-    const ok = document.execCommand('copy')
-    area.remove()
-    return ok
-  } catch {
-    return false
-  }
-}
 
 /** ui.js へ渡す道具。**あちらは import を書けない**ので、ここで揃えて渡す。 */
 const DEPS = { jsx, jsxs, useCallback, useEffect, useRef, useState, host }
@@ -72,16 +46,17 @@ function Host({ ctx }) {
     try {
       res = await ctx.rest('/ui.js')
     } catch (e) {
-      // **起動・更新の直後は、たいてい待てば直る。** バックエンドがプラグインを読み込み終わる前に
-      // 開くとここに来る。赤で「接続できません」と出すと致命的に見えたので、警告色で待ち方を案内し、
-      // 理由（無効・読み込み失敗など）は詳細として添える。
+      // **原因はほぼ一つ。** 「いま選んでいるプロファイルの設定で、このプラグインが
+      // 有効になっていない」。プラグインの本体は共通に1つしか無いのに、有効かどうかは
+      // プロファイルごとに決まるため、役のプロファイル（operator など）を選んだまま
+      // 開くとここに来る。**入れ直しても直らない**——プロファイルの設定は変わらないため。
+      // 再読み込みも詳細のコピーも、この状況では何も動かせないので出さない。
       const detail = e?.detail || e?.message || String(e)
       setError({
         warn: true,
         message:
-          '画面の準備ができていません。Hermes を起動・更新した直後は、読み込みに少し時間がかかります。' +
-          '数秒待ってから「再読み込み」を押してください。' +
-          '何度押しても変わらないときは、画面左下からゲートウェイを再起動してください。',
+          '画面左下でプロファイルを default に切り替えてから、もう一度 SEAOS を開いてください。' +
+          'SEAOS の画面は default でだけ開きます（他の役を選んでいる間は開けません）。',
         detail
       })
       return
@@ -113,7 +88,6 @@ function Host({ ctx }) {
 
   if (error) {
     const color = error.warn ? WARN : DANGER
-    const full = error.detail ? `${error.message}\n詳細: ${error.detail}` : error.message
     return jsxs('div', {
       className: 'mx-auto flex max-w-3xl flex-col gap-3 p-6',
       children: [
@@ -126,25 +100,6 @@ function Host({ ctx }) {
             error.detail
               ? jsx('div', { className: 'mt-1 opacity-70', style: SELECTABLE, children: `詳細: ${error.detail}` })
               : null
-          ]
-        }),
-        jsxs('div', {
-          className: 'flex gap-2',
-          children: [
-            jsx('button', {
-              type: 'button',
-              onClick: fetchUi,
-              className: 'rounded px-3 py-1.5 text-xs',
-              style: { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` },
-              children: '再読み込み'
-            }),
-            jsx('button', {
-              type: 'button',
-              onClick: () => copyText(full),
-              className: 'rounded px-3 py-1.5 text-xs',
-              style: { background: 'transparent', color: 'inherit', border: `1px solid ${color}` },
-              children: '詳細をコピー'
-            })
           ]
         })
       ]

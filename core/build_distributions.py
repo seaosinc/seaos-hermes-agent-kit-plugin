@@ -36,6 +36,18 @@ SMART = os.environ.get("MODEL_SMART", "openai/gpt-6-astra")
 # 難度の高い実装だけに充てる上位モデル。**単価が高いので既定では使わない**——
 # ROLES で明示的に指定した役だけが引く（いまは senior-developer のみ）。
 SENIOR = os.environ.get("MODEL_SENIOR", "anthropic/claude-opus-5")
+# profile.yaml の model には、生のモデル名のほかに段の名前（fast / smart / senior）を
+# 書ける。**段で書けば、MODEL_SMART などの差し替えに追従する**——生の名前を
+# 固定すると、モデルを入れ替えたときにその役だけ古いまま取り残される。
+TIERS = {"fast": FAST, "smart": SMART, "senior": SENIOR}
+
+
+def model_of(value: str | None) -> str:
+    """profile.yaml の model を実際のモデル名にする。空なら FAST。"""
+    name = (value or "").strip()
+    return TIERS.get(name, name or FAST)
+
+
 INTERVAL = int(os.environ.get("DISPATCH_INTERVAL", "15"))
 def _home() -> Path:
     """Hermes のホーム。core/paths.py と同じ規則（単体でも読めるように、読めなければ自前で決める）。"""
@@ -156,9 +168,9 @@ WORKSPACE_MEMORY = int(os.environ.get("WORKSPACE_MEMORY", "4096"))
 # fixer / broker / handler / recruiter / avatar は箱を立てない。
 # だから 6 枚走っても、実際に 4GB を取るのは箱を持つ役のぶんに限られる。
 #
-# **ただし recruiter が作る新しい役は、既定で箱を持つ**（workspace: true）。
-# 箱を持つ役が増えるほど最悪値は上がる——6 枚全部が箱なら 24GB で、
-# 一度落ちかけた線を超える。役を増やしたら、ここを見直すこと。
+# **新しく作る役は、既定では箱を持たない**（workspace: false）。箱が要る役を
+# 増やすほど最悪値は上がる——6 枚全部が箱なら 24GB で、一度落ちかけた線を超える。
+# コードを書く役を足したら、ここを見直すこと。
 MAX_IN_PROGRESS = int(os.environ.get("MAX_IN_PROGRESS", "6"))
 MAX_IN_PROGRESS_PER_PROFILE = int(os.environ.get("MAX_IN_PROGRESS_PER_PROFILE", "2"))
 
@@ -364,7 +376,7 @@ def worker_roles(kit: Path) -> dict[str, dict]:
     for d in worker_dirs(kit):
         prof = yaml.safe_load((d / "profile.yaml").read_text(encoding="utf-8")) or {}
         out[d.name] = {
-            "model": prof.get("model") or FAST,
+            "model": model_of(prof.get("model")),
             # コードを書く役だけに委譲のスキルと実装の規約を載せる。
             # 調べるだけの役に clone / push / 委譲を教えても、使い道が無いうえに
             # 「自分の仕事だ」と誤解させる。
@@ -390,7 +402,11 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             "mcp_shared": prof.get("mcp_shared", ["context7"]),
             # 作業部屋に入れるか。プロファイルを書き換える役（recruiter）は
             # ホストのファイルに届く必要があるので、箱に入れない。
-            "workspace": prof.get("workspace", d.name != "recruiter"),
+            # 作業部屋に入れるか。**既定は持たせない。** 箱が要るのはコードを
+            # clone してビルドする役だけで、調べる・書く・整える役には要らない。
+            # 既定で持たせていたときは、Docker の無い機械（Windows）で作った役が
+            # そのまま動かず、しかも 1 枚 4GB の最悪値だけが上がっていた。
+            "workspace": prof.get("workspace", False),
             # **コマンドを実行させるか。** false にすると terminal ごと外れる。
             # 他人が書いた文章を読む役（handler）は、読んだ内容に影響された状態で
             # コマンドを打つ経路そのものを持たないほうが堅い。
@@ -410,7 +426,7 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             "describe": " ".join((prof.get("description") or "").split()),
             "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)]
                    + ([("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False)]
-                      if (prof.get("workspace", d.name != "recruiter")
+                      if (prof.get("workspace", False)
                           and prof.get("shell", True)) else [])
                    # **MCP を足した役は、たいてい鍵も要る。** profile.yaml で宣言させ、
                    # env apply が配る。宣言しないと、サーバは起動しても認証されない

@@ -456,6 +456,36 @@ def test_workspace_roles_declare_gh_token():
     assert "GH_TOKEN" not in [e["name"] for e in manifest("recruiter")["env_requires"]]
 
 
+def test_recruiter_is_not_on_the_cheap_model():
+    # **役を作る役の出来は、作った役の数だけ後から効く。** 安い模型では担当範囲の
+    # 切り方が粗く、既存と重なる役や誰も引けない description ができた。
+    assert cfg("recruiter")["model"]["default"] == bd.SMART, "recruiter が安い模型のまま"
+
+
+def test_model_tier_names_follow_replacements():
+    # profile.yaml に段の名前で書けること。生の名前を固定すると、モデルを
+    # 入れ替えたときにその役だけ古いまま取り残される。
+    assert bd.model_of("smart") == bd.SMART
+    assert bd.model_of("senior") == bd.SENIOR
+    assert bd.model_of("") == bd.FAST and bd.model_of(None) == bd.FAST
+    assert bd.model_of("openai/gpt-5.6-sol") == "openai/gpt-5.6-sol", "生の名前も書ける"
+
+
+def test_new_workers_have_no_container_by_default():
+    # 箱は1枚 4GB を取り、Docker の無い機械では役ごと動かない。**足すのは明示のときだけ。**
+    spec = {"name": "n", "description": "d"}
+    tmp = Path(tempfile.mkdtemp(prefix="worker-default-"))
+    d = tmp / "probe"
+    (d / "skills").mkdir(parents=True)
+    (d / "profile.yaml").write_text(yaml.safe_dump(spec, allow_unicode=True), encoding="utf-8")
+    (d / "SOUL.md").write_text("x\n", encoding="utf-8")
+    import unittest.mock as mock
+    with mock.patch.object(bd, "worker_dirs", lambda kit: [d]):
+        got = bd.worker_roles(ROOT)
+    assert got["probe"]["workspace"] is False, "新しい役が既定で箱を持っている"
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_template_is_not_deployed():
     # 「何でもやる役」は役割の不在で、不在だとモデルも道具も作業環境も選べない。
     # 雛形としてだけ残し、本番のプロファイルにはしない。
@@ -828,6 +858,9 @@ if __name__ == "__main__":
     check("作業部屋の作り方を同梱する", test_workspace_recipe_is_shipped)
     check("イメージ名の正が1つ", test_image_name_has_one_source)
     check("GH_TOKEN を宣言している", test_workspace_roles_declare_gh_token)
+    check("recruiter は上位モデル", test_recruiter_is_not_on_the_cheap_model)
+    check("モデルは段の名前で書ける", test_model_tier_names_follow_replacements)
+    check("新しい役は既定で箱なし", test_new_workers_have_no_container_by_default)
     check("雛形は配らない", test_template_is_not_deployed)
     check("recruiter がキットを直せる", test_recruiter_can_edit_the_kit)
     check("シェルの無い役に手が残っていない", test_shellless_roles_have_no_way_to_run_commands)
