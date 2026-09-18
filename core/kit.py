@@ -262,6 +262,25 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
     return result
 
 
+def _add_enabled(path: Path, cfg: dict, plugin: str) -> bool:
+    """役の config.yaml の `plugins.enabled` へ1つ足す。**ほかの設定は触らない。**"""
+    plugins = cfg.get("plugins")
+    if not isinstance(plugins, dict):
+        plugins = {"enabled": [], "disabled": []}
+        cfg["plugins"] = plugins
+    enabled = plugins.get("enabled")
+    if not isinstance(enabled, list):
+        enabled = []
+    if plugin in enabled:
+        return True
+    plugins["enabled"] = [*enabled, plugin]
+    try:
+        path.write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
 def retire(log: Optional[Log] = None) -> Result:
     """**廃止した役と定期実行を、入っている環境から外す。**
 
@@ -336,6 +355,14 @@ def enable_plugins() -> Result:
             code, _out = hermes.run(["-p", name, "plugins", "enable", plugin, "--no-allow-tool-override"])
             if code == 0:
                 result.lines.append(f"{name} で {plugin} を有効にしました")
+                continue
+            # **役のプロファイルからは、本体側に入っているプラグインを有効にできない**
+            # （`plugins enable` はその役のフォルダしか見ずに「そんな名前は無い」と断る）。
+            # 一方、設定画面のバックエンドは本体側のフォルダも見るので、設定に名前さえあれば通る。
+            # 配布物の config には入れてあるが、update は既存の config を上書きしないので、
+            # 入っている環境にはここで書き足す。
+            if _add_enabled(cfg_path, cfg, plugin):
+                result.lines.append(f"{name} の設定に {plugin} を足しました")
             else:
                 result.lines.append(f"{name} で {plugin} を有効にできませんでした")
                 result.failures += 1
