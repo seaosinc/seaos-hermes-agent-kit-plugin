@@ -62,6 +62,15 @@ DISABLED_DESCRIPTION = ("【無効】このプロファイルは使われてい�
                         "kanban の担当に選んではならず、どのカードも割り当ててはならない。")
 
 
+def _reason(out: str) -> str:
+    """失敗の理由を1行に畳む。**本体の出力をそのまま画面へ渡すための整形だけ。**"""
+    lines = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
+    if not lines:
+        return "（本体は何も言っていない）"
+    text = " / ".join(lines[-3:])
+    return text if len(text) <= 300 else text[:300] + "…"
+
+
 def sync_descriptions(log: Optional[Log] = None) -> Result:
     """説明文を生成器の文面に合わせる。**振り分けの唯一の入力なので毎回やる。**
 
@@ -78,12 +87,14 @@ def sync_descriptions(log: Optional[Log] = None) -> Result:
             continue
         if not text:
             continue
-        code, _out = hermes.set_description(name, text)
+        code, out = hermes.set_description(name, text)
         if code == 0:
             result.lines.append(f"{name} の説明文をそろえました")
         else:
             result.failures += 1
-            result.lines.append(f"✗ {name} の説明文を設定できませんでした")
+            # **本体の言い分をそのまま出す。** 握りつぶすと、画面には「設定できません
+            # でした」しか出ず、直す手掛かりがどこにも残らない（実際に詰まった）。
+            result.lines.append(f"✗ {name} の説明文を設定できませんでした: {_reason(out)}")
     return result
 
 
@@ -252,10 +263,11 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
             else:
                 result.lines.append(f"{name} のプロファイルを削除しました")
         else:
-            code, _ = hermes.set_description(name, DISABLED_DESCRIPTION)
+            code, out = hermes.set_description(name, DISABLED_DESCRIPTION)
             if code != 0:
                 result.failures += 1
-                result.lines.append(f"✗ {name} の説明文を書き換えられませんでした（担当に選ばれるおそれがあります）")
+                result.lines.append(
+                    f"✗ {name} の説明文を書き換えられませんでした（担当に選ばれるおそれがあります）: {_reason(out)}")
     if log:
         for line in result.lines:
             log(line)
