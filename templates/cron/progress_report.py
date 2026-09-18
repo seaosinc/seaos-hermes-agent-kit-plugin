@@ -12,7 +12,10 @@ cron の `--no-agent` で走るので、**標準出力がそのまま通知に�
 
   ・始まってから `QUIET_SECONDS` 以内は黙る。ふつうに終わる仕事まで実況しない
   ・一度喋ったら `REPEAT_SECONDS` は同じカードの話をしない
-  ・終わったカードの話はしない（完了は担当が自分で報告する）
+  ・終わったカードの話はしない（完了は担当が自分で報告する）。done でも archived でも、
+    板から動いた時点で実況は止まる
+  ・同じカードを `MAX_TIMES` 回より多く実況しない。**それ以上は進捗ではなく詰まり**で、
+    延々と「まだ動いています」と言い続けるのは黙っているより悪い（spin-guard の担当）
 
 言ったことは `<HERMES_HOME>/kanban/.progress-report.json` に置く。消えても、
 次の周期でまた喋るだけで壊れない。
@@ -37,6 +40,8 @@ QUIET_SECONDS = int(os.environ.get("PROGRESS_QUIET_SECONDS", "120"))
 REPEAT_SECONDS = int(os.environ.get("PROGRESS_REPEAT_SECONDS", "180"))
 # 一度に出す件数の上限。板が詰まったときに長文を投げない。
 MAX_LINES = 5
+# 同じカードについて実況する回数の上限。**繰り返すほど価値が下がる。**
+MAX_TIMES = int(os.environ.get("PROGRESS_MAX_TIMES", "3"))
 
 # 状態ごとの、人に伝わる言い方。**板の用語をそのまま出さない。**
 SAYING = {
@@ -76,7 +81,8 @@ def main() -> int:
     if db is None:
         return 0
     now = int(time.time())
-    said = load()
+    # {カード id: [最後に言った時刻, 言った回数]}
+    said = {k: (v if isinstance(v, list) else [v, 1]) for k, v in load().items()}
 
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     try:
@@ -97,11 +103,14 @@ def main() -> int:
         elapsed = now - int(started or created or now)
         if elapsed < QUIET_SECONDS:
             continue
-        if now - int(said.get(cid) or 0) < REPEAT_SECONDS:
+        last, times = said.get(cid) or [0, 0]
+        if now - int(last) < REPEAT_SECONDS:
+            continue
+        if int(times) >= MAX_TIMES:
             continue
         who = f"{assignee} が" if assignee else ""
         lines.append(f"・{str(title or cid)[:60]}（{who}{SAYING.get(str(status), status)}・{minutes(elapsed)}経過）")
-        said[cid] = now
+        said[cid] = [now, int(times) + 1]
         if len(lines) >= MAX_LINES:
             break
 
