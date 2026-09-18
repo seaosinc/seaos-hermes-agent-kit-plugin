@@ -146,6 +146,51 @@ def test_runtime_floor_raises_short_limits_before_the_card_is_made():
     assert hook(tool_name="kanban_comment", args={"max_runtime_seconds": 0}) is None, "他の道具まで触った"
 
 
+def test_runtime_floor_drops_skills_the_assignee_does_not_have():
+    """担当が持っていないスキルの指定は、カードが作られる前に外れる。
+
+    スキルはプロファイルごとに配られる。自分の手元にある名前をカードへ必須指定すると、
+    受け取った役は起動時にクラッシュして一度も動けない（実際に起きた）。
+    """
+    import importlib.util
+    import os
+    import tempfile
+
+    spec = importlib.util.spec_from_file_location(
+        "runtime_floor2", ROOT / "templates/plugins/runtime-floor/__init__.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    home = Path(tempfile.mkdtemp(prefix="floor-skills-"))
+    for role, skills in (("operator", ["kanban-collaboration", "operator-only"]),
+                         ("fixer", ["kanban-collaboration", "unblocking"])):
+        for name in skills:
+            (home / "profiles" / role / "skills" / name).mkdir(parents=True, exist_ok=True)
+
+    old = os.environ.get("HERMES_HOME")
+    os.environ["HERMES_HOME"] = str(home)
+    try:
+        hook = mod._on_pre_tool_call
+        # 担当が持っていないものは外れ、持っているものは残る
+        got = hook(tool_name="kanban_create",
+                   args={"assignee": "fixer", "skills": ["kanban-collaboration", "operator-only"]})
+        assert got == {"action": "modify", "args": {"skills": ["kanban-collaboration"]}}, got
+        # 全部持っているなら触らない
+        assert hook(tool_name="kanban_create",
+                    args={"assignee": "fixer", "skills": ["unblocking"]}) is None
+        # 担当が決まっていないカードは、全役が持っているものだけ残す
+        got = hook(tool_name="kanban_create", args={"skills": ["kanban-collaboration", "unblocking"]})
+        assert got == {"action": "modify", "args": {"skills": ["kanban-collaboration"]}}, got
+        # 指定が無ければ触らない
+        assert hook(tool_name="kanban_create", args={"title": "x"}) is None
+    finally:
+        if old is None:
+            os.environ.pop("HERMES_HOME", None)
+        else:
+            os.environ["HERMES_HOME"] = old
+        shutil.rmtree(home, ignore_errors=True)
+
+
 def test_gate_ships_complete():
     """ゲートはプラグイン・ポーラー・スクリプトが揃って初めて動く。"""
     o = OUT / "operator"
@@ -839,6 +884,8 @@ if __name__ == "__main__":
     check("ワーカーの雛形が展開されている", test_worker_placeholders_expanded)
     check("platform_toolsets に terminal", test_platform_toolsets_carry_terminal)
     check("プラグインが有効になっている", test_plugin_is_enabled)
+    check("短すぎる上限は作る前に直る", test_runtime_floor_raises_short_limits_before_the_card_is_made)
+    check("担当が持たないスキルの指定を外す", test_runtime_floor_drops_skills_the_assignee_does_not_have)
     check("ゲートの部品がそろっている", test_gate_ships_complete)
     check("cron のジョブは配らない", test_cron_jobs_are_not_shipped)
     check("cron のスクリプトは配る", test_cron_scripts_are_shipped)
