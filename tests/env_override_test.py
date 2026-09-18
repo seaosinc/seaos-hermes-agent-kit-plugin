@@ -122,6 +122,25 @@ def test_api_shows_only_plain_values():
     assert "xoxb-hidden" not in everything and "sk-hidden" not in everything, "鍵の値を画面へ返している"
 
 
+def test_deleted_profile_is_not_shown_as_residual():
+    """削除済みの印が残っている役は、画面でも「残置」と出さない。"""
+    import plugin_api as api
+
+    reset()
+    d = HOME / "profiles" / "recruiter"
+    d.mkdir(parents=True, exist_ok=True)
+    assert next(r for r in api.list_roles() if r["name"] == "recruiter")["installed"]
+
+    marker = HOME / "profiles" / ".deleted" / "recruiter"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("", encoding="utf-8")
+    try:
+        row = next(r for r in api.list_roles() if r["name"] == "recruiter")
+        assert not row["installed"], "本体からは見えない役を、画面が残置と出している"
+    finally:
+        marker.unlink()
+
+
 def test_owner_can_always_talk():
     """オーナーは、話しかけてよい人に入れ忘れても、operator に配る一覧へ足される。"""
     reset()

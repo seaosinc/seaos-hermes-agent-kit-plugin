@@ -27,6 +27,7 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "core"))
 
 import env as env_mod  # noqa: E402
+import hermes  # noqa: E402
 import kit  # noqa: E402
 import roles  # noqa: E402
 from paths import env_file, git_bin, kit_root, os_kind, profile_dir  # noqa: E402
@@ -54,7 +55,10 @@ def list_roles() -> List[Dict]:
         out.append(
             {
                 "name": name,
-                "installed": profile_dir(name).is_dir(),
+                # **フォルダの有無ではなく、本体から見えるかを聞く。** 削除済みの印
+                # （profiles/.deleted/<役>）が残っていると、フォルダがあっても本体は
+                # 存在しないものとして扱う。画面だけ「残置」と出て食い違っていた。
+                "installed": hermes.profile_exists(name),
                 # 反映の対象か。`essential` は外せない（板の仕組みが前提にしている）
                 "enabled": name in enabled,
                 "essential": roles.essential(name),
@@ -398,7 +402,7 @@ def removal_impact(name: str) -> Dict:
         # **どのカードかを画面に出す。** 件数だけでは、板のどれを片付ければ
         # よいのか分からない（分からず無効化できない、という報告が出た）。
         "busyReason": worker_mod.busy_reason(name),
-        "installed": pdir.is_dir(),
+        "installed": hermes.profile_exists(name),
         "memories": memories,
         "sessions": sessions,
     }
