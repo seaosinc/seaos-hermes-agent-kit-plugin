@@ -198,7 +198,7 @@ ROLES: dict[str, dict] = {
         "plugins": ["booking-gate"],
         "hooks": ["mem0-up"],
         "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard",
-                 "container-guard",
+                 "container-guard", "progress-report",
                  "kit-sync", "kit-maintain"],
         "env": [
             ("SLACK_BOT_TOKEN", "Slack の Bot トークン。窓口を Slack にするなら要る（Hermes Desktop から使うなら不要）", False),
@@ -732,6 +732,10 @@ CRON_JOBS = {
     # **毎分。** 親が SIGKILL されると作業部屋は running のまま残り、
     # Hermes の回収係（status=exited しか見ない）は一生届かない。1つ 4GB。
     "container-guard": ("* * * * *",  "container_guard.py"),
+    # **毎分。** 頼んでから何も言われない時間が、そのまま「固まったのか」という
+    # 不安になる。時間のかかっているカードだけを実況する（黙る線と間隔は
+    # スクリプト側に書いてある）。
+    "progress-report": ("* * * * *",  "progress_report.py"),
     "kit-sync":      ("*/10 * * * *", "kit_sync.py"),
     "kit-maintain":  ("30 4 * * *",   "kit_maintain.py"),
 }
