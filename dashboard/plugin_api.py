@@ -395,6 +395,9 @@ def removal_impact(name: str) -> Dict:
     return {
         "name": name,
         "busy": worker_mod.busy_cards(name),
+        # **どのカードかを画面に出す。** 件数だけでは、板のどれを片付ければ
+        # よいのか分からない（分からず無効化できない、という報告が出た）。
+        "busyReason": worker_mod.busy_reason(name),
         "installed": pdir.is_dir(),
         "memories": memories,
         "sessions": sessions,

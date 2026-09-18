@@ -227,9 +227,9 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
 
     if name not in roles.all_names():
         raise selection.SelectionError(f"そのエージェントはありません: {name}")
-    busy = worker_mod.busy_cards(name)
-    if busy:
-        raise selection.SelectionError(f"{name} は進行中のカードを {busy} 件抱えています。先に片付けてください")
+    reason = worker_mod.busy_reason(name)
+    if reason:
+        raise selection.SelectionError(reason + "。終わるのを待つか、そのカードを止めてください")
 
     result = Result()
     selection.set_enabled(name, False, essential=roles.essential(name))

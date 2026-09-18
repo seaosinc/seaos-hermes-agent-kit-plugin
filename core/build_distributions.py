@@ -48,7 +48,12 @@ def model_of(value: str | None) -> str:
     return TIERS.get(name, name or FAST)
 
 
-INTERVAL = int(os.environ.get("DISPATCH_INTERVAL", "15"))
+# カードを配る係が板を見に行く間隔。**実測で 12〜18 秒がまるごと待ちになっていた**
+# （子カードが出てから誰かが掴むまで）。見に行くのは SQLite を1回引くだけなので、
+# 短くしても負荷は増えない。
+INTERVAL = int(os.environ.get("DISPATCH_INTERVAL", "5"))
+
+
 def _home() -> Path:
     """Hermes のホーム。core/paths.py と同じ規則（単体でも読めるように、読めなければ自前で決める）。"""
     try:

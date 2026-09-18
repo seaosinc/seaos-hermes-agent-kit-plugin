@@ -292,8 +292,8 @@ export default function create(deps) {
           blocked
             ? jsx('div', {
                 className: 'mt-3 rounded px-3 py-2 text-xs',
-                style: { border: `1px solid ${WARN}`, color: WARN },
-                children: `進行中のカードが ${impact.busy} 件あります。先に片付けてください。`
+                style: { border: `1px solid ${WARN}`, color: WARN, ...SELECTABLE },
+                children: impact.busyReason || `実行中のカードが ${impact.busy} 枚あります。`
               })
             : jsx('div', {
                 className: 'mt-2 text-xs opacity-70',

@@ -475,24 +475,48 @@ def _repo_slug(url: str) -> str:
     return "/".join(text.split("/")[-2:])
 
 
-def busy_cards(name: str) -> int:
-    """進行中のカードを抱えていないか。**消す前に必ず見る。**"""
+def running_cards(name: str) -> list[tuple[str, str, str]]:
+    """**いま走っているカード**を (id, 状態, 題名) で返す。役を消す・止める前に見る。
+
+    **見るのは running だけである。** 以前は ready / todo / blocked も数えていたが、
+    それらは進んでいない——止める理由にならないのに、板から片付けたはずの役が
+    永久に無効化できなくなった（実際に踏んだ）。行き場を失ったカードは
+    assignee-guard が毎分ひろって入力待ちへ回すので、迷子にもならない。
+    """
     db = hermes_home() / "kanban.db"
     if not db.is_file():
-        return 0
+        return []
     try:
         con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
         try:
             cur = con.execute(
-                "SELECT COUNT(*) FROM tasks WHERE assignee=? "
-                "AND status IN ('todo','ready','running','blocked','review');",
+                "SELECT id, status, title FROM tasks WHERE assignee=? AND status='running';",
                 (name,),
             )
-            return int(cur.fetchone()[0])
+            return [(str(r[0]), str(r[1]), str(r[2] or "")) for r in cur.fetchall()]
         finally:
             con.close()
     except sqlite3.Error:
-        return 0
+        return []
+
+
+def busy_cards(name: str) -> int:
+    """走っているカードの枚数。"""
+    return len(running_cards(name))
+
+
+def busy_reason(name: str) -> str:
+    """断るときの文面。**どのカードのことか分かるように、板の ID と題名を出す。**
+
+    件数だけだと、板のどれを片付ければよいのか分からない（分からないまま
+    無効化できない、という報告が出た）。
+    """
+    cards = running_cards(name)
+    if not cards:
+        return ""
+    shown = ", ".join(f"{i}（{s}）{t[:24]}" for i, s, t in cards[:5])
+    more = f" ほか{len(cards) - 5}枚" if len(cards) > 5 else ""
+    return f"{name} が実行中のカードを {len(cards)} 枚抱えています: {shown}{more}"
 
 
 def remove(name: str, *, keep_profile: bool = False) -> Dict:
@@ -502,9 +526,9 @@ def remove(name: str, *, keep_profile: bool = False) -> Dict:
     if not d.is_dir():
         raise WorkerError(f"存在しない: {name}")
 
-    busy = busy_cards(name)
-    if busy > 0:
-        raise WorkerError(f"{name} は進行中のカードを {busy} 件抱えている。先に片付けること")
+    reason = busy_reason(name)
+    if reason:
+        raise WorkerError(reason + "。終わるのを待つか、そのカードを止めること")
 
     # **その役だけの鍵も落とす。** 役が消えれば管理対象から外れるので、
     # 正の `.env` に値が入ったまま取り残される（実際に残った）。
