@@ -62,15 +62,6 @@ DISABLED_DESCRIPTION = ("【無効】このプロファイルは使われてい�
                         "kanban の担当に選んではならず、どのカードも割り当ててはならない。")
 
 
-def _reason(out: str) -> str:
-    """失敗の理由を1行に畳む。**本体の出力をそのまま画面へ渡すための整形だけ。**"""
-    lines = [ln.strip() for ln in (out or "").splitlines() if ln.strip()]
-    if not lines:
-        return "（本体は何も言っていない）"
-    text = " / ".join(lines[-3:])
-    return text if len(text) <= 300 else text[:300] + "…"
-
-
 def sync_descriptions(log: Optional[Log] = None) -> Result:
     """説明文を生成器の文面に合わせる。**振り分けの唯一の入力なので毎回やる。**
 
@@ -87,14 +78,12 @@ def sync_descriptions(log: Optional[Log] = None) -> Result:
             continue
         if not text:
             continue
-        code, out = hermes.set_description(name, text)
+        code, _out = hermes.set_description(name, text)
         if code == 0:
             result.lines.append(f"{name} の説明文をそろえました")
         else:
             result.failures += 1
-            # **本体の言い分をそのまま出す。** 握りつぶすと、画面には「設定できません
-            # でした」しか出ず、直す手掛かりがどこにも残らない（実際に詰まった）。
-            result.lines.append(f"✗ {name} の説明文を設定できませんでした: {_reason(out)}")
+            result.lines.append(f"✗ {name} の説明文を設定できませんでした")
     return result
 
 
@@ -263,11 +252,10 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
             else:
                 result.lines.append(f"{name} のプロファイルを削除しました")
         else:
-            code, out = hermes.set_description(name, DISABLED_DESCRIPTION)
+            code, _ = hermes.set_description(name, DISABLED_DESCRIPTION)
             if code != 0:
                 result.failures += 1
-                result.lines.append(
-                    f"✗ {name} の説明文を書き換えられませんでした（担当に選ばれるおそれがあります）: {_reason(out)}")
+                result.lines.append(f"✗ {name} の説明文を書き換えられませんでした（担当に選ばれるおそれがあります）")
     if log:
         for line in result.lines:
             log(line)
@@ -391,8 +379,7 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     件数で言い、**いつもと違うこと（新設・移行・失敗）だけ名前を出す。**
     """
     result = Result()
-    # **配布物の置き場。** ループの中で本体の出力を受ける変数と取り違えないよう、
-    # 役割の分かる名前にしておく（`out` で受けて上書きし、2周目で壊した）。
+    # **配布物の置き場。** ループの中で使い回すので、役割の分かる名前にしておく。
     dist_root = build(log=log)
 
     updated = unchanged = 0
@@ -402,16 +389,16 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         if not dist.is_dir():
             continue
         if not hermes.profile_exists(name):
-            code, said = hermes.install(dist)
+            code, _ = hermes.install(dist)
             notable.append(f"{name} を新しく導入しました" if code == 0
-                           else f"{name} を導入できませんでした: {_reason(said)}")
+                           else f"{name} を導入できませんでした")
             result.failures += 0 if code == 0 else 1
             continue
         if not hermes.is_distribution(name):
             # 旧方式で作られたプロファイル。一度だけ配布物として入れ直す
-            code, said = hermes.install(dist, force=True)
+            code, _ = hermes.install(dist, force=True)
             notable.append(f"{name} を配布物として入れ直しました" if code == 0
-                           else f"{name} を入れ直せませんでした: {_reason(said)}")
+                           else f"{name} を入れ直せませんでした")
             result.failures += 0 if code == 0 else 1
             continue
         if retarget_source(dist, name):
@@ -419,11 +406,11 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
         if not force_config and _installed_matches(dist, name):
             unchanged += 1
             continue
-        code, said = hermes.update(name, force_config=force_config)
+        code, _ = hermes.update(name, force_config=force_config)
         if code == 0:
             updated += 1
         else:
-            notable.append(f"{name} を更新できませんでした: {_reason(said)}")
+            notable.append(f"{name} を更新できませんでした")
             result.failures += 1
 
     if updated:

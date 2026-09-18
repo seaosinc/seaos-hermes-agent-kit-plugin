@@ -189,7 +189,7 @@ def test_update_survives_more_than_one_role():
 
     src = inspect.getsource(kit.update)
     assert "dist_root = build(" in src, "置き場の変数が変わった。取り違えていないか見ること"
-    for bad in ("code, out = hermes.install", "code, out = hermes.update"):
+    for bad in ("out = hermes.install", "out = hermes.update"):
         assert bad not in src, f"置き場の変数を上書きしている: {bad}"
 
 
