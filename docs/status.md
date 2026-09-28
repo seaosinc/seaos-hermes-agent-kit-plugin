@@ -64,7 +64,7 @@ AWS の箱（Ubuntu）でキットを動かす想定のため。このリポジ�
 
 ## 残っている作業
 
-1. **Windows の実機確認。** 実装は入れたが、動かしていない
+1. **Windows の作業部屋の実機確認。** 作業部屋以外は実機で確認済み
    （`gateway_pid` の PowerShell 経由の検出、`kit.cmd` のラッパ、Scheduled Task、
    winget での Docker / Node.js の導入と UAC の出方）。
 

@@ -14,7 +14,7 @@ Slack（または Hermes Desktop）で窓口のエージェントに頼むと、
 
 | | 必須か | 補足 |
 |---|---|---|
-| macOS か Windows の PC | 必須 | Windows は実機での確認がまだ済んでいません（→ [Windows で使う場合](#windows-で使う場合)） |
+| macOS か Windows の PC | 必須 | Windows は手順が少し違います（→ [Windows で使う場合](#windows-で使う場合)） |
 | GitHub アカウント | 必須 | このリポジトリは非公開です。**閲覧できる権限をもらっておいてください** |
 | OpenRouter の API キー | 必須 | エージェントが使う AI モデルの鍵です。[openrouter.ai/keys](https://openrouter.ai/keys) で作れます |
 | Slack のワークスペース | 任意 | Slack から話しかけたいときだけ。Hermes Desktop だけでも使えます |
@@ -267,8 +267,8 @@ Windows でログオン時に Slack の窓口を自動で起こすには、Power
 schtasks /Create /SC ONLOGON /TN "hermes-gateway" /TR "hermes --profile operator gateway run"
 ```
 
-**Windows は実機での確認がまだ済んでいません。** とくに、コードを書くエージェント（developer / senior-developer）の
-作業部屋は、Windows では動かない可能性があります。うまくいかない場合は、そのエージェントを外して使ってください。
+**コードを書くエージェント（developer / senior-developer）の作業部屋だけは、Windows での確認がまだ済んでいません。**
+動かない可能性があります。うまくいかない場合は、そのエージェントを外して使ってください。
 
 ---
 
