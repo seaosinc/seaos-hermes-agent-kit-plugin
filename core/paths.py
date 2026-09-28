@@ -134,6 +134,14 @@ def env_file() -> Path:
     return new_path
 
 
+def role_context_file(name: str) -> Path:
+    """**その役だけに渡す前提**（設定画面で書いたもの）。秘密と同じく、キットの外に置く。
+
+    中に置くと `hermes plugins install --force` で消える。
+    """
+    return hermes_home() / "seaos-kit" / "context" / f"{name}.md"
+
+
 def selection_file() -> Path:
     """**どの役を入れるか**の記録。秘密と同じく、キットの外に置く。
 

@@ -7,6 +7,10 @@ config.yaml ごと入れ替えるので、ここが消える——**実際に全
 埋めるのは `templates/shared/ENVIRONMENT.md.tmpl` の穴。**推測しない**
 ——`python` が無い環境で `python` と書けば担当はそこで落ちるし、
 Homebrew の綴りを Linux で試しても落ちる。実測した事実だけを渡す。
+
+実測の後ろには、**その役だけの前提**（設定画面で人が書いたもの）を足す。
+探索してよいディレクトリのように、機械ごと・役ごとに違う事実を置く場所。
+受け付けるのは、profile.yaml に `context`（何を書いてほしいか）を宣言した役だけ。
 """
 
 from __future__ import annotations
@@ -22,7 +26,7 @@ from typing import Callable, Dict, List, Optional
 import yaml
 
 import roles
-from paths import kit_root, profile_dir
+from paths import kit_root, profile_dir, role_context_file
 
 Log = Callable[[str], None]
 
@@ -166,15 +170,50 @@ def render() -> str:
     return text
 
 
+# **毎回読まれる場所なので、長さを抑える。** 前提と事実を書く欄で、手順書を置く欄ではない。
+CONTEXT_MAX_CHARS = 4000
+
+
+def role_context(name: str) -> str:
+    """その役だけの前提。無ければ空。**受け付けない役には、書かれていても渡さない。**"""
+    if not roles.context_prompt(name):
+        return ""
+    path = role_context_file(name)
+    return path.read_text(encoding="utf-8").strip() if path.is_file() else ""
+
+
+def set_role_context(name: str, text: str) -> Result:
+    """その役だけの前提を保存し、すぐ config.yaml へ反映する。**空なら消す。**"""
+    if not roles.context_prompt(name):
+        raise ValueError(f"{name} は前提を受け付けない役です（profile.yaml に context がありません）")
+    text = text.strip()
+    if len(text) > CONTEXT_MAX_CHARS:
+        raise ValueError(f"{CONTEXT_MAX_CHARS} 文字以内で書いてください（いま {len(text)} 文字）")
+    path = role_context_file(name)
+    if text:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
+    elif path.is_file():
+        path.unlink()
+    return apply()
+
+
+def _compose(base: str, name: str) -> str:
+    extra = role_context(name)
+    if not extra:
+        return base
+    block = "## この役だけの前提\n\n設定画面で人が書いた、この役に固有の事実。\n\n" + extra
+    return (base.rstrip() + "\n\n" + block) if base else block
+
+
 def apply(log: Optional[Log] = None) -> Result:
     """全役の config.yaml へ書く。**既に同じなら触らない。**"""
     res = Result()
-    hint = render()
-    if not hint:
-        return res
+    base = render()
 
     changed = 0
     for name in roles.names():
+        hint = _compose(base, name)
         cfg = profile_dir(name) / "config.yaml"
         if not cfg.is_file():
             continue
@@ -185,7 +224,8 @@ def apply(log: Optional[Log] = None) -> Result:
             res.lines.append(f"✗ {name} の設定を読み取れませんでした")
             continue
         agent = body.setdefault("agent", {})
-        if agent.get("environment_hint") == hint:
+        # 前提を消したときは空で書き直す（残すと、消したはずの前提を読み続ける）
+        if (agent.get("environment_hint") or "") == hint:
             continue
         agent["environment_hint"] = hint
         cfg.write_text(yaml.safe_dump(body, allow_unicode=True, sort_keys=False),

@@ -345,12 +345,73 @@ export default function create(deps) {
   }
 
 
+  /** その役だけの前提。**探索してよいディレクトリのような、役に固有の事実**を書く。
+   *
+   * **受け付ける役にだけ出す。** 何を書いてほしいかは役が宣言する（profile.yaml の
+   * `context`）ので、それをそのまま案内に使う。
+   * 保存するとすぐ config.yaml へ書かれ、次のセッションから効く。空で保存すれば消える。 */
+  function RoleContext({ role, prompt, value, onSave }) {
+    const [text, setText] = useState(value || '')
+    const [saving, setSaving] = useState(false)
+    const [saved, setSaved] = useState(false)
+    const [error, setError] = useState('')
+    const dirty = text.trim() !== (value || '').trim()
+
+    const save = async () => {
+      setSaving(true)
+      setError('')
+      try {
+        await onSave(role, text)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1500)
+      } catch (e) {
+        setError(e.message)
+      } finally {
+        setSaving(false)
+      }
+    }
+
+    return jsxs('div', {
+      className: 'mt-4',
+      children: [
+        jsx('div', { className: 'text-xs opacity-60', children: 'この役だけに伝える前提' }),
+        jsx('div', {
+          className: 'mt-0.5 whitespace-pre-wrap text-xs opacity-60',
+          children: prompt
+        }),
+        jsx('div', {
+          className: 'mt-0.5 text-xs opacity-60',
+          children: '次のセッションから効きます。'
+        }),
+        jsx('textarea', {
+          value: text,
+          onChange: (e) => setText(e.target.value),
+          rows: 6,
+          spellCheck: false,
+          className: 'mt-2 w-full rounded px-2 py-1.5 font-mono text-xs focus:outline-none',
+          style: { border: BORDER, background: SURFACE_2, color: 'inherit', resize: 'vertical', ...SELECTABLE }
+        }),
+        error
+          ? jsx('div', { className: 'mt-1 text-xs', style: { color: DANGER, ...SELECTABLE }, children: error })
+          : null,
+        jsxs('div', {
+          className: 'mt-2 flex items-center justify-end gap-2',
+          children: [
+            saved ? jsx('span', { className: 'text-xs opacity-60', children: '保存しました' }) : null,
+            jsx(Button, { label: saving ? '保存しています…' : '保存', onClick: save, disabled: saving || !dirty, primary: true })
+          ]
+        })
+      ]
+    })
+  }
+
+
   /** その役だけの鍵。**共通の一覧に混ぜない。**
    *
    * 窓口ごとに Slack のトークンが要るので、混ぜると役の数だけ行が増えて読めなくなる。
    * ダイアログが役に属するので、中では変数名だけでよい（役名が文脈になる）。
    */
-  function OwnSecretsDialog({ role, secrets, overrides = [], onEdit, onClear, onClose }) {
+  function OwnSecretsDialog({ role, secrets, overrides = [], contextPrompt = '', context = '', onEdit, onClear, onSaveContext, onClose }) {
     return jsx('div', {
       className: 'fixed inset-0 z-40 flex items-center justify-center bg-black/40',
       onClick: onClose,
@@ -359,7 +420,7 @@ export default function create(deps) {
         style: { border: BORDER, background: SURFACE },
         onClick: (e) => e.stopPropagation(),
         children: [
-          jsx('div', { className: 'text-sm font-medium', children: `${role} の接続情報` }),
+          jsx('div', { className: 'text-sm font-medium', children: `${role} の設定` }),
           secrets.length
             ? jsx('div', {
                 className: 'mt-1 text-xs opacity-60',
@@ -384,6 +445,9 @@ export default function create(deps) {
                 className: 'mt-1',
                 children: overrides.map((x) => jsx(SecretRow, { secret: x, onEdit, onClear }, x.name))
               })
+            : null,
+          contextPrompt
+            ? jsx(RoleContext, { role, prompt: contextPrompt, value: context, onSave: onSaveContext })
             : null,
           jsx('div', {
             className: 'mt-4 flex justify-end',
@@ -451,6 +515,14 @@ export default function create(deps) {
     const saveSecret = useCallback(
       async (name, value) => {
         await call(ctx, '/secrets', { method: 'POST', body: { name, value } })
+        await load()
+      },
+      [ctx, load]
+    )
+
+    const saveContext = useCallback(
+      async (name, text) => {
+        await call(ctx, '/roles/context', { method: 'POST', body: { name, text } })
         await load()
       },
       [ctx, load]
@@ -768,7 +840,7 @@ export default function create(deps) {
                     ]
                   }),
                   // **共有はこの環境の役だけ。** 配布物は既に入っている。
-                  r.enabled && (r.ownSecrets?.length || r.overrideSecrets?.length)
+                  r.enabled && (r.ownSecrets?.length || r.overrideSecrets?.length || r.contextPrompt)
                     ? jsxs('button', {
                         type: 'button',
                         onClick: () => setOwnOf(r),
@@ -908,8 +980,11 @@ export default function create(deps) {
               role: ownOf.name,
               secrets: (roles.find((x) => x.name === ownOf.name) || ownOf).ownSecrets || [],
               overrides: (roles.find((x) => x.name === ownOf.name) || ownOf).overrideSecrets || [],
+              contextPrompt: (roles.find((x) => x.name === ownOf.name) || ownOf).contextPrompt || '',
+              context: (roles.find((x) => x.name === ownOf.name) || ownOf).context || '',
               onEdit: setEditing,
               onClear: clearSecret,
+              onSaveContext: saveContext,
               onClose: () => setOwnOf(null)
             })
           : null,

@@ -147,6 +147,11 @@ def summary(name: str) -> str:
     return (head + "。") if head and len(head) < len(described) else described[:40]
 
 
+def context_prompt(name: str) -> str:
+    """その役が人から受け取る前提の説明（profile.yaml の `context`）。**空なら受け付けない役。**"""
+    return str((all_specs().get(name) or {}).get("context") or "").strip()
+
+
 def origin(name: str) -> str:
     """その役の出自。`"shipped"`（配られてきた）か `"local"`（この環境で作った）。
 

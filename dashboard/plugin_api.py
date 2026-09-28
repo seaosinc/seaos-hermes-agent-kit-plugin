@@ -27,6 +27,7 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "core"))
 
 import env as env_mod  # noqa: E402
+import envhint  # noqa: E402
 import kit  # noqa: E402
 import roles  # noqa: E402
 from paths import env_file, git_bin, kit_root, os_kind, profile_dir, profiles_dir  # noqa: E402
@@ -103,6 +104,10 @@ def list_roles() -> List[Dict]:
                 ],
                 # 配られてきた役か、この環境で作った役か。後者は git に入らない
                 "origin": roles.origin(name),
+                # **その役だけの前提**（探索してよいディレクトリなど）。秘密ではないので値を返す。
+                # `contextPrompt` が空の役は受け付けない——画面は欄を出さない
+                "contextPrompt": roles.context_prompt(name),
+                "context": envhint.role_context(name),
             }
         )
     return out
@@ -367,6 +372,26 @@ def set_secret(body: SecretIn) -> Dict:
 
     env_mod.set_value(body.name, body.value, f"{body.name}（GUI から設定）")
     return {"name": body.name, "configured": bool(body.value)}
+
+
+class ContextIn(BaseModel):
+    name: str
+    text: str
+
+
+@router.post("/roles/context")
+def set_role_context(body: ContextIn) -> Dict:
+    """その役だけの前提を保存し、その場で config.yaml へ書く。**空で送れば消す。**
+
+    効くのは次のセッションから（Hermes はシステムプロンプトを組むときに読む）。
+    """
+    if body.name not in roles.all_names():
+        raise HTTPException(status_code=404, detail=f"そのエージェントはありません: {body.name}")
+    try:
+        result = envhint.set_role_context(body.name, body.text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": result.ok(), "lines": result.lines}
 
 
 class UpdateIn(BaseModel):

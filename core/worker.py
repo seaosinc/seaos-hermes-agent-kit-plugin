@@ -160,6 +160,21 @@ def _set_scalar(path: Path, field: str, value: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _set_context(path: Path, prompt: str) -> None:
+    """`context`（人から受け取る前提の説明）を書く。**空なら行ごと消す**（受け付けない役に戻す）。
+
+    `:` を含む説明も壊れないよう、引用符で包む（JSON の文字列は YAML としても読める）。
+    雛形より古い profile.yaml には行が無いので、無ければ末尾に足す。
+    """
+    text = path.read_text(encoding="utf-8")
+    line = f"context: {json.dumps(prompt, ensure_ascii=False)}\n" if prompt else ""
+    if re.search(r"^context:.*$", text, flags=re.M):
+        text = re.sub(r"^context:.*\n?", line, text, count=1, flags=re.M)
+    elif line:
+        text = text.rstrip("\n") + "\n\n" + line
+    path.write_text(text, encoding="utf-8")
+
+
 def _set_description(path: Path, desc: str) -> None:
     text = path.read_text(encoding="utf-8")
     body = "".join(f"  {line}\n" for line in (desc.splitlines() or [desc]))
@@ -190,6 +205,7 @@ def new(
     *,
     desc: str,
     summary: str = "",
+    context: str = "",
     model: str = "",
     extra: str = "",
     soul: Optional[Path] = None,
@@ -236,6 +252,8 @@ def new(
     _set_description(profile, desc)
     if summary:
         _set_scalar(profile, "summary", summary)
+    if context:
+        _set_context(profile, context)
     if model:
         _set_scalar(profile, "model", model)
     if extra:
@@ -309,6 +327,7 @@ def update_worker(
     *,
     desc: Optional[str] = None,
     summary: Optional[str] = None,
+    context: Optional[str] = None,
     model: Optional[str] = None,
     extra: Optional[str] = None,
     soul: Optional[Path] = None,
@@ -329,6 +348,9 @@ def update_worker(
     if summary is not None:
         _set_scalar(profile, "summary", summary)
         changed.append("summary")
+    if context is not None:
+        _set_context(profile, context)
+        changed.append("context")
     if model is not None:
         _set_scalar(profile, "model", model)
         changed.append("model")

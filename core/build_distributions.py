@@ -434,6 +434,9 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             # **人が読む一行。** 設定画面の一覧に出る。無ければ description の
             # 最初の一文で代用する——decomposer 向けの長文をそのまま出すと切れる。
             "summary": " ".join((prof.get("summary") or "").split()),
+            # **人から前提を受け取る役だけが持つ。** 値は「何を書いてほしいか」の説明で、
+            # 設定画面の入力欄の脇に出る。無い役には欄を出さず、書かれていても渡さない。
+            "context": str(prof.get("context") or "").strip(),
             "desc": " ".join((prof.get("description") or "").split()),
             "describe": " ".join((prof.get("description") or "").split()),
             "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)]
