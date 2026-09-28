@@ -12,11 +12,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from paths import kit_root, local_workers_dir
+from paths import env_file, kit_root, local_workers_dir
 
 _GENERATOR_PATH = Path(__file__).resolve().parent / "build_distributions.py"
 # 生成器の環境変数（モデル名・置き場）。変われば読み直す。
-_GENERATOR_ENV = ("MODEL_FAST", "MODEL_SMART", "MODEL_SENIOR", "WORKSPACE_IMAGE",
+_GENERATOR_ENV = ("MODEL_PROVIDER", "MODEL_FAST", "MODEL_MID", "MODEL_SMART", "MODEL_SENIOR",
+                  "BEDROCK_REGION", "OPENCODE_PROVIDER", "WORKSPACE_IMAGE",
                   "WORKSPACE_ARTIFACTS_ROOT", "WORKSPACE_FILES_ROOT", "WORKSPACE_ATTACHMENTS_ROOT",
                   "KIT_VERSION", "HERMES_HOME")
 _cache: Dict[str, Tuple[Any, Any]] = {}
@@ -37,7 +38,10 @@ def generator():
     かといって呼ぶたびに読み直すと、1回 60ms が1リクエストで100回を超え、
     設定画面の一覧に 7 秒かかった（実測）。更新時刻と環境変数で見分ける。
     """
-    key = (_stamp(_GENERATOR_PATH), tuple(os.environ.get(k) for k in _GENERATOR_ENV))
+    # **`.env` の更新時刻も見る。** どのプロバイダを使うかは `.env` にあり、生成器は
+    # 読み込み時にそれで段と鍵を決める。見ないと、切り替えても古い段のまま配る。
+    key = (_stamp(_GENERATOR_PATH), _stamp(env_file()),
+           tuple(os.environ.get(k) for k in _GENERATOR_ENV))
     hit = _cache.get("generator")
     if hit and hit[0] == key:
         return hit[1]
@@ -197,7 +201,11 @@ def own_env_vars(name: str) -> List[str]:
 # own（`env_own`）との違いは**共通へ落ちるかどうか**。Slack のトークンは落ちると
 # 二重返事の事故になるので落とさないが、モデルの鍵は落ちてよい——
 # 無いと何も動かない唯一の鍵なので、むしろ落ちないと困る。
-OVERRIDABLE_ENV = ("OPENROUTER_API_KEY",)
+OVERRIDABLE_ENV = ("OPENROUTER_API_KEY", "AWS_BEARER_TOKEN_BEDROCK")
+
+# **どちらのプロバイダの鍵も、常に管理下に置く。** 選んでいない側の鍵は役へは配らないが、
+# 管理から外すと、切り替えたあと各役の .env に古い鍵が残り続ける（掃除の対象にならない）。
+MODEL_KEYS = ("OPENROUTER_API_KEY", "AWS_BEARER_TOKEN_BEDROCK")
 
 
 # **秘密ではない値。** 設定画面で伏せ字にせず、入っている値も見せる。
@@ -271,4 +279,7 @@ def managed_env_vars() -> List[str]:
             key = env_key(name, var)
             if key not in seen:
                 seen.append(key)
+    for var in MODEL_KEYS:
+        if var not in seen:
+            seen.append(var)
     return seen

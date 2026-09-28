@@ -88,13 +88,6 @@ def ensure_env(log: Optional[Log] = None) -> Path:
                 log("+ MEM0_NEO4J_PASSWORD を追記（compose.yml が必須にしている）")
         return path
 
-    # 事実抽出は OpenRouter に寄せる（既存のプロファイルから鍵を拾う）
-    llm_key = ""
-    for candidate in (profile_dir("operator") / ".env", hermes_home() / ".env", kit_root() / ".env"):
-        llm_key = _read_env(candidate).get("OPENROUTER_API_KEY", "")
-        if llm_key:
-            break
-
     path.write_text(
         "# hermes-kit が生成。ここは秘密なのでキットには入れない。\n"
         "# 消すと過去の記憶が読めなくなるので、消さないこと。\n"
@@ -103,11 +96,11 @@ def ensure_env(log: Optional[Log] = None) -> Path:
         "MEM0_PG_USER=mem0\n"
         "MEM0_PG_DB=mem0\n"
         f"MEM0_NEO4J_PASSWORD={_secret(32)}\n"
-        "MEM0_PORT=8888\n"
-        f"MEM0_LLM_API_KEY={llm_key}\n"
-        "MEM0_LLM_BASE_URL=https://openrouter.ai/api/v1\n",
+        "MEM0_PORT=8888\n",
         encoding="utf-8",
     )
+    # 事実抽出と埋め込みの取り寄せ先は、キットのプロバイダに合わせて書く
+    _write_settings(path, settings())
     try:
         path.chmod(stat.S_IRUSR | stat.S_IWUSR)
     except OSError:
@@ -115,6 +108,115 @@ def ensure_env(log: Optional[Log] = None) -> Path:
     if log:
         log(f"+ {path}（API キーと DB パスワードを生成）")
     return path
+
+
+# ── 取り寄せ先（OpenRouter / Bedrock）──────────────────────────────────────
+
+# Bedrock の事実抽出と埋め込み。**次元は表の列と揃える**（compat.py が pgvector にも渡す）。
+# 事実抽出は OpenAI 互換の口で呼ぶので、`global.` の付かない ID を使う。
+BEDROCK_LLM = "openai.gpt-5.6-luna"
+BEDROCK_EMBEDDER = "amazon.titan-embed-text-v2:0"
+BEDROCK_EMBEDDING_DIMS = "1024"
+
+
+def settings() -> Dict[str, str]:
+    """mem0 の .env に置く、取り寄せ先の値。**キットの MODEL_PROVIDER に従う。**
+
+    鍵はキットの .env（唯一の正）から取る。OpenRouter のときは MEM0_* のモデル指定を
+    空にして、mem0 の既定（gpt-4o / text-embedding-3-small）をそのまま使う。
+    """
+    from env import read_env
+    from paths import env_file
+
+    gen = roles.generator()
+    # 窓口（operator）と同じ鍵。役つきの上書きがあればそれ、無ければ共通
+    key = roles.env_value("operator", gen.MODEL_KEY, read_env(env_file()))
+    if gen.PROVIDER == "bedrock":
+        return {
+            "MEM0_LLM_API_KEY": key,
+            "MEM0_LLM_BASE_URL": gen.BEDROCK_OPENAI_BASE_URL,
+            "MEM0_LLM_MODEL": BEDROCK_LLM,
+            "MEM0_EMBEDDER_PROVIDER": "aws_bedrock",
+            "MEM0_EMBEDDER_MODEL": BEDROCK_EMBEDDER,
+            "MEM0_EMBEDDING_DIMS": BEDROCK_EMBEDDING_DIMS,
+            "MEM0_AWS_BEARER_TOKEN_BEDROCK": key,
+            "MEM0_AWS_REGION": gen.BEDROCK_REGION,
+        }
+    return {
+        "MEM0_LLM_API_KEY": key,
+        "MEM0_LLM_BASE_URL": "https://openrouter.ai/api/v1",
+        "MEM0_LLM_MODEL": "",
+        "MEM0_EMBEDDER_PROVIDER": "",
+        "MEM0_EMBEDDER_MODEL": "",
+        "MEM0_EMBEDDING_DIMS": "",
+        "MEM0_AWS_BEARER_TOKEN_BEDROCK": "",
+        "MEM0_AWS_REGION": "",
+    }
+
+
+def _write_settings(path: Path, values: Dict[str, str]) -> bool:
+    """mem0 の .env の取り寄せ先の行を書き換える。**秘密（DB のパスワードなど）には触らない。**
+
+    変わったら True。
+    """
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    current = _read_env(path)
+    if all(current.get(k, "") == v for k, v in values.items()):
+        return False
+    kept = [line for line in lines if line.partition("=")[0].strip() not in values]
+    kept += [f"{k}={v}" for k, v in values.items()]
+    path.write_text("\n".join(kept).strip() + "\n", encoding="utf-8")
+    try:
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass
+    return True
+
+
+def sync(log: Optional[Log] = None) -> bool:
+    """取り寄せ先を mem0 に合わせる。**変わったときだけ、動いているコンテナを作り直す。**
+
+    鍵を後から入れた・プロバイダを切り替えた、のどちらもここで届く。
+    mem0 を立てていない環境では何もしない。
+    """
+    if not mem0_env().is_file():
+        return True
+    if not _write_settings(mem0_env(), settings()):
+        return True
+    if not running():
+        return True
+    # イメージにも差がありうる（Bedrock の埋め込みに boto3 が要る）ので、建て直して起こす
+    code, _out = _compose("up", "-d", "--build")
+    if log:
+        log("mem0 を新しい取り寄せ先で起動し直しました" if code == 0
+            else "✗ mem0 を起動し直せませんでした")
+    return code == 0
+
+
+def wipe(log: Optional[Log] = None) -> bool:
+    """**共有記憶を消す。** 取り寄せ先を切り替えると埋め込みが変わり、これまでの記憶は
+    引けなくなる（互換性が無い）ので、作り直す。
+
+    消すのはデータ（ボリューム）だけで、秘密（mem0 の .env）は残す。新しい DB は同じ
+    パスワードで初期化される。動いていれば、新しい設定で起こし直す。
+    """
+    if not have_docker() or not mem0_env().is_file():
+        return True
+    was_running = running()
+    _write_settings(mem0_env(), settings())
+    code, _out = _compose("down", "-v")
+    if code != 0:
+        if log:
+            log("✗ 共有記憶を消せませんでした（docker compose down -v）")
+        return False
+    if log:
+        log("共有記憶（mem0）を消しました")
+    if was_running:
+        code, _out = _compose("up", "-d", "--build")
+        if log:
+            log("mem0 を新しい取り寄せ先で起動しました" if code == 0 else "✗ mem0 を起動できませんでした")
+        return code == 0
+    return True
 
 
 def memory_roles() -> List[str]:

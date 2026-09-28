@@ -198,6 +198,24 @@ def _installed_matches(dist: Path, name: str) -> bool:
     return True
 
 
+# 取り寄せ先を決める config.yaml の節。**ここが配るものと違えば、config.yaml ごと入れ替える。**
+_MODEL_SECTIONS = ("model", "providers", "bedrock", "auxiliary", "delegation")
+
+
+def _model_differs(dist: Path, name: str) -> bool:
+    """**モデルと取り寄せ先が、入っているものと違うか。**
+
+    update は config.yaml を既定で保持するので、プロバイダを切り替えても
+    `--force-config` を付けないと古いモデルのまま動き続ける。違う役だけ入れ替える。
+    """
+    try:
+        built = yaml.safe_load((dist / "config.yaml").read_text(encoding="utf-8")) or {}
+        installed = yaml.safe_load((profile_dir(name) / "config.yaml").read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return False
+    return any(built.get(k) != installed.get(k) for k in _MODEL_SECTIONS)
+
+
 def enable_role(name: str, log: Optional[Log] = None) -> Result:
     """役を入れる側に戻す。**記録するだけ**で、導入は次の反映で行う。"""
     import selection
@@ -403,10 +421,11 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
             continue
         if retarget_source(dist, name):
             notable.append(f"{name} の取得元を、いまのキットの場所へ付け替えました")
-        if not force_config and _installed_matches(dist, name):
+        replace_config = force_config or _model_differs(dist, name)
+        if not replace_config and _installed_matches(dist, name):
             unchanged += 1
             continue
-        code, _ = hermes.update(name, force_config=force_config)
+        code, _ = hermes.update(name, force_config=replace_config)
         if code == 0:
             updated += 1
         else:
@@ -446,6 +465,9 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     import mem0
 
     mem0.rewire(log=result.lines.append)
+    # **取り寄せ先を mem0 にも届ける。** 鍵を後から入れたときも、ここで届く。
+    if not mem0.sync(log=result.lines.append):
+        result.failures += 1
 
     retired = retire()
     result.lines.extend(retired.lines)

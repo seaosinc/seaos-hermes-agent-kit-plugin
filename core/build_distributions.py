@@ -31,13 +31,72 @@ from pathlib import Path
 
 import yaml
 
-FAST = os.environ.get("MODEL_FAST", "openai/gpt-5.6-luna")
+def _kit_env_value(name: str) -> str:
+    """キットの `.env`（`<Hermes のホーム>/seaos-kit/.env`）から1つ読む。環境変数が先に勝つ。
+
+    **どのプロバイダを使うかは設定画面で選ぶ**ので、値は `.env` にある。生成器は単体でも
+    動くので、`paths` が読めなければ既定のホームを見る。
+    """
+    if os.environ.get(name):
+        return os.environ[name].strip()
+    try:
+        from paths import env_file
+
+        path = env_file()
+    except ImportError:
+        home = Path(os.environ.get("HERMES_HOME") or str(Path.home() / ".hermes"))
+        home = home.parent.parent if home.parent.name == "profiles" else home
+        path = home / "seaos-kit" / ".env"
+    if not path.is_file():
+        return ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.partition("=")
+        if sep and key.strip() == name:
+            return value.strip()
+    return ""
+
+
+# **モデルの取り寄せ先。** `openrouter` か `bedrock`。全役で1つ。
+# 切り替えると共有記憶（mem0）の埋め込みが変わるので、切り替えは core/provider.py を通す。
+PROVIDERS = ("openrouter", "bedrock")
+PROVIDER = _kit_env_value("MODEL_PROVIDER") or "openrouter"
+if PROVIDER not in PROVIDERS:
+    PROVIDER = "openrouter"
+
+# Bedrock は **ネイティブの Converse**（Hermes の `provider: bedrock`）で使う。鍵は
+# Bedrock の API キー1つ。OpenAI 互換の口（bedrock-mantle）は GPT と Claude で入口が
+# 分かれていて（`/openai/v1` と `/anthropic/v1`）、1つの口で全段を賄えない（実測）。
+#
+# **入口は us-east-1。** 4段が揃うのはここだけだった（2026-09 の実測。東京には GPT-5.x が
+# 無く、us-west-2 には sol も Opus も無い）。モデルは地域を固定しない `global.`（安い）。
+BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "us-east-1")
+# 共有記憶（mem0）の事実抽出だけは OpenAI 互換で繋ぐ（mem0 の口がそれしか無い）
+BEDROCK_OPENAI_BASE_URL = f"https://bedrock-mantle.{BEDROCK_REGION}.api.aws/openai/v1"
+
+# プロバイダごとの段。**同じモデルを同じ段に置く。** Bedrock に gpt-6-astra は無いので、
+# smart は gpt-6-sol に充てる。
+_TIER_DEFAULTS = {
+    "openrouter": {"fast": "openai/gpt-5.6-luna", "mid": "openai/gpt-5.6-sol",
+                   "smart": "openai/gpt-6-astra", "senior": "anthropic/claude-opus-5"},
+    "bedrock": {"fast": "global.openai.gpt-5.6-luna", "mid": "global.openai.gpt-5.6-sol",
+                "smart": "global.openai.gpt-6-sol", "senior": "global.anthropic.claude-opus-5-5"},
+}[PROVIDER]
+
+# モデルの鍵。**プロバイダごとに固有の名前のまま持つ**——Hermes も opencode も
+# その名前で読むので、汎用の名前にすると結局どこかで付け替えることになる。
+MODEL_KEY = {"openrouter": "OPENROUTER_API_KEY", "bedrock": "AWS_BEARER_TOKEN_BEDROCK"}[PROVIDER]
+MODEL_KEY_ENV = (MODEL_KEY, {
+    "openrouter": "モデルプロバイダ（OpenRouter）の API キー",
+    "bedrock": "Amazon Bedrock の API キー",
+}[PROVIDER], True)
+
+FAST = os.environ.get("MODEL_FAST", _TIER_DEFAULTS["fast"])
 # 速い模型と上位の間。**文章の良し悪しが仕事の質になる役**に充てる。
-MID = os.environ.get("MODEL_MID", "openai/gpt-5.6-sol")
-SMART = os.environ.get("MODEL_SMART", "openai/gpt-6-astra")
+MID = os.environ.get("MODEL_MID", _TIER_DEFAULTS["mid"])
+SMART = os.environ.get("MODEL_SMART", _TIER_DEFAULTS["smart"])
 # 難度の高い実装だけに充てる上位モデル。**単価が高いので既定では使わない**——
 # ROLES で明示的に指定した役だけが引く（いまは senior-developer のみ）。
-SENIOR = os.environ.get("MODEL_SENIOR", "anthropic/claude-opus-5")
+SENIOR = os.environ.get("MODEL_SENIOR", _TIER_DEFAULTS["senior"])
 # profile.yaml の model には、生のモデル名のほかに段の名前（fast / smart / senior）を
 # 書ける（fast / mid / smart / senior）。**段で書けば、MODEL_MID などの
 # 差し替えに追従する**——生の名前を
@@ -120,7 +179,8 @@ WORKSPACE_CACHE = os.environ.get("WORKSPACE_CACHE_VOLUME", "hermes-workspace-cac
 # ツール実行に対応していないことがあり（実測: google/gemini-3-pro-image-preview で
 # "No endpoints found that support tool use"）、その場合エラーだけ返して何もしない。
 # provider/model の形が要るので、キットのモデル名にプロバイダを冠する。
-OPENCODE_PROVIDER = os.environ.get("OPENCODE_PROVIDER", "openrouter")
+OPENCODE_PROVIDER = os.environ.get(
+    "OPENCODE_PROVIDER", {"openrouter": "openrouter", "bedrock": "amazon-bedrock"}[PROVIDER])
 # 成果物の受け渡し口。カードのワークスペース（ホスト側）を**左右同じ絶対パス**で渡す。
 # こうすると HERMES_KANBAN_WORKSPACE が箱の中でも外でも同じ意味になり、
 # kanban_complete の artifacts がホスト側で解決できる（kanban_db.py:5647 は
@@ -212,7 +272,7 @@ ROLES: dict[str, dict] = {
             ("SLACK_ALLOWED_USERS", "常に話せる人の Slack メンバー ID（U で始まる。複数はカンマ区切り）。SLACK_OWNER_ID の人は、ここに入れなくても自動で話せる", False),
             ("SLACK_OWNER_ID", "判断を仰ぐ相手の Slack メンバー ID（U で始まる）", False),
             ("SLACK_HOME_CHANNEL", "既定の投稿先チャンネルの ID（C で始まる。#general のような名前ではない）", False),
-            ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
+            MODEL_KEY_ENV,
         ],
         "summary": "ユーザーとの窓口。依頼を受けて結果を報告する",
         "desc": "ユーザーと話す唯一の窓口。依頼をカードにして triage に置き、結果をユーザーが判断できる形で報告する。長い複数テーマの報告は意味のまとまりを保った連続投稿に分け、短文や単一テーマは分割しない。",
@@ -234,7 +294,7 @@ ROLES: dict[str, dict] = {
         # 今回に当てはめてよいかを決める責任が、引く役と同じところにある必要がある。
         # mem0 への接続は全役が持つ（core/mem0.py の memory_roles）。
         "memory": True,
-        "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "env": [MODEL_KEY_ENV],
         "summary": "詰まりを解決し、完了を判定する",
         "desc": "止まったカードを動かして去る。依存の整理、詰まりの解決、完了判定。",
         "describe": ("止まったカードを動かす役。依存を整理し、詰まりを解き、"
@@ -248,7 +308,7 @@ ROLES: dict[str, dict] = {
         "skills": ["kanban-collaboration"],
         "no_delegation": True,
         "plugins": ["a2a-platform"],
-        "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "env": [MODEL_KEY_ENV],
         "summary": "外部エージェントとの連携",
         "desc": "A2A を通じて他のエージェントと連携し、依頼と成果を伝達する役。実装は developer に任せる。",
         "describe": "A2A でエージェントを発見・呼び出し、成果を検証してカードに記録する。リポジトリの実装は developer が担当する。",
@@ -266,7 +326,7 @@ ROLES: dict[str, dict] = {
         # コンテナの中に居ては何も触れない。
         "workspace": False,
         "skills": ["kanban-collaboration"],
-        "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)],
+        "env": [MODEL_KEY_ENV],
         "summary": "この PC の画面を操作する・スクショを撮る",
         "desc": "GUI 操作専用の実行役。CLI や API では代替できない画面操作と、この PC の画面のスクリーンショットを担当する。",
         "describe": ("人間の分身としてこの PC の画面を操作する役。クリック・キー入力・スクリーンショット。"
@@ -282,7 +342,7 @@ ROLES: dict[str, dict] = {
         # ライブラリの綴りを推測せずに引く口
         "mcp_shared": ["context7"],
         "env": [
-            ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
+            MODEL_KEY_ENV,
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
             # **AWS。いまは配線だけで、値は未設定。** Terraform を扱うときに要る。
             # すべて任意——**空なら env apply が行ごと落とす**ので、作業部屋へは
@@ -326,7 +386,7 @@ ROLES: dict[str, dict] = {
         "workspace": True,
         "mcp_shared": ["context7"],
         "env": [
-            ("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True),
+            MODEL_KEY_ENV,
             ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
             # **AWS。いまは配線だけで、値は未設定。** Terraform を扱うときに要る。
             # すべて任意——**空なら env apply が行ごと落とす**ので、作業部屋へは
@@ -439,7 +499,7 @@ def worker_roles(kit: Path) -> dict[str, dict]:
             "context": str(prof.get("context") or "").strip(),
             "desc": " ".join((prof.get("description") or "").split()),
             "describe": " ".join((prof.get("description") or "").split()),
-            "env": [("OPENROUTER_API_KEY", "モデルプロバイダの API キー", True)]
+            "env": [MODEL_KEY_ENV]
                    + ([("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False)]
                       if (prof.get("workspace", False)
                           and prof.get("shell", True)) else [])
@@ -630,7 +690,7 @@ def _workspace_terminal(spec: dict) -> dict:
         ],
         # ホストの値を名前で転送する。**イメージには焼かない。**
         "docker_forward_env": [
-            "GH_TOKEN", "OPENROUTER_API_KEY",
+            "GH_TOKEN", MODEL_KEY,
             # **カードの識別と成果物の置き場。** 秘密ではないが、渡さないと
             # 規約が指す $HERMES_KANBAN_WORKSPACE が箱の中で空になり、
             # 成果物の宣言が / 直下を指してしまう（実際に踏んだ）。
@@ -669,6 +729,15 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         },
         "auxiliary": {"kanban_decomposer": {"model": SMART}},
     }
+    if PROVIDER == "bedrock":
+        # 鍵（AWS_BEARER_TOKEN_BEDROCK）は Hermes が各役の .env から読む。
+        # **モデルの一覧取り（discovery）は切る。** API キーでは一覧の API を叩けず、
+        # 使うモデルはここで決めているので要らない。
+        cfg["model"]["provider"] = "bedrock"
+        cfg["bedrock"] = {"region": BEDROCK_REGION, "discovery": {"enabled": False}}
+        # 補助の仕事も同じ口で。**既定の逃げ先は OpenRouter** なので、書かないと
+        # 鍵の無い先へ落ちる。
+        cfg["auxiliary"]["kanban_decomposer"]["provider"] = "main"
     # **共有記憶は全役が持つ。** 報告はカードの comment と mem0 の両方に残す
     # ——カードは purge で消えるが、mem0 は残り、役をまたいで引ける。
     #

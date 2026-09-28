@@ -259,7 +259,7 @@ def list_secrets() -> List[Dict]:
     これだけは値も返す。伏せると、入っている値を確かめながら直せない。
 
     `required` は「**無いとキット自体が成り立たない**」ものだけに付ける
-    （いまは OPENROUTER_API_KEY ひとつ）。それ以外は空でも動くので任意にし、
+    （いまはモデルの鍵ひとつ。取り寄せ先に応じて OPENROUTER_API_KEY か AWS_BEARER_TOKEN_BEDROCK）。それ以外は空でも動くので任意にし、
     代わりに `disables` で「入れないと何が使えなくなるか」を返す。
     """
     source = env_mod.read_env(env_file())
@@ -372,6 +372,33 @@ def set_secret(body: SecretIn) -> Dict:
 
     env_mod.set_value(body.name, body.value, f"{body.name}（GUI から設定）")
     return {"name": body.name, "configured": bool(body.value)}
+
+
+@router.get("/provider")
+def get_provider() -> Dict:
+    """モデルの取り寄せ先。切り替えたときの警告文も返す（画面が確認に使う）。"""
+    import provider as provider_mod
+
+    return {"current": provider_mod.current(), "options": provider_mod.options(),
+            "warning": provider_mod.WARNING}
+
+
+class ProviderIn(BaseModel):
+    name: str
+    # **記憶を消すことを人が確かめたか。** 無ければ断る
+    confirm: bool = False
+
+
+@router.post("/provider")
+def set_provider(body: ProviderIn) -> Dict:
+    """取り寄せ先を切り替える。**共有記憶（mem0）を消す。** 反映は「エージェントを反映」で。"""
+    import provider as provider_mod
+
+    try:
+        result = provider_mod.switch(body.name, confirm=body.confirm)
+    except provider_mod.ProviderError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": result.ok(), "lines": result.lines}
 
 
 class ContextIn(BaseModel):

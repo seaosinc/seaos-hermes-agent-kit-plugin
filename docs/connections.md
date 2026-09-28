@@ -14,7 +14,8 @@
 
 | 名前 | 必須か | 使うエージェント | 無いとどうなるか |
 |---|---|---|---|
-| `OPENROUTER_API_KEY` | **必須** | 全員 | 何も動きません |
+| `OPENROUTER_API_KEY` | **必須**（OpenRouter を使うとき） | 全員 | 何も動きません |
+| `AWS_BEARER_TOKEN_BEDROCK` | **必須**（Bedrock を使うとき） | 全員 | 何も動きません |
 | `GH_TOKEN` | 任意 | developer / senior-developer / handler | GitHub の読み書き（clone・PR・Issue）ができません |
 | `NOTION_TOKEN` | 任意 | handler | Notion を読めません |
 | `BACKLOG_DOMAIN` | 任意 | handler | Backlog を読めません（`BACKLOG_API_KEY` とセット） |
@@ -71,12 +72,38 @@ AWS の操作をエージェントに任せるときだけ入れます。IAM で
 
 ---
 
+## Amazon Bedrock を使う
+
+モデルの取り寄せ先は、OpenRouter と Amazon Bedrock から選べます。**全エージェントで1つ**です。
+
+1. SEAOS 画面の **「モデルの取り寄せ先」** で「Amazon Bedrock」を選ぶ
+2. 確認が出るので **「記憶を消して切り替える」** を押す
+3. 「接続情報」の **AWS_BEARER_TOKEN_BEDROCK** に、Bedrock の API キーを入れる
+4. **「エージェントを反映」** を押す
+
+CLI では `seaos-kit provider set bedrock` です。
+
+- **切り替えると、共有記憶（mem0）は消えます。** 埋め込みのモデルが変わり、これまでの記憶とは互換性が無いためです。元に戻せません
+- 入口は `us-east-1` です（今の4段がすべて揃うのはここだけでした）。モデルは次のとおりです
+
+  | 段 | OpenRouter | Bedrock |
+  |---|---|---|
+  | fast | `openai/gpt-5.6-luna` | `global.openai.gpt-5.6-luna` |
+  | mid | `openai/gpt-5.6-sol` | `global.openai.gpt-5.6-sol` |
+  | smart | `openai/gpt-6-astra` | `global.openai.gpt-6-sol`（Bedrock に gpt-6-astra が無いため） |
+  | senior | `anthropic/claude-opus-5` | `global.anthropic.claude-opus-5-5` |
+
+- 共有記憶は、事実の抽出に `openai.gpt-5.6-luna`、埋め込みに `amazon.titan-embed-text-v2:0` を使います
+- Bedrock の API キーは、AWS コンソールの **Amazon Bedrock → API keys** で作れます
+
+---
+
 ## エージェントごとに別の OpenRouter キーを使う
 
 請求や利用上限をエージェントごとに分けたいときに使います。
 
 1. エージェントの行の **「設定」** を押す
-2. 「共通の接続情報を、この役だけ別の値にできます。」の下の **OPENROUTER_API_KEY** に入れる
+2. 「共通の接続情報を、この役だけ別の値にできます。」の下の **OPENROUTER_API_KEY**（Bedrock なら **AWS_BEARER_TOKEN_BEDROCK**）に入れる
 3. **「エージェントを反映」** を押す
 
 - 入れていないエージェントは、共通の値を使います

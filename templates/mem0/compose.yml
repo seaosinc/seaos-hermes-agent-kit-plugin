@@ -75,12 +75,21 @@ services:
       POSTGRES_USER: ${MEM0_PG_USER:-mem0}
       POSTGRES_PASSWORD: ${MEM0_PG_PASSWORD}
       POSTGRES_DB: ${MEM0_PG_DB:-mem0}
-      # 事実抽出と埋め込みに使うモデル。OpenRouter 経由で揃える
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USERNAME: neo4j
       NEO4J_PASSWORD: ${MEM0_NEO4J_PASSWORD}
+      # 事実抽出と埋め込みに使うモデル。**取り寄せ先はキットの MODEL_PROVIDER に従う**
+      # （core/mem0.py の settings が .env に書く）。OpenRouter のときは下の MEM0_* が空で、
+      # main.py の既定（gpt-4o / text-embedding-3-small）をそのまま使う。
       OPENAI_API_KEY: ${MEM0_LLM_API_KEY:-}
       OPENAI_BASE_URL: ${MEM0_LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      MEM0_LLM_MODEL: ${MEM0_LLM_MODEL:-}
+      MEM0_EMBEDDER_PROVIDER: ${MEM0_EMBEDDER_PROVIDER:-}
+      MEM0_EMBEDDER_MODEL: ${MEM0_EMBEDDER_MODEL:-}
+      MEM0_EMBEDDING_DIMS: ${MEM0_EMBEDDING_DIMS:-}
+      # Bedrock の埋め込み（boto3）が読む。OpenRouter のときは空
+      AWS_BEARER_TOKEN_BEDROCK: ${MEM0_AWS_BEARER_TOKEN_BEDROCK:-}
+      AWS_REGION: ${MEM0_AWS_REGION:-}
     volumes:
       # 履歴 DB（SQLite）の置き場。無いと起動時に
       # "unable to open database file" で落ちる

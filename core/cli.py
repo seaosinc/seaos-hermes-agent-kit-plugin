@@ -19,6 +19,7 @@ import install as install_mod  # noqa: E402
 import kit  # noqa: E402
 import maintain as maintain_mod  # noqa: E402
 import platform_ops  # noqa: E402
+import provider as provider_mod  # noqa: E402
 import mem0  # noqa: E402
 import roles  # noqa: E402
 import selftest  # noqa: E402
@@ -128,6 +129,12 @@ def _parser() -> argparse.ArgumentParser:
     m0sub.add_parser("up", help="起動して各役へ繋ぐ")
     m0sub.add_parser("down", help="停止する")
     m0sub.add_parser("check", help="状態を見る")
+
+    pv = sub.add_parser("provider", help="モデルの取り寄せ先（openrouter / bedrock）を見る・切り替える")
+    pvsub = pv.add_subparsers(dest="pcmd")
+    pvset = pvsub.add_parser("set", help="切り替える。**共有記憶（mem0）を消す**")
+    pvset.add_argument("name", choices=["openrouter", "bedrock"])
+    pvset.add_argument("--yes", action="store_true", help="記憶を消すことを確認済みとして進める")
 
     gw = sub.add_parser("gateway", help="ゲートウェイの常駐（OS ごとの作法を吸収する）")
     gwsub = gw.add_subparsers(dest="gcmd", required=True)
@@ -355,6 +362,24 @@ def _cmd_mem0(args: argparse.Namespace) -> int:
     return 2
 
 
+def _cmd_provider(args: argparse.Namespace) -> int:
+    if args.pcmd != "set":
+        _print(f"取り寄せ先: {provider_mod.LABELS[provider_mod.current()]}")
+        return 0
+    confirm = args.yes
+    if not confirm and args.name != provider_mod.current():
+        _print(provider_mod.WARNING)
+        try:
+            confirm = input("消して切り替えますか？ [y/N] ").strip().lower() in ("y", "yes")
+        except EOFError:
+            confirm = False
+        if not confirm:
+            _print("やめました")
+            return 1
+    res = provider_mod.switch(args.name, confirm=confirm, log=_print)
+    return 0 if res.ok() else 1
+
+
 def _cmd_gateway(args: argparse.Namespace) -> int:
     prof = getattr(args, "profile", None) or booking.gate_profile()
     if args.gcmd == "restart":
@@ -421,6 +446,7 @@ HANDLERS = {
     "files": _cmd_files,
     "workspace": _cmd_workspace,
     "mem0": _cmd_mem0,
+    "provider": _cmd_provider,
     "gateway": _cmd_gateway,
     "install": _cmd_install,
     "uninstall": _cmd_uninstall,

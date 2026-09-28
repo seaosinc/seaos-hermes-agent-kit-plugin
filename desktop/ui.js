@@ -262,6 +262,47 @@ export default function create(deps) {
   }
 
 
+  /** 取り寄せ先を切り替える前に、**記憶が消えること**を確かめる。 */
+  function ProviderDialog({ target, warning, onConfirm, onClose }) {
+    const [working, setWorking] = useState(false)
+    return jsx('div', {
+      className: 'fixed inset-0 z-50 flex items-center justify-center bg-black/40',
+      onClick: onClose,
+      children: jsxs('div', {
+        className: 'w-[30rem] max-w-[90vw] rounded-lg p-5 shadow-xl',
+        style: { border: BORDER, background: SURFACE },
+        onClick: (e) => e.stopPropagation(),
+        children: [
+          jsx('div', { className: 'text-sm font-medium', children: `${target.label} に切り替える` }),
+          jsx('div', {
+            className: 'mt-3 rounded px-3 py-2 text-xs',
+            style: { border: `1px solid ${DANGER}`, color: DANGER, ...SELECTABLE },
+            children: warning
+          }),
+          jsxs('div', {
+            className: 'mt-5 flex justify-end gap-2',
+            children: [
+              jsx(Button, { label: 'キャンセル', onClick: onClose, disabled: working }),
+              jsx(Button, {
+                label: working ? '切り替えています…' : '記憶を消して切り替える',
+                disabled: working,
+                onClick: async () => {
+                  setWorking(true)
+                  try {
+                    await onConfirm(target.id)
+                  } finally {
+                    setWorking(false)
+                  }
+                }
+              })
+            ]
+          })
+        ]
+      })
+    })
+  }
+
+
   /** 削除する前に、何が起きるかを見せる。
    *
    * **記憶とセッションは戻せない。** 既定は残す側にして、消すほうを明示させる。
@@ -472,17 +513,21 @@ export default function create(deps) {
     const [check, setCheck] = useState({ ok: true, blocking: [], warnings: [] })
     const [version, setVersion] = useState(null)
     const [machine, setMachine] = useState(null)
+    const [provider, setProvider] = useState(null)
+    const [switching, setSwitching] = useState(null)
 
     const load = useCallback(async () => {
       setError('')
       try {
         // **並べて投げる。** 1つずつ待つと、遅いものの合計だけ画面が固まる
-        const [r, s, c, v] = await Promise.all([
+        const [r, s, c, v, p] = await Promise.all([
           call(ctx, '/roles'),
           call(ctx, '/secrets'),
           call(ctx, '/validate'),
-          call(ctx, '/version')
+          call(ctx, '/version'),
+          call(ctx, '/provider')
         ])
+        setProvider(p)
         setRoles(r)
         setSecrets(s)
         setCheck(c)
@@ -524,6 +569,29 @@ export default function create(deps) {
       async (name, text) => {
         await call(ctx, '/roles/context', { method: 'POST', body: { name, text } })
         await load()
+      },
+      [ctx, load]
+    )
+
+    // **切り替えは記憶を消す。** 確認を通ってからだけ送る
+    const switchProvider = useCallback(
+      async (name) => {
+        setError('')
+        setNotice('')
+        try {
+          const res = await call(ctx, '/provider', {
+            method: 'POST',
+            body: { name, confirm: true },
+            timeoutMs: 180000
+          })
+          setSwitching(null)
+          setLog(res.lines || [])
+          setNotice(res.ok ? '切り替えました。実行結果の案内に沿って反映してください。' : '一部に失敗しました。実行結果をご確認ください。')
+          await load()
+        } catch (e) {
+          setSwitching(null)
+          setError(e.message)
+        }
       },
       [ctx, load]
     )
@@ -945,6 +1013,40 @@ export default function create(deps) {
             })
           : null,
 
+        // モデルの取り寄せ先
+        provider
+          ? jsxs('section', {
+              className: 'flex flex-col',
+              children: [
+                jsx('div', {
+                  className: 'pb-1 text-xs font-medium opacity-60',
+                  children: 'モデルの取り寄せ先'
+                }),
+                jsxs('div', {
+                  className: 'flex items-center gap-3 py-2',
+                  style: { borderBottom: BORDER },
+                  children: [
+                    jsx('select', {
+                      value: provider.current,
+                      disabled: busy,
+                      onChange: (e) => {
+                        const target = provider.options.find((o) => o.id === e.target.value)
+                        if (target && target.id !== provider.current) setSwitching(target)
+                      },
+                      className: 'rounded px-2 py-1 text-sm focus:outline-none disabled:opacity-40',
+                      style: { border: BORDER, background: SURFACE_2, color: 'inherit' },
+                      children: provider.options.map((o) => jsx('option', { value: o.id, children: o.label }, o.id))
+                    }),
+                    jsx('div', {
+                      className: 'text-xs opacity-60',
+                      children: '全エージェントと共有記憶が使います。切り替えると共有記憶は消えます。'
+                    })
+                  ]
+                })
+              ]
+            })
+          : null,
+
         // 接続情報
         jsxs('section', {
           className: 'flex flex-col',
@@ -972,6 +1074,15 @@ export default function create(deps) {
                   children: log.join('\n')
                 })
               ]
+            })
+          : null,
+
+        switching && provider
+          ? jsx(ProviderDialog, {
+              target: switching,
+              warning: provider.warning,
+              onConfirm: switchProvider,
+              onClose: () => setSwitching(null)
             })
           : null,
 

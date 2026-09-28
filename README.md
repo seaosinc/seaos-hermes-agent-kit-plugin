@@ -16,7 +16,7 @@ Slack（または Hermes Desktop）で窓口のエージェントに頼むと、
 |---|---|---|
 | macOS か Windows の PC | 必須 | Windows は手順が少し違います（→ [Windows で使う場合](#windows-で使う場合)） |
 | GitHub アカウント | 必須 | このリポジトリは非公開です。**閲覧できる権限をもらっておいてください** |
-| OpenRouter の API キー | 必須 | エージェントが使う AI モデルの鍵です。[openrouter.ai/keys](https://openrouter.ai/keys) で作れます |
+| OpenRouter か Amazon Bedrock の API キー | 必須 | エージェントが使う AI モデルの鍵です。既定は OpenRouter で、[openrouter.ai/keys](https://openrouter.ai/keys) で作れます（→ [Bedrock を使う](docs/connections.md#amazon-bedrock-を使う)） |
 | Slack のワークスペース | 任意 | Slack から話しかけたいときだけ。Hermes Desktop だけでも使えます |
 
 Docker や Node.js などの道具は、足りなければ SEAOS 画面の **「ツール」** に、この PC で入れるためのコマンドが出ます（→ [ツールを揃える](docs/agents.md#ツールを揃える)）。
@@ -61,6 +61,7 @@ GitHub の認証を求められたら、閲覧権限のあるアカウントで�
 
 「接続情報」の **OPENROUTER_API_KEY**（赤い `*` の付いた行）の「設定」を押し、
 OpenRouter の API キーを貼り付けて保存します。
+Amazon Bedrock を使う場合は、先に「モデルの取り寄せ先」を切り替えます（→ [Bedrock を使う](docs/connections.md#amazon-bedrock-を使う)）。
 
 これが無いと先へ進めません。それ以外の行（GitHub、Notion、Backlog など）は、
 使う機能に合わせて後から入れれば大丈夫です。→ [接続情報の一覧と入手方法](docs/connections.md)

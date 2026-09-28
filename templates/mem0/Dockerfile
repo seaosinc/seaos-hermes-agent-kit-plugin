@@ -4,11 +4,13 @@
 #   psycopg          : pgvector の接続
 #   langchain-neo4j  : graph_store。main.py にハードコードされていて外せない
 #   rank-bm25        : グラフ検索のリランキング
+#   boto3            : Bedrock の埋め込み。API キー（AWS_BEARER_TOKEN_BEDROCK）を読むのは 1.39 から
 FROM mem0/mem0-api-server:latest
 RUN pip install --no-cache-dir \
       "psycopg[binary,pool]" \
       langchain-neo4j \
-      rank-bm25
+      rank-bm25 \
+      "boto3>=1.39"
 
 # Hermes の mem0 プラグインは user_id を filters の中に入れて送るが、
 # このサーバーはトップレベルしか見ない。その差を吸収する。

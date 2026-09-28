@@ -53,3 +53,42 @@ class LiftFiltersMiddleware(BaseHTTPMiddleware):
 
 def install(app):
     app.add_middleware(LiftFiltersMiddleware)
+
+
+def patch_config():
+    """main.py の DEFAULT_CONFIG を、環境変数で差し替える。
+
+    main.py は LLM と埋め込みを OpenAI 固定で書いている。取り寄せ先が Bedrock のときは、
+    LLM のモデル名と、埋め込み（プロバイダ・モデル・次元）を入れ替える必要がある。
+    **変数が空なら何もしない**——OpenRouter のときの動きは変わらない。
+    """
+    import os
+
+    import mem0
+
+    original = mem0.Memory.from_config.__func__
+
+    def from_config(cls, config_dict):
+        config_dict = dict(config_dict)
+        model = os.environ.get("MEM0_LLM_MODEL", "").strip()
+        if model:
+            llm = dict(config_dict.get("llm") or {})
+            llm["config"] = {**(llm.get("config") or {}), "model": model}
+            config_dict["llm"] = llm
+        provider = os.environ.get("MEM0_EMBEDDER_PROVIDER", "").strip()
+        if provider:
+            dims = int(os.environ.get("MEM0_EMBEDDING_DIMS", "0") or 0) or None
+            embedder = {"model": os.environ.get("MEM0_EMBEDDER_MODEL", "").strip() or None}
+            if dims:
+                embedder["embedding_dims"] = dims
+            if os.environ.get("AWS_REGION"):
+                embedder["aws_region"] = os.environ["AWS_REGION"]
+            config_dict["embedder"] = {"provider": provider, "config": embedder}
+            if dims:
+                # **表の列の次元も揃える。** pgvector は既定で 1536 次元の列を作る
+                store = dict(config_dict.get("vector_store") or {})
+                store["config"] = {**(store.get("config") or {}), "embedding_model_dims": dims}
+                config_dict["vector_store"] = store
+        return original(cls, config_dict)
+
+    mem0.Memory.from_config = classmethod(from_config)
