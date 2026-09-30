@@ -2,7 +2,6 @@
 name: unblocking
 description: "詰まったカードの解き方。止まった理由の読み方、決め方の5つの形（情報を足す・自分で決める・担当を振り直す・板を整える・ユーザーへ上げる）、道具が足りないという主張の確かめ方、調査カードの振り方、ユーザーへ上げる線引き。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [kanban, unblock, escalation, fixer]

@@ -2,7 +2,6 @@
 name: file-handoff
 description: "ファイルや画像のやりとり。ユーザーから受け取ったファイルを担当が読める場所へ写して本文に書く手順と、手元にあるものを Slack へ返す手順（MEDIA 行）、返してよい範囲。ファイル・画像・添付が関わる依頼を受けたら読む。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [files, slack, operator]

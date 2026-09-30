@@ -2,7 +2,6 @@
 name: github-readonly-review
 description: "Use when researching GitHub PR review state. Separate review bodies, inline comments, and thread resolution, and report unavailable fields without guessing."
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [github, pull-request, review, read-only, provenance]

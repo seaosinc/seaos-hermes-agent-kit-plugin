@@ -2,7 +2,6 @@
 name: kanban-collaboration
 description: "kanban ボードの操作規約。ツールと CLI の使い分け、役割の名前、カードの扱い。全役割が読む。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [kanban, collaboration, delegation, multi-agent]

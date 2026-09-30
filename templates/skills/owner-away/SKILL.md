@@ -2,7 +2,6 @@
 name: owner-away
 description: "オーナーの不在中に、オーナー宛の DM やメンションを代わりに受けたときの規約。「［オーナー宛の…を、オーナーの不在中に代わりに受けた…］」で始まる話が来たら読む。保留のカード（seaos-kit card）の扱いもここにある。"
 version: 1.1.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [slack, owner, away]

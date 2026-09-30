@@ -2,7 +2,6 @@
 name: handoff-and-report
 description: "止まった仕事の振り分け方（自分で答える・fixer に渡す・ユーザーに聞く）と、ユーザーへ出す報告の書き方（見出し、長い回答の分け方、判断を求める形、複数人の場での宛先の示し方）。カードが止まったとき、成果を報告するとき、ユーザーに判断を仰ぐとき、複数人のチャンネルやスレッドで返事をするときに読む。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [kanban, escalation, reporting, operator]
