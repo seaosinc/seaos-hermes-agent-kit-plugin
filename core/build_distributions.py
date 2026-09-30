@@ -335,6 +335,27 @@ ROLES: dict[str, dict] = {
                      "例:「この PC の画面のスクショを撮って送る」「このアプリの設定画面を開いて値を確かめる」。"
                      "CLI や API で済む作業、Web ページのスクショ（developer が作業部屋で撮る）は扱わない。"),
     },
+    # 仕組みの整備役。**板の外にいる**——カードを受けず、人が Desktop / CLI から名指しで呼ぶ。
+    # fixer は板の中で判断するだけで手を持たない。ボードが壊れた、定期実行やゲートウェイが
+    # 止まった、といった「仕組みそのもの」が回らないとき、直接手を入れて直すのがこの役。
+    "mechanic": {
+        "model": SMART,
+        # **外せない役。** 仕組みが壊れたときに直す手なので、外していると、壊れたときに誰も直せない。
+        "essential": True,
+        # 箱に入れない。**直す対象はこの PC そのもの**（~/.hermes、ゲートウェイ、ボード）。
+        "workspace": False,
+        # 汎用のトラブルシューティングは配る。この PC に固有の手当ては、mechanic が
+        # `local-` のスキルとして書き残し、その PC にだけ置く（配らない）。
+        "skills": ["troubleshoot-desktop", "troubleshoot-slack", "troubleshoot-board",
+                   "troubleshoot-scheduled", "troubleshoot-memory", "troubleshoot-windows"],
+        "mcp_shared": ["context7"],
+        "env": [MODEL_KEY_ENV],
+        "summary": "仕組みが回らないとき、直接手を入れて直す",
+        "desc": "SEAOS の仕組み（ボード、ゲートウェイ、定期実行、共有の記憶、Desktop）が回っていないとき、人に呼ばれて直接直す整備役。カードは受けない。",
+        "describe": ("仕組みの整備役。人が Hermes Desktop や CLI から名指しで呼ぶ。"
+                     "【重要】カードをこのプロファイルに割り当ててはならない。"
+                     "板の上の仕事は受けない。"),
+    },
     "developer": {
         "model": FAST,
         # Hermes 側は窓口・検証役なので FAST のまま。実装を担う OpenCode は
