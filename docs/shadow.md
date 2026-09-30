@@ -12,8 +12,9 @@ operator は「ボット」として窓口に立ちますが、影武者は「�
 
 ## どう動くか
 
-- Slack のステータスを **🤖「Bot 対応中」** にしているあいだだけ、影武者が動きます。
-  ステータスを外せば、すぐに止まります
+- Slack のステータスの**絵文字を 🤖（`:robot_face:`）** にしているあいだだけ、影武者が動きます。
+  見るのは絵文字だけで、文言は何でも構いません（「会議中」「今日は休み」など）。
+  ステータスを外すか、絵文字を 🤖 以外にすれば、すぐに止まります
 - あなた宛の **DM** と、チャンネル・グループ DM・スレッドでの **`@あなた` のメンション**に、あなたのアカウントで返事をします。
   あなた宛かどうか分からない発言には反応しません
 - 返事の先頭には、必ず **「🤖 代理応答」** が付きます。相手は、あなた本人の返事と取り違えません
@@ -126,7 +127,7 @@ doctor の「影武者」の節に「✓ shadow: 本人（U…）のトークン
 
 | コマンド | すること |
 |---|---|
-| `seaos-kit shadow on` | ステータスを 🤖「Bot 対応中」にして、代わりに受け始めます |
+| `seaos-kit shadow on` | ステータスを 🤖「Bot 対応中」にして、代わりに受け始めます（文言はこの既定が入るだけで、動くかどうかには関係しません） |
 | `seaos-kit shadow on --minutes 60` | 60 分たったら自動で止まります |
 | `seaos-kit shadow off` | 影武者のステータスを外して、止めます（あなたが手で付けた別のステータスには触りません） |
 | `seaos-kit shadow status` | いま代わりに受けているかを出します |
@@ -163,7 +164,7 @@ SEAOS 画面の「エージェント」で shadow のチェックを外します
 | 誰の話に応じるか | operator と共有。`SLACK_ALLOWED_USERS` は operator のもの（オーナーを含む）から本人を除いて配る（`roles.derived_env`）。ゲストの承認は、booking-gate を載せた窓口すべてに置く（`booking_sync.gate_profiles`） |
 | 許可の無い人 | 黙る。`unauthorized_dm_behavior: ignore` と、booking-gate の `notice_profiles`（既定は operator だけ） |
 | 本人の発言 | 常に捨てる。**許可から外して認可の段で落とす**うえに、shadow プラグインでも落とす |
-| ON / OFF | 本人の Slack ステータス（`:robot_face:`）が正。`user_status_changed` と 5 分ごとの読み直しで追う。読めないうちは OFF |
+| ON / OFF | 本人の Slack ステータスの**絵文字**（`:robot_face:`）が正。文言は見ない。`user_status_changed` と 5 分ごとの読み直しで追う。読めないうちは OFF |
 | 代理の印 | shadow の口の `send` / `edit_message` に挟んで付ける。最終の返事だけでなく、Hermes の定型の知らせにも付く |
 | 定型の知らせ | 途中経過・警告・記憶の通知などは切る（`config_extra`）。本人が言ったように見えるため |
 | 入れ方 | `opt_in`。何もしなければ入らない（`selection.json` の `enabled`） |
