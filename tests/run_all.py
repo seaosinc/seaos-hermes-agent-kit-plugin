@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """テストをまとめて走らせる。
 
-    ~/.hermes/hermes-agent/venv/bin/python tests/run_all.py            # 速いものだけ
-    ~/.hermes/hermes-agent/venv/bin/python tests/run_all.py --all      # hermes を実際に呼ぶものも
+    ~/.hermes/hermes-agent/venv/bin/python tests/run_all.py
 
 **本番の ~/.hermes には触らない**（各テストが一時ディレクトリを HOME に見立てる）。
-`fresh_install_test` は hermes で実際にプロファイルを入れるので遅い。既定では飛ばす。
+Hermes 本体を動かすテスト（`_harness.CI_ONLY`）は、ここからは流さない。
+一時 HOME でも、この PC の Hermes のインストール先を書き換えるからである。
+それらは GitHub Actions の「Hermes 契約検査」が流す。
 """
 
 from __future__ import annotations
@@ -16,15 +17,16 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SLOW = {"fresh_install_test.py"}
+sys.path.insert(0, str(HERE))
+
+from _harness import CI_ONLY  # noqa: E402
 
 
 def main() -> int:
-    run_slow = "--all" in sys.argv[1:]
     failed: list[str] = []
     for test in sorted(HERE.glob("*_test.py")):
-        if test.name in SLOW and not run_slow:
-            print(f"- {test.name}（遅いので飛ばす。--all で走る）")
+        if test.name in CI_ONLY:
+            print(f"- {test.name}（Hermes 本体を動かすので、GitHub の Hermes 契約検査で走る）")
             continue
         started = time.time()
         proc = subprocess.run([sys.executable, str(test)], capture_output=True, text=True)

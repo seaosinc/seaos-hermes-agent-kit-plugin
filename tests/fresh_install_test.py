@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """まっさらな環境へ配布物を入れられるかを確かめる（別マシンの代役）。
 
-    ~/.hermes/hermes-agent/venv/bin/python tests/fresh_install_test.py
-
-一時ディレクトリを `HERMES_HOME` に見立てて、`hermes profile install` で各役を入れる。
-**本番の ~/.hermes には触らない。**
+**GitHub Actions（.github/workflows/hermes.yml の Hermes 契約検査）でだけ走る。**
+一時ディレクトリを `HERMES_HOME` に見立てて、`hermes profile install` で各役を入れるが、
+Hermes 本体のインストール先は共有なので、手元で流すとこの PC の Hermes が壊れる
+（→ _harness.CI_ONLY）。手元で叩いても、理由を出して何もせずに終わる。
 
 配布の再現性はここでしか担保できない。手元では既に入っているので「動いている」ように
 見えるが、初めての環境では config の既定・スキルの場所・cron のスクリプトなど、
@@ -20,10 +20,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+from _harness import check, finish, require_disposable_env  # noqa: E402
+
+# **何かを作る前に止める。** 一時ディレクトリも Hermes の呼び出しも、この下にある。
+require_disposable_env()
+
 ROOT = Path(__file__).resolve().parent.parent
 HERMES = Path(os.environ.get("HERMES_BIN") or (Path.home() / ".local/bin/hermes"))
-
-from _harness import check, finish  # noqa: E402
 
 
 def run(args: list[str], home: Path) -> subprocess.CompletedProcess:
