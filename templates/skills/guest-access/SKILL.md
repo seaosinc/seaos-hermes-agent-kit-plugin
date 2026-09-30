@@ -36,7 +36,7 @@ Slack で話しかけてくる相手は2種類いる。
 誰の依頼か分からないカードを作らないこと。あとから誰の依頼だったか辿れなくなる。
 
 **ツールの `kanban_create` では依頼者を記録できない。** `created_by` は偽装防止のため
-`HERMES_PROFILE`（＝ `operator`）に固定されていて、引数で上書きできない。
+自分の役名（＝ `operator`）に固定されていて、引数で上書きできない。
 ゲストの依頼は `terminal` から CLI で作る:
 
     hermes kanban create "<タイトル>" \

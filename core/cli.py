@@ -138,11 +138,14 @@ def _parser() -> argparse.ArgumentParser:
 
     gw = sub.add_parser("gateway", help="ゲートウェイの常駐（OS ごとの作法を吸収する）")
     gwsub = gw.add_subparsers(dest="gcmd", required=True)
-    gr = gwsub.add_parser("restart", help="再起動する")
+    gr = gwsub.add_parser("restart", help="その役だけを起こし直す（ホストと他の役は止めない）")
     gr.add_argument("profile", nargs="?", help="省略時はゲートが載っている役")
     gr.add_argument("--when-idle", action="store_true",
                     help="走行中のカードが無くなってから（誰も落とさない）")
-    gwsub.add_parser("status", help="いまの状態")
+    gr.add_argument("--host", action="store_true",
+                    help="全役を受け持つホストごと起こし直す（全役が一度落ち、走行中のカードも落ちる）")
+    gs = gwsub.add_parser("status", help="いまの状態")
+    gs.add_argument("profile", nargs="?", help="省略時はゲートが載っている役")
 
     sub.add_parser("install", help="全役を導入し、配布物に載らないものを揃える")
     unins = sub.add_parser("uninstall", help="撤去する（既定はキット自身の痕跡だけ）")
@@ -160,6 +163,7 @@ def _parser() -> argparse.ArgumentParser:
     tm.add_argument("-n", "--limit", type=int, default=10, help="見る枚数（既定 10）")
 
     sub.add_parser("maintain", help="日次の保守一式（反映 → 掃除 → 検証）")
+
 
     return parser
 
@@ -383,11 +387,17 @@ def _cmd_provider(args: argparse.Namespace) -> int:
 def _cmd_gateway(args: argparse.Namespace) -> int:
     prof = getattr(args, "profile", None) or booking.gate_profile()
     if args.gcmd == "restart":
-        fn = platform_ops.restart_when_idle if args.when_idle else platform_ops.restart_gateway
-        return 0 if fn(prof, log=_print) else 1
+        if args.when_idle:
+            ok = platform_ops.restart_when_idle(prof, log=_print, whole_host=args.host)
+        elif args.host:
+            ok = platform_ops.restart_host(log=_print)
+        else:
+            ok = platform_ops.restart_gateway(prof, log=_print)
+        return 0 if ok else 1
     if args.gcmd == "status":
         _print(f"役: {prof}")
-        _print(f"pid: {platform_ops.gateway_pid(prof) or '（動いていない）'}")
+        for line in platform_ops.status_lines(prof):
+            _print(line)
         _print(f"走行中カード: {platform_ops.running_cards()}")
         _print(platform_ops.autostart_hint())
         return 0

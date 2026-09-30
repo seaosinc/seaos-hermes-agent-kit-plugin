@@ -50,11 +50,19 @@ SEAOS 画面の **operator の行の「設定」** を押し、次の値を入�
 
 入れたら **「エージェントを反映」** を押します。
 
-## 4. operator を起こす
+## 4. operator が起き直すのを待つ
+
+反映すると、operator は**走っている作業が落ち着いたところで自動で起こし直され**、新しい鍵を読みます
+（走っている作業が無ければ、すぐに）。ほかのエージェントや走っている作業は止まりません。
+
+すぐに起こしたいときや、ゲートウェイそのものが止まっているときは、次を実行します。
 
 ```
 seaos-kit gateway restart operator
 ```
+
+ゲートウェイは PC に1つで、全エージェントの窓口をまとめて受け持ちます。動いていれば operator だけを
+起こし直し、止まっていればゲートウェイごと起こします。
 
 `seaos-kit` の場所は OS によって違います（→ [README の Windows の節](../README.md#windows-で使う場合)）。
 
@@ -99,8 +107,10 @@ DM ならメンションは要りません。
    `user_events`、`user_status_changed` が増えています）
 3. **あなた自身が** App を再インストールする。「あなたとして読む」許可を求められるので、許可する。
    トークンは変わらないので、入れ直す値はありません
-4. `seaos-kit gateway restart operator`
-5. ステータスを 🤖 にして、誰かに DM してもらい、operator から返事が来ることを確かめる
+4. ステータスを 🤖 にして、誰かに DM してもらい、operator から返事が来ることを確かめる
+
+キット側の準備は要りません。この機能の入った版が届くと（自動の取り込みか「エージェントを反映」）、
+operator は手が空いたところで自動で起こし直され、この機能を読み込みます。
 
 ---
 
@@ -122,7 +132,7 @@ DM ならメンションは要りません。
 | 症状 | 確認すること |
 |---|---|
 | 返事が来ない | `SLACK_ALLOWED_USERS` に自分のメンバー ID が入っているか。App をチャンネルに招待したか。メンションしたか |
-| まったく反応しない | `seaos-kit gateway status` で pid が出ているか。出ていなければ `seaos-kit gateway restart operator` |
+| まったく反応しない | `seaos-kit gateway status` で「ホスト: pid …」と「operator: 受け持たれている」が出ているか。出ていなければ `seaos-kit gateway restart operator` |
 | operator 以外が返事をしているようだ | `seaos-kit doctor` を実行。「Slack の窓口が奪われていないか」に ✗ が出ていたら、案内どおりに直す（→ [困ったとき](troubleshooting.md)） |
 | 添付したファイルを読めないと言われる | Slack App に `files:read` の権限があるか（README のマニフェストで作れば入っています） |
 | 画像やファイルが返ってこない（「送れなかった」と言われる） | Slack App に `files:write` の権限があるか。頼んだ作業の結果（スクショなど）が DM に返ってこないなら `im:write` も。`seaos-kit doctor` の「Slack App の権限」に ✗ が出ます。**OAuth & Permissions → Bot Token Scopes** に足して App を再インストールする（トークンは変わりません） |

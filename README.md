@@ -276,14 +276,18 @@ seaos-kit doctor
 |---|---|---|
 | コマンドを打つ場所 | ターミナル | PowerShell |
 | `seaos-kit` の場所 | `~/.local/bin/seaos-kit` | `%LOCALAPPDATA%\Programs\seaos-kit\seaos-kit.cmd` |
-| PC の起動時に Slack 窓口を自動で起こす | 自動では起きません。落ちたら `seaos-kit gateway restart operator` | タスク スケジューラに登録します（下記） |
+| PC の起動時に Slack 窓口を自動で起こす | 自動では起きません。落ちたら `seaos-kit gateway restart operator`（全エージェントを受け持つゲートウェイが起きます） | タスク スケジューラに登録します（下記） |
 | 道具を入れるときの承認 | Mac のログインパスワード | 「このアプリがデバイスに変更を加えることを許可しますか？」で「はい」 |
 
 Windows でログオン時に Slack の窓口を自動で起こすには、PowerShell で一度だけ実行します。
+ゲートウェイは PC に1つで、全エージェントの窓口をまとめて受け持ちます。登録するのもこの1つです。
 
 ```
-schtasks /Create /SC ONLOGON /TN "hermes-gateway" /TR "hermes --profile operator gateway run"
+schtasks /Create /SC ONLOGON /TN "hermes-gateway" /TR "hermes gateway run"
 ```
+
+以前 `hermes --profile operator gateway run` で登録した場合は、同じコマンドに `/F` を付けて上書きしてください
+（operator がゲートウェイの持ち主になると、operator だけを起こし直せなくなります）。
 
 **コードを書く developer の作業部屋だけは、Windows での確認がまだ済んでいません。**
 動かない可能性があります。うまくいかない場合は、そのエージェントを外して使ってください。

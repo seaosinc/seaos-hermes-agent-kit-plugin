@@ -232,6 +232,12 @@ def enable_role(name: str, log: Optional[Log] = None) -> Result:
     changed = selection.set_enabled(name, True)
     result.lines.append(f"{name} を有効にしました（反映すると導入されます）" if changed
                         else f"{name} は有効です")
+    # **止めた窓口は、有効に戻しても止まったまま。** 無効にしたときに置いた「止めた印」は
+    # Hermes 側に残り、ホストを起こし直しても載らない。戻す手を示す。
+    import platform_ops
+    if platform_ops.is_parked(name):
+        result.lines.append(f"{name} の窓口は止めてあります。反映のあと "
+                            f"seaos-kit gateway restart {name} で戻します")
     if log:
         for line in result.lines:
             log(line)
@@ -260,7 +266,7 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
     result.lines.append(f"{name} を無効にしました")
 
     if (roles.all_specs().get(name) or {}).get("gateway") and platform_ops.gateway_pid(name):
-        if platform_ops.stop_gateway(name):
+        if platform_ops.stop_gateway(name, log=result.lines.append):
             result.lines.append(f"{name} の窓口を止めました")
         else:
             result.failures += 1
@@ -393,6 +399,58 @@ def enable_plugins() -> Result:
     return result
 
 
+def _gateway_fingerprints() -> dict:
+    """窓口の役ごとに、**ゲートウェイが起動時にしか読まないもの**の指紋を取る。
+
+    プラグイン（`plugins/`）、`config.yaml`、鍵（`.env`）は、ゲートウェイが役を載せるときに
+    読み込む。反映で配っても、起こし直すまでは古いまま動く。
+    `agent.environment_hint` は会話のたびに読まれるので、比べない（起こし直す理由にならない）。
+    """
+    import hashlib
+
+    prints = {}
+    specs = roles.all_specs()
+    for name in roles.names():
+        if not (specs.get(name) or {}).get("gateway"):
+            continue
+        pdir = profile_dir(name)
+        digest = hashlib.sha256()
+        try:
+            cfg = yaml.safe_load((pdir / "config.yaml").read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            cfg = {}
+        if isinstance(cfg.get("agent"), dict):
+            cfg["agent"].pop("environment_hint", None)
+        digest.update(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=True).encode("utf-8"))
+        files = [pdir / ".env", *sorted((pdir / "plugins").rglob("*"))]
+        for path in files:
+            if path.is_file() and "__pycache__" not in path.parts:
+                digest.update(str(path.relative_to(pdir)).encode("utf-8"))
+                digest.update(path.read_bytes())
+        prints[name] = digest.hexdigest()
+    return prints
+
+
+def _restart_changed_gateways(before: dict, result: "Result") -> None:
+    """反映で窓口の読み込むものが変わっていたら、**手が空いてから**その役だけを起こし直す。
+
+    起こし直さないと、新しいプラグインや鍵が効かない（反映しても「何も変わらない」ように見える）。
+    走っている作業は落とさない——待つ処理は裏で走り、反映そのものはすぐ終わる。
+    止まっている窓口は起こさない（止めたのは人の判断かもしれない）。
+    """
+    import platform_ops
+
+    after = _gateway_fingerprints()
+    for name, digest in after.items():
+        if before.get(name) == digest or not platform_ops.serves_here(name):
+            continue
+        if platform_ops.restart_later(name):
+            result.lines.append(f"{name} の設定が変わったので、手が空いたら {name} だけを起こし直します")
+        else:
+            result.lines.append(f"✗ {name} を起こし直せませんでした（seaos-kit gateway restart {name}）")
+            result.failures += 1
+
+
 def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     """templates/ → 配布物 → 各プロファイル → 説明文。
 
@@ -403,6 +461,8 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     件数で言い、**いつもと違うこと（新設・移行・失敗）だけ名前を出す。**
     """
     result = Result()
+    # 窓口が読み込むものを、反映の前に控えておく（後で比べて、変わっていたら起こし直す）。
+    gateway_before = _gateway_fingerprints()
     # **配布物の置き場。** ループの中で使い回すので、役割の分かる名前にしておく。
     dist_root = build(log=log)
 
@@ -506,6 +566,8 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     # 分かる形にする。鍵が入ったら戻す——片道にしない。
     flipped, _disabled = env_mod.sync_mcp_enabled()
     result.lines.extend(flipped)
+
+    _restart_changed_gateways(gateway_before, result)
 
     if log:
         for line in result.lines:
