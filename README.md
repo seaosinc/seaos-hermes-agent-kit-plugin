@@ -172,7 +172,14 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
         "reactions:read",
         "reactions:write",
         "users:read",
-        "users:read.email"
+        "users:read.email",
+        "users.profile:read"
+      ],
+      "user": [
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
       ]
     }
   },
@@ -187,7 +194,14 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
         "assistant_thread_started",
         "assistant_thread_context_changed",
         "reaction_added",
-        "reaction_removed"
+        "reaction_removed",
+        "user_status_changed"
+      ],
+      "user_events": [
+        "message.channels",
+        "message.groups",
+        "message.im",
+        "message.mpim"
       ]
     },
     "interactivity": {
@@ -215,7 +229,11 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
 | | `assistant:write` | 「入力中…」の表示が出ない |
 | | `reactions:read` `reactions:write` | リアクションで操作できない |
 | | `users:read` `users:read.email` | 相手の名前やメールアドレスからゲストを引けない |
+| | `users.profile:read` | 不在のあいだ、オーナー宛の話を代わりに受けない（→ [不在のあいだ代わりに受ける](docs/slack.md#不在のあいだ代わりに受ける)） |
+| User Token Scopes | `channels:history` `groups:history` `im:history` `mpim:history` | 同上 |
 | Event Subscriptions（bot events） | `app_mention` `message.channels` `message.groups` `message.im` `message.mpim` `assistant_thread_started` `assistant_thread_context_changed` `reaction_added` `reaction_removed` | メッセージやリアクションに反応しない |
+| | `user_status_changed` | 同上（オーナーのステータスの変化に気づけない） |
+| Event Subscriptions（events on behalf of users） | `message.channels` `message.groups` `message.im` `message.mpim` | 同上 |
 
 `seaos-kit doctor` の「Slack App の権限」で、足りない権限を確かめられます。
 

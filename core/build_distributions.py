@@ -260,8 +260,10 @@ ROLES: dict[str, dict] = {
         # **場面ごとの手順はスキルへ出す。** SOUL に積むと毎回読ませることになり、
         # 守ってほしい原則が薄まる。SOUL に残すのはいつでも効くものだけ。
         "skills": ["kanban-collaboration", "guest-access", "request-intake",
-                   "file-handoff", "slack-reactions", "handoff-and-report"],
-        "plugins": ["booking-gate"],
+                   "file-handoff", "slack-reactions", "handoff-and-report", "owner-away"],
+        # owner-away: オーナーの不在中（ステータスの絵文字が 🤖）、オーナー宛の DM とメンションを
+        # 代わりに受ける。返事はボットの名前で出す（docs/slack.md の「不在のあいだ代わりに受ける」）。
+        "plugins": ["booking-gate", "owner-away"],
         "hooks": ["mem0-up"],
         "cron": ["booking-sync", "runtime-guard", "spin-guard", "assignee-guard",
                  "container-guard", "progress-report",
