@@ -19,6 +19,18 @@ class HermesMissing(RuntimeError):
     """`hermes` が PATH に無い。"""
 
 
+def forbidden() -> bool:
+    """**テスト中は、この PC の Hermes を起動しない。** 起動するなら理由を返す口で断る。
+
+    テストは一時ディレクトリを HERMES_HOME にして走る。その HOME で本物の Hermes を起動すると、
+    Hermes は道具の置き場を一時 HOME に移し、共有の起動スクリプトをその Python で書き直す。
+    一時 HOME が消えると Hermes Desktop が「未インストール」になる（2026-09-30 に2度起きた）。
+    テストの仕組み（tests/_harness.py）が SEAOS_KIT_TESTING を立てる。GitHub Actions は捨てられる
+    環境なので、そこでは起動してよい。
+    """
+    return bool(os.environ.get("SEAOS_KIT_TESTING")) and os.environ.get("GITHUB_ACTIONS") != "true"
+
+
 def _bin() -> str:
     exe = hermes_bin()
     if not exe:
@@ -42,11 +54,17 @@ def run(args: List[str], *, stdin_empty: bool = True,
     # （hermes_constants.py の named_profile_home）。定期実行のスクリプトは
     # まさにその位置（プロファイル配下の scripts/）で走るので、放っておくと
     # 「説明文を設定できず」が全役ぶん出る（実際に出た）。
+    if forbidden():
+        return 126, "テスト中は、この PC の Hermes を起動しない（hermes.forbidden）"
     try:
         proc = subprocess.run(
             [_bin(), *args],
             capture_output=True,
             text=True,
+            # **UTF-8 で読む。** 日本語版 Windows の既定（cp932）で読むと、Hermes の出力の
+            # 日本語や記号で落ちる。読めない文字は置き換えて、判定だけは続ける。
+            encoding="utf-8",
+            errors="replace",
             stdin=subprocess.DEVNULL if stdin_empty else None,
             cwd=str(Path.home()),
             env={**os.environ, "HERMES_HOME": str(hermes_home())},

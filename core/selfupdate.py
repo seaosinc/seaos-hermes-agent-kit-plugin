@@ -83,7 +83,7 @@ def run(*, dry_run: bool = False, force_config: bool = False, log: Optional[Log]
         say(line)
 
     say("=== 3. 検証 ===")
-    rep = doctor_mod.run()
+    rep = doctor_mod.run(refs=False)
     for line in rep.lines:
         say(line)
     return result.ok() and rep.passed()

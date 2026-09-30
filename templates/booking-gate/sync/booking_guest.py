@@ -184,10 +184,8 @@ def resolve_channel(target: str, cfg: dict) -> tuple[str, str]:
         if cursor:
             params["cursor"] = cursor
         url = "https://slack.com/api/conversations.list?" + bs.urllib.parse.urlencode(params)
-        req = bs.urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
         try:
-            with bs.urllib.request.urlopen(req, timeout=15) as r:
-                data = json.loads(r.read().decode("utf-8"))
+            data = bs.slack_get(url, token)  # 途中で切れたら読み直す
         except Exception as e:
             raise SystemExit(f"✗ チャンネル一覧を取れない: {e}")
         if not data.get("ok"):

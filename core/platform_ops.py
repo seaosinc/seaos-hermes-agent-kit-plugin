@@ -664,7 +664,9 @@ def link_command(log: Optional[Log] = None) -> Path:
 
     if os_kind() == "win32":
         path = target / f"{COMMAND}.cmd"
-        path.write_text(f'@echo off\r\n"{python}" "{entry}" %*\r\n', encoding="utf-8")
+        # **newline="" で書く。** 既定のまま書くと、Windows の Python が `\n` をさらに `\r\n` に
+        # 変え、`\r\r\n` になって .cmd が壊れた（実際に壊れていた）。
+        path.write_text(win_wrapper(str(python), str(entry)), encoding="utf-8", newline="")
         if log:
             log(f"+ {path}")
         # **置くだけでは呼べない。** PATH に無いと、エージェントの端末から叩けない。
@@ -685,6 +687,35 @@ def link_command(log: Optional[Log] = None) -> Path:
     if log:
         log(f"+ {path} → {entry}")
     return path
+
+
+def _win_env_path(path: str) -> str:
+    """パスの先頭を `%LOCALAPPDATA%` / `%USERPROFILE%` に置き換える。
+
+    **ユーザー名が日本語だと、パスをそのまま書いた .cmd は読み違えられる。** cmd.exe は
+    .cmd を OS の文字コード（日本語版は cp932）で読むので、UTF-8 で書いた日本語が化け、
+    Python の場所を取り違える。環境変数で書けば、ファイルの中から日本語が消える。
+    """
+    for var in ("LOCALAPPDATA", "USERPROFILE"):
+        base = os.environ.get(var, "").rstrip("\\/")
+        if base and path.lower().startswith(base.lower() + "\\"):
+            return f"%{var}%" + path[len(base):]
+    return path
+
+
+def win_wrapper(python: str, entry: str) -> str:
+    """Windows の `seaos-kit.cmd` の中身。
+
+    **Python を UTF-8 で動かす**（PYTHONUTF8）。日本語版 Windows の既定は cp932 で、
+    出力をエージェントが受け取ると ✓ や ✗ を書けずに落ち、Hermes の出力も読み違える。
+    パスに日本語が残るときだけ、先に cmd.exe の文字コードを UTF-8 に切り替える。
+    """
+    py, script = _win_env_path(python), _win_env_path(entry)
+    lines = ["@echo off", 'set "PYTHONUTF8=1"']
+    if not (py + script).isascii():
+        lines.insert(1, "chcp 65001 >nul")
+    lines.append(f'"{py}" "{script}" %*')
+    return "\r\n".join(lines) + "\r\n"
 
 
 def unlink_command(log: Optional[Log] = None) -> bool:

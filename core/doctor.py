@@ -396,7 +396,13 @@ def _assignees(rep: Report) -> None:
         rep.note(f"過去の担当（実体なし・履歴のみ）: {' '.join(stale)}")
 
 
-def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
+def run(log: Optional[Log] = None, *, deep: bool = True, refs: bool = True) -> Report:
+    """設定漏れを検証する。
+
+    `refs=False` で「規約が名指しした名前」の確かめ（refcheck）を省く。refcheck は Hermes を
+    `--help` 付きで何十回も起動するので、Hermes の起動が重い Windows では数分かかり、
+    upgrade や日次の保守がそこで時間切れになった。単独の `seaos-kit doctor` では省かない。
+    """
     rep = Report()
 
     _orphan_profiles(rep)
@@ -414,7 +420,10 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     # ——エージェントは呼べないまま「できない」と正しく報告して止まるだけなので、
     # 綴りの誤りが世代を越えて残る。
     rep.section("規約が名指しした名前（コマンド・道具・スキル・役）")
-    refcheck.run(rep, deep=deep)
+    if refs:
+        refcheck.run(rep, deep=deep)
+    else:
+        rep.note("省いた（重いので。確かめるときは seaos-kit doctor）")
 
     # **MCP の allowlist は綴りを間違えても黙って落ちる。** 実在しない名前を
     # 8個並べたまま、担当が「取れない前提」のカードを4時間ぶん立てた事故がある。

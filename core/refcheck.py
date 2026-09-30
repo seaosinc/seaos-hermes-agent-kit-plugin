@@ -70,8 +70,17 @@ def _invocations(body: str):
                 yield m.group(1), rest[index]
 
 
+def _hermes_forbidden(argv: List[str]) -> bool:
+    """この PC の Hermes を起動する呼び出しで、いまはテスト中か（→ hermes.forbidden）。"""
+    import hermes as hermes_mod
+
+    return bool(argv) and argv[0] == hermes_bin() and hermes_mod.forbidden()
+
+
 def _subcommands(argv: List[str]) -> Set[str]:
     """`--help` が出す `{a,b,c}` を読む。**入口に直接聞く**ので、実装とズレない。"""
+    if _hermes_forbidden(argv):
+        return set()
     try:
         proc = subprocess.run(argv + ["--help"], capture_output=True, text=True,
                               timeout=60, stdin=subprocess.DEVNULL)
@@ -176,7 +185,7 @@ def tools_of(role: str, members: Dict[str, Set[str]]) -> Set[str]:
     """その役が実際に呼べる道具。**定義ではなく実体を見る。**"""
     hermes = hermes_bin()
     out: Set[str] = _provider_tools(role)
-    if not hermes:
+    if not hermes or _hermes_forbidden([hermes]):
         return out
     for platform in ("cli", "slack"):
         try:
@@ -240,6 +249,8 @@ def _choice_groups(text: str) -> Set[str]:
 
 
 def _help_text(argv: List[str]) -> str:
+    if _hermes_forbidden(argv):
+        return ""
     try:
         proc = subprocess.run(argv + ["--help"], capture_output=True, text=True,
                               timeout=60, stdin=subprocess.DEVNULL)
