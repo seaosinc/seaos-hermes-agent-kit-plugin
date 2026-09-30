@@ -320,10 +320,10 @@ ROLES: dict[str, dict] = {
                    "troubleshoot-scheduled", "troubleshoot-memory", "troubleshoot-windows"],
         "mcp_shared": ["context7"],
         "env": [MODEL_KEY_ENV],
-        "summary": "SEAOS の仕組みそのものの不具合を直す",
-        "desc": "SEAOS の仕組み（ボード、ゲートウェイ、定期実行、各役の設定と配布物、共有の記憶、Desktop）の不具合を、直接手を入れて直す整備役。",
+        "summary": "SEAOS の仕組みそのものを整備する",
+        "desc": "SEAOS の仕組みそのもの（ボード、ゲートウェイ、定期実行、各役の設定と配布物、共有の記憶、アクセス許可、Hermes Desktop）を整備する役。",
         "describe": ("SEAOS の仕組みそのもの（ボード、ゲートウェイ、定期実行、各役の設定と配布物、"
-                     "共有の記憶、アクセス許可、Hermes Desktop）の不具合を直す整備役。"
+                     "共有の記憶、アクセス許可、Hermes Desktop）を整備する役。"
                      "例:「完了したのに報告が来ない原因を突き止めて直す」「止まったままのカードを直す」"
                      "「定期実行が登録されていないのを直す」。"
                      "mechanic を呼ぶのは、仕組みの不具合で依頼が進まなくなったときである。たとえば、完了しても報告が来ない、カードが同じ状態のまま動かない、定期実行が失敗し続けている、見張り（guard）が止まりを知らせた、といったとき。mechanic が直すのは依頼を運ぶ仕組みであって、依頼の内容そのものには対処しない。"),
