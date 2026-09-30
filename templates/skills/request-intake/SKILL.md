@@ -2,7 +2,6 @@
 name: request-intake
 description: "ユーザーの依頼をカードにするときの手順。カードの立て方（--triage・担当を付けない・What だけ書く）、コードに触る依頼にリポジトリ行を入れること、「毎朝」のような繰り返しを cron に持たせること、仕様が変わったときの作り直し、通知の紐付け、エージェントの新設を頼まれたときの聞き出し。窓口が依頼を受けたら読む。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [kanban, intake, operator]

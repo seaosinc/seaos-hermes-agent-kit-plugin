@@ -2,7 +2,6 @@
 name: precedent-lookup
 description: "過去の判断（共有記憶）の引き方と残し方。前例といまとの差を測ってから決めるための手順。判断する役だけが読む。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [memory, judgement, mem0]

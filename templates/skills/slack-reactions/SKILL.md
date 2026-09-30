@@ -2,7 +2,6 @@
 name: slack-reactions
 description: "Slack の絵文字リアクションで来た合図への応じ方。👀 は状況を聞かれている、✅ 🙆 👌 🎉 💯 はもう終わりでよいという合図で、その依頼を片付ける。人がメッセージに絵文字を付けたときに読む。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [slack, reactions, operator]

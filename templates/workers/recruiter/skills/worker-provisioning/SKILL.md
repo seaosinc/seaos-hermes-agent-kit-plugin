@@ -2,7 +2,6 @@
 name: worker-provisioning
 description: "業務別ワーカー一式（SOUL・profile・専用スキル・MCP）を書き起こして反映するまでの手順。recruiter 専用。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [worker, provisioning, soul, skill, mcp, seaos-kit]
@@ -212,7 +211,7 @@ decomposer が読むのは**この文だけ**である。SOUL もスキルも読
     mkdir -p /tmp/recruiter/<name>/skills/<skill-name>
     # /tmp/recruiter/<name>/skills/<skill-name>/SKILL.md を書く
 
-frontmatter は他のスキルに揃える（`name` / `description` / `version` / `platforms` / `metadata.hermes.tags`）。
+frontmatter は他のスキルに揃える（`name` / `description` / `version` / `metadata.hermes.tags`）。**`platforms` は書かない**——書くと、そこに無い OS（Windows など）ではスキルが読めなくなる。
 `name` はディレクトリ名と一致させること。
 
 **このスキルはそのワーカーだけに入る。** 全プロファイルに配りたい共通規約なら、

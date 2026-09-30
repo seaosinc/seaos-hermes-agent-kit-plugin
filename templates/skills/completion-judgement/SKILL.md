@@ -2,7 +2,6 @@
 name: completion-judgement
 description: "依頼が終わったかどうかの判定。子カードが全部終わってルートカードが戻ってきたとき、最初に頼まれたことが達成されているかを成果物まで見て判断し、足りなければ足りない分だけ足す手順。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [kanban, completion, fixer]

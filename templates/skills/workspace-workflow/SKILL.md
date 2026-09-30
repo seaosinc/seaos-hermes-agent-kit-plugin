@@ -2,7 +2,6 @@
 name: workspace-workflow
 description: "使い捨ての作業部屋の性質と、そこで使う道具の綴り。コードを書く役が使う。"
 version: 2.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [worker, workspace, git, container]

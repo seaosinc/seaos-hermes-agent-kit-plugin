@@ -2,7 +2,6 @@
 name: delegate-to-cli-agents
 description: "重い実装を OpenCode に委譲する判断基準と手順。作業部屋（コンテナ）の中で使う。"
 version: 2.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [worker, delegation, opencode, workspace, cost]

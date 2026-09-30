@@ -2,7 +2,6 @@
 name: guest-access
 description: "オーナー以外（ゲスト）と Slack で話すときの規約。依頼者をカードに記録すること、アクセス許可の操作はオーナーの指示でのみ行うこと。返信で宛先を示す作法そのものは handoff-and-report スキルに従う。"
 version: 1.0.0
-platforms: [macos, linux]
 metadata:
   hermes:
     tags: [access-control, kanban, slack, guest]
