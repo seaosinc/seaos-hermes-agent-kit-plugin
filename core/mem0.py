@@ -241,8 +241,15 @@ def wire_one(name: str, port: str, key: str, log: Optional[Log] = None) -> bool:
         return True
     target = pdir / "mem0.json"
     before = target.read_text(encoding="utf-8") if target.is_file() else ""
+    # **接続先は `host` で渡す。** Hermes の mem0 プラグインは `host` があれば手元のサーバーへ
+    # HTTP で繋ぎ（SelfHostedBackend）、無ければクラウド（app.mem0.ai）へ繋ぐ。以前は
+    # `base_url` だけを書いていたので、全役がクラウドへ手元の鍵を送って「Invalid API key」で
+    # 初期化に失敗し、記憶が1件も書けていなかった（画面には何も出ない）。
+    # `base_url` は、それを読んでいた古い Hermes のために残す。
+    url = f"http://localhost:{port}"
     payload = {
-        "base_url": f"http://localhost:{port}",
+        "host": url,
+        "base_url": url,
         "api_key": key,
         "user_id": USER_ID,
     }

@@ -9,6 +9,7 @@ booking / hotl / workspace / mem0 の検査は、それぞれのモジュール�
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
@@ -430,7 +431,19 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
         rep.ok("mem0 が動いている")
         for name in mem0.memory_roles():
             target = profile_dir(name) / "mem0.json"
-            rep.ok(f"{name} が mem0 を参照") if target.is_file() else rep.ng(f"{name} が mem0 を参照していない")
+            if not target.is_file():
+                rep.ng(f"{name} が mem0 を参照していない")
+                continue
+            # **ファイルがあるだけでは繋がらない。** `host` が無いと、Hermes は手元ではなく
+            # クラウドへ繋ぎに行き、鍵が合わずに記憶が使えない（エラーはログにしか出ない）。
+            try:
+                host = (json.loads(target.read_text(encoding="utf-8")) or {}).get("host")
+            except (OSError, ValueError):
+                host = None
+            if host:
+                rep.ok(f"{name} が mem0 を参照")
+            else:
+                rep.ng(f"{name} の mem0 の接続先（host）が無い（クラウドへ繋ぎに行って失敗する）→ seaos-kit update")
     else:
         rep.note("mem0 は動いていない（Docker が無い環境では正常）")
 
