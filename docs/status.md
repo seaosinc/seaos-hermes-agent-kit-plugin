@@ -30,7 +30,7 @@
 | `dashboard/plugin_api.py` | GUI から core を呼ぶ口 |
 | `desktop/plugin.js` / `ui.js` | 設定画面。薄い皮（plugin.js）が中身（ui.js）をその場で読み込む。素の ESM（ビルド不要） |
 | `templates/` | 役の規約・スキル・作業部屋・定期実行のスクリプト |
-| `tests/` | `tests/run_all.py` でまとめて走る（`--all` で hermes を実際に呼ぶものも） |
+| `tests/` | `tests/run_all.py` でまとめて走る。Hermes 本体を動かすもの（`fresh_install_test.py`）は手元では走らず、GitHub の「Hermes 契約検査」だけが流す |
 
 インストールはローカルの bare リポジトリから実証済み。
 

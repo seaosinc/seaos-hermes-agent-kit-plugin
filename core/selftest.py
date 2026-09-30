@@ -16,8 +16,22 @@ from paths import kit_root
 Log = Callable[[str], None]
 
 
+def _ci_only(tests: Path) -> set:
+    """Hermes 本体を動かすので GitHub でだけ走らせるテスト（tests/_harness.py の CI_ONLY）。"""
+    sys.path.insert(0, str(tests))
+    try:
+        from _harness import CI_ONLY
+    finally:
+        sys.path.remove(str(tests))
+    return set(CI_ONLY)
+
+
 def suites() -> List[Path]:
-    return sorted((kit_root() / "tests").glob("*_test.py"))
+    """手元で流すテスト。**Hermes 本体を動かすものは含めない**——一時 HOME で動かしても、
+    この PC の Hermes のインストール先を書き換える（実際に Hermes Desktop が壊れた）。"""
+    tests = kit_root() / "tests"
+    skip = _ci_only(tests)
+    return sorted(p for p in tests.glob("*_test.py") if p.name not in skip)
 
 
 def run(log: Optional[Log] = None) -> Tuple[bool, List[str]]:
