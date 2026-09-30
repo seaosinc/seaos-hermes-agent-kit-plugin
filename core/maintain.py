@@ -168,7 +168,7 @@ def maintain(*, log: Optional[Log] = None) -> Result:
         pass
 
     # 6. 検証
-    checked = doctor_mod.run()
+    checked = doctor_mod.run(refs=False)
     res.lines.extend(checked.lines)
     res.failures += checked.failures
     return res

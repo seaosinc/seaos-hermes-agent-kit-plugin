@@ -511,7 +511,18 @@ HANDLERS = {
 }
 
 
+def _utf8_stdio() -> None:
+    """**出力を UTF-8 にする。** 日本語版 Windows の既定（cp932）のまま、出力をエージェントや
+    定期実行が受け取ると、✓ や ✗ を書けずに落ちる。書けない文字は置き換えて続ける。"""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _utf8_stdio()
     args = _parser().parse_args(argv)
     return HANDLERS[args.cmd](args)
 

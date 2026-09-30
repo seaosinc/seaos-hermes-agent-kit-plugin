@@ -567,6 +567,17 @@ def update(*, force_config: bool = False, log: Optional[Log] = None) -> Result:
     flipped, _disabled = env_mod.sync_mcp_enabled()
     result.lines.extend(flipped)
 
+    # **定期実行が消えていたら登録し直す。** 登録は install の仕事だが、install が走らなかった、
+    # 後から消えた、という環境では、許可表（booking-sync）もキットの取り込み（kit-sync）も
+    # 止まったまま誰も気づけない（Windows の PC で、オーナー以外が全員止まっていた）。
+    # 反映のたびに「無ければ作る」を通せば、反映を押すだけで戻る。登録済みなら何もしない。
+    import install as install_mod
+
+    cron_lines: List[str] = []
+    cron = install_mod.register_cron(log=cron_lines.append)
+    result.lines.extend(l for l in cron_lines if "登録しました" in l or l.startswith("✗"))
+    result.failures += cron.failures
+
     _restart_changed_gateways(gateway_before, result)
 
     if log:

@@ -11,6 +11,11 @@ import sys
 
 failures: list[str] = []
 
+# **テスト中は、この PC の Hermes を起動させない**（core/hermes.py の forbidden）。
+# 一時 HOME で本物の Hermes を起動すると、共有の起動スクリプトが一時 HOME の Python で書き直され、
+# 一時 HOME が消えたとき Hermes Desktop が壊れる（2026-09-30 に2度起きた）。
+os.environ["SEAOS_KIT_TESTING"] = "1"
+
 # **Hermes 本体を動かすテストは、捨てられる環境（GitHub Actions）でだけ走らせる。**
 #
 # 一時ディレクトリを HERMES_HOME に見立てても、この PC の Hermes 本体を呼べば
