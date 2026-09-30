@@ -164,6 +164,20 @@ def _parser() -> argparse.ArgumentParser:
 
     sub.add_parser("maintain", help="日次の保守一式（反映 → 掃除 → 検証）")
 
+    cd = sub.add_parser("card", help="カードの保留（作るが、オーナーが決めるまで誰にも回さない）")
+    cdsub = cd.add_subparsers(dest="ccmd", required=True)
+    ch = cdsub.add_parser("hold", help="担当を付けずに止めた状態でカードを作り、保留にする")
+    ch.add_argument("title", help="カードのタイトル")
+    ch.add_argument("--body", required=True, help="用件と完了条件")
+    ch.add_argument("--requester", required=True, help="依頼者の Slack メンバー ID（U で始まる）")
+    ch.add_argument("--json", action="store_true")
+    cl = cdsub.add_parser("held", help="保留中のカードの一覧")
+    cl.add_argument("--json", action="store_true")
+    cr = cdsub.add_parser("resume", help="保留を解いて、分解（triage）に回す")
+    cr.add_argument("task_id")
+    cx = cdsub.add_parser("drop", help="保留のまま畳む")
+    cx.add_argument("task_id")
+
 
     return parser
 
@@ -438,6 +452,35 @@ def _cmd_guest(args: argparse.Namespace) -> int:
     return code
 
 
+def _cmd_card(args: argparse.Namespace) -> int:
+    import json
+
+    import cards
+
+    try:
+        if args.ccmd == "hold":
+            task = cards.hold(args.title, args.body, args.requester)
+            _print(json.dumps(task, ensure_ascii=False) if args.json
+                   else f"✓ {task.get('id')} を保留にした（オーナーが進めると決めるまで、誰にも回らない）")
+        elif args.ccmd == "held":
+            rows = cards.held()
+            if args.json:
+                _print(json.dumps(rows, ensure_ascii=False))
+            else:
+                for line in cards.describe(rows) or ("（保留中のカードは無い）",):
+                    _print(line)
+        elif args.ccmd == "resume":
+            new_id = cards.resume(args.task_id)
+            _print(f"✓ {args.task_id} の保留を解いた。{new_id} として分解に回した")
+        else:
+            cards.drop(args.task_id)
+            _print(f"✓ {args.task_id} を保留のまま畳んだ")
+    except cards.CardError as exc:
+        _print(f"✗ {exc}")
+        return 1
+    return 0
+
+
 # 下位コマンド -> 処理。**処理は core の関数を呼ぶだけ**にする（判断を皮に書かない）。
 HANDLERS = {
     "roles": _cmd_roles,
@@ -464,6 +507,7 @@ HANDLERS = {
     "timing": _cmd_timing,
     "maintain": _cmd_maintain,
     "guest": _cmd_guest,
+    "card": _cmd_card,
 }
 
 

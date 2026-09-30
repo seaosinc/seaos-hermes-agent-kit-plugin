@@ -46,6 +46,17 @@
 | `seaos-kit enable <名前>` | 戻します。そのあと `seaos-kit update` で導入されます |
 | `seaos-kit worker list` | エージェントの一覧（この PC で作ったものかどうかも出ます） |
 
+## 保留のカード
+
+オーナーが決めるまで誰にも回さないカードです。ふだんは operator が使います（→ [不在のあいだ代わりに受ける](slack.md#不在のあいだ代わりに受ける)）。
+
+| コマンド | すること |
+|---|---|
+| `seaos-kit card held` | 保留中のカードの一覧 |
+| `seaos-kit card resume <id>` | 保留を解いて、分解に回します |
+| `seaos-kit card drop <id>` | 保留のまま畳みます |
+| `seaos-kit card hold "<タイトル>" --body … --requester <U…>` | 保留のカードを作ります |
+
 ## この PC の道具
 
 | コマンド | すること |
