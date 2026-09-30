@@ -71,6 +71,24 @@ SEAOS 画面の **「ツール」** に状態が出ます。
 
 入れ終わったら、`seaos-kit install` を一度実行すると、Docker を使う作業部屋や共有の記憶が用意されます。
 
+### Windows は、先に WSL2 を入れる
+
+Windows の Docker Desktop は、WSL2 が無いと動きません。WSL2 は Windows に最初から入っていないので、Docker より先に入れます。
+
+1. PowerShell を **管理者として実行** し、次を実行する
+
+   ```powershell
+   wsl --install --no-distribution
+   ```
+
+2. PC を再起動する
+3. そのあとで Docker Desktop を入れる
+
+**「WSL のインストールが壊れている可能性があります」と出たとき**（エラーコード `REGDB_E_CLASSNOTREG` など）は、表示どおり何かキーを押して修復させ、再起動してからもう一度 1 を実行します。
+修復で直らなければ、管理者の PowerShell で `winget install --id Microsoft.WSL` を実行して再起動します。
+
+それでも Docker Desktop が「仮想化が無効」などと言うときは、PC の BIOS で仮想化（Intel VT-x / AMD-V）が切られています。会社の PC なら、情報システムの担当に頼んでください。
+
 ## エージェントを増やす
 
 operator に「◯◯ をする専用のエージェントがほしい」と頼むと、operator がいくつか質問したうえで、
