@@ -187,12 +187,11 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
     "event_subscriptions": {
       "bot_events": [
         "app_mention",
+        "app_home_opened",
         "message.channels",
         "message.groups",
         "message.im",
         "message.mpim",
-        "assistant_thread_started",
-        "assistant_thread_context_changed",
         "reaction_added",
         "reaction_removed",
         "user_status_changed"
@@ -231,7 +230,7 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
 | | `users:read` `users:read.email` | 相手の名前やメールアドレスからゲストを引けない |
 | | `users.profile:read` | 不在のあいだ、オーナー宛の話を代わりに受けない（→ [不在のあいだ代わりに受ける](docs/slack.md#不在のあいだ代わりに受ける)） |
 | User Token Scopes | `channels:history` `groups:history` `im:history` `mpim:history` | 同上 |
-| Event Subscriptions（bot events） | `app_mention` `message.channels` `message.groups` `message.im` `message.mpim` `assistant_thread_started` `assistant_thread_context_changed` `reaction_added` `reaction_removed` | メッセージやリアクションに反応しない |
+| Event Subscriptions（bot events） | `app_mention` `app_home_opened` `message.channels` `message.groups` `message.im` `message.mpim` `reaction_added` `reaction_removed` | メッセージやリアクションに反応しない |
 | | `user_status_changed` | 同上（オーナーのステータスの変化に気づけない） |
 | Event Subscriptions（events on behalf of users） | `message.channels` `message.groups` `message.im` `message.mpim` | 同上 |
 
