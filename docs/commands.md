@@ -33,8 +33,9 @@
 | `seaos-kit install` | 初回の仕上げ。定期的な見回り・作業部屋・共有の記憶を用意します。何度実行しても壊れません |
 | `seaos-kit update` | 画面の「エージェントを反映」と同じです |
 | `seaos-kit update --force-config` | エージェントの設定ファイルまで入れ直します。困ったときに案内されたら使います |
-| `seaos-kit gateway restart operator` | Slack の窓口（operator）を起こし直します |
-| `seaos-kit gateway status` | 窓口が動いているか（pid が出ていれば動いています） |
+| `seaos-kit gateway restart operator` | Slack の窓口（operator）だけを起こし直します。鍵を変えたあとはこれで読み直します。ゲートウェイが止まっていれば、それごと起こします |
+| `seaos-kit gateway restart --host` | ゲートウェイごと起こし直します。**全エージェントが一度止まり、走っている作業も落ちます** |
+| `seaos-kit gateway status` | ゲートウェイが動いているか（「ホスト: pid …」）と、その役が受け持たれているか |
 
 ## エージェント
 
@@ -44,6 +45,16 @@
 | `seaos-kit disable <名前>` | 外します（画面のチェックを外すのと同じ）。記憶も消すなら `--remove-profile` |
 | `seaos-kit enable <名前>` | 戻します。そのあと `seaos-kit update` で導入されます |
 | `seaos-kit worker list` | エージェントの一覧（この PC で作ったものかどうかも出ます） |
+
+## 影武者
+
+使い方は [影武者](shadow.md) にあります。
+
+| コマンド | すること |
+|---|---|
+| `seaos-kit shadow on` | Slack のステータスを 🤖「Bot 対応中」にして、影武者に代わりに受けさせます。`--minutes 60` で 60 分後に自動で止まります |
+| `seaos-kit shadow off` | 影武者のステータスを外して止めます |
+| `seaos-kit shadow status` | いま代わりに受けているか |
 
 ## この PC の道具
 

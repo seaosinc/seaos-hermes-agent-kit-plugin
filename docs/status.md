@@ -58,9 +58,13 @@ AWS の箱（Ubuntu）でキットを動かす想定のため。このリポジ�
 
 | | 常駐 | コマンドの置き場 |
 |---|---|---|
-| macOS | 素のプロセス（launchd は使わない。plist が再生成され HERMES_PROFILE が消えるため） | `~/.local/bin/seaos-kit`（ラッパ） |
-| Windows | 素のプロセス ＋ Scheduled Task | `%LOCALAPPDATA%\Programs\seaos-kit\seaos-kit.cmd` |
-| Linux（AWS のみ） | systemd user unit ＋ linger | `~/.local/bin/seaos-kit`（ラッパ） |
+| macOS | 全役を受け持つホスト1つを素のプロセスで（launchd は使わない） | `~/.local/bin/seaos-kit`（ラッパ） |
+| Windows | ホスト1つを素のプロセスで ＋ Scheduled Task | `%LOCALAPPDATA%\Programs\seaos-kit\seaos-kit.cmd` |
+| Linux（AWS のみ） | systemd user unit（`hermes-gateway.service`、ホスト1つ）＋ linger | `~/.local/bin/seaos-kit`（ラッパ） |
+
+**ゲートウェイは1台に1つ（multiplex）。** 役ごとの再起動・停止は、ホストにその役だけを
+外させる・載せ直させる（`hermes -p <役> gateway restart / stop`）。ホストは default から、
+HERMES_PROFILE を持たせずに起こす（持たせると全役の子プロセスがその名前を名乗る）。
 
 ## 残っている作業
 

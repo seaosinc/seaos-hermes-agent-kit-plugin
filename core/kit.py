@@ -229,9 +229,15 @@ def enable_role(name: str, log: Optional[Log] = None) -> Result:
     if name not in roles.all_names():
         raise selection.SelectionError(f"そのエージェントはありません: {name}")
     result = Result()
-    changed = selection.set_enabled(name, True)
+    changed = selection.set_enabled(name, True, opt_in=roles.opt_in(name))
     result.lines.append(f"{name} を有効にしました（反映すると導入されます）" if changed
                         else f"{name} は有効です")
+    # **止めた窓口は、有効に戻しても止まったまま。** 無効にしたときに置いた「止めた印」は
+    # Hermes 側に残り、ホストを起こし直しても載らない。戻す手を示す。
+    import platform_ops
+    if platform_ops.is_parked(name):
+        result.lines.append(f"{name} の窓口は止めてあります。反映のあと "
+                            f"seaos-kit gateway restart {name} で戻します")
     if log:
         for line in result.lines:
             log(line)
@@ -256,11 +262,11 @@ def disable_role(name: str, *, remove_profile: bool = False, log: Optional[Log] 
         raise selection.SelectionError(reason + "。終わるのを待つか、そのカードを止めてください")
 
     result = Result()
-    selection.set_enabled(name, False, essential=roles.essential(name))
+    selection.set_enabled(name, False, essential=roles.essential(name), opt_in=roles.opt_in(name))
     result.lines.append(f"{name} を無効にしました")
 
     if (roles.all_specs().get(name) or {}).get("gateway") and platform_ops.gateway_pid(name):
-        if platform_ops.stop_gateway(name):
+        if platform_ops.stop_gateway(name, log=result.lines.append):
             result.lines.append(f"{name} の窓口を止めました")
         else:
             result.failures += 1

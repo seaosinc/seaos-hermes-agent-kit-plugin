@@ -469,6 +469,21 @@ def pairing_dir(profile: str) -> Path:
     return home / "platforms" / "pairing"
 
 
+def gate_profiles(cfg: dict) -> list[str]:
+    """ゲートを載せている窓口の全部。**アクセス許可は窓口で共有する**ので、承認はその全部に置く。
+
+    operator の許可で話せる人は、影武者（shadow）とも話せる。窓口ごとに承認を
+    持つ Hermes の作りに合わせて、同じ人を各窓口へ書く。
+    """
+    names = [cfg["profile"]]
+    root = HERMES_HOME / "profiles"
+    if root.is_dir():
+        for d in sorted(root.iterdir()):
+            if d.name not in names and (d / "plugins" / "booking-gate").is_dir():
+                names.append(d.name)
+    return names
+
+
 def approved_by_us(profile: str) -> set[str]:
     """いま自分の印で承認されている人。差分を取って監査ログに書くために使う。"""
     try:
@@ -597,7 +612,10 @@ def main() -> int:
 
     # 承認は少し長めに残す。切れた直後の発言に一言返すため（会話は通らない）
     approved = active_user_ids(table, cfg, now, int(cfg.get("notice_window_minutes", 10)))
+    # 数えるのは主の窓口の分だけ（同じ人を窓口の数だけ数えると、増減が水増しに見える）
     added, removed = sync_pairing(cfg["profile"], approved)
+    for profile in gate_profiles(cfg)[1:]:
+        sync_pairing(profile, approved)
     audit_transitions(before, active, table)
 
     summary = f"枠 {len(table['slots'])} / 有効 {len(active)} 人（承認 +{added} -{removed}）"

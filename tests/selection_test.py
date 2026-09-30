@@ -36,10 +36,27 @@ def reset() -> None:
     selection.selection_file().unlink(missing_ok=True)
 
 
+def _all_but_opt_in():
+    return [n for n in roles.all_names() if not roles.opt_in(n)]
+
+
 def test_default_enables_everything():
-    """何も選んでいなければ全役が入る（既存の環境の振る舞いを変えない）。"""
+    """何も選んでいなければ、入れると決める役（opt_in）以外の全役が入る（既存の環境の振る舞いを変えない）。"""
     reset()
-    assert roles.names() == roles.all_names(), roles.names()
+    assert roles.names() == _all_but_opt_in(), roles.names()
+
+
+def test_opt_in_role_enters_only_when_chosen():
+    """影武者は入れると決めたときだけ入り、外せば抜ける。外した役の記録は巻き込まない。"""
+    reset()
+    assert "shadow" not in roles.names()
+    selection.set_enabled("avatar", False)
+    assert selection.set_enabled("shadow", True, opt_in=True)
+    assert "shadow" in roles.names()
+    assert "avatar" not in roles.names(), "入れる記録で、外した記録が消えた"
+    assert selection.set_enabled("shadow", False, opt_in=True)
+    assert "shadow" not in roles.names()
+    assert "avatar" not in roles.names()
 
 
 def test_disabled_role_is_left_out():
@@ -71,7 +88,7 @@ def test_broken_file_enables_everything():
     reset()
     selection.selection_file().parent.mkdir(parents=True, exist_ok=True)
     selection.selection_file().write_text("{", encoding="utf-8")
-    assert roles.names() == roles.all_names()
+    assert roles.names() == _all_but_opt_in()
 
 
 def test_keys_of_disabled_role_stay_managed():

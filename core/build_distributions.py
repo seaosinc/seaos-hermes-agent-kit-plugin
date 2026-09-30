@@ -22,6 +22,7 @@ Hermes には「プロファイルを git で配って更新する」公式の�
 
 from __future__ import annotations
 
+import copy
 import os
 import re
 import shutil
@@ -280,6 +281,66 @@ ROLES: dict[str, dict] = {
                      "結果をユーザーが判断できる形で報告する。長い複数テーマの報告は意味のまとまりを保った"
                      "連続投稿に分け、短文や単一テーマは分割しない。【重要】実作業のカードをこのプロファイルに"
                      "割り当ててはならない。"),
+    },
+    # 影武者。本人が不在のあいだ、**本人の Slack アカウントのまま**代わりに受ける窓口。
+    # 設計と、operator の中に口を足さずに役を分けた理由は docs/shadow.md。
+    "shadow": {
+        "model": FAST,
+        # **入れると決めた人だけに入る。** 本人のユーザートークンを預かる役なので、
+        # 何もしなければ入らない（他の役は外すまで入る）。
+        "opt_in": True,
+        "gateway": True,
+        # 規約は operator から借りる。受けて、カードにして、報告する流れは同じ。
+        "soul_from": "operator",
+        "soul_extra": "SOUL.extra.md",
+        # Slack には本人のユーザートークンで繋がる（doctor が権限の表を切り替える）。
+        "slack_user_token": True,
+        # **アクセス許可は operator と共有する。** 話しかけてよい人は operator のものを
+        # そのまま配り、本人（SLACK_SELF_ID）だけを除く。本人が許可に残ると、
+        # 本人が手で打った発言が依頼として通ってしまう（roles.derived_env）。
+        "access_from": "operator",
+        # SLACK_BOT_TOKEN と呼ぶのは Hermes がその名前で読むから。中身は本人の xoxp。
+        "env_own": ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_SELF_ID"],
+        # 絵文字の作法（slack-reactions）は渡さない。付く絵文字は本人に宛てたもの。
+        "skills": ["kanban-collaboration", "guest-access", "request-intake",
+                   "file-handoff", "handoff-and-report"],
+        "plugins": ["booking-gate", "shadow"],
+        "slack_extra": {
+            # 本人のアカウントで絵文字が付いてしまうので、受け取りの印も絵文字の操作も切る
+            "reactions": False,
+            "reaction_triggers": False,
+        },
+        "slack_config": {
+            # **許可の無い人には黙る。** Hermes の既定は DM にペアリングコードを返すことで、
+            # 影武者がそれをやると本人の名前で同僚にコードが届く。
+            "unauthorized_dm_behavior": "ignore",
+        },
+        # **本人の名前で出る定型の知らせを減らす。** 途中経過・割り込みの知らせ・警告は
+        # 相手には意味が無く、本人が言ったように見える。出るものには印が付く（shadow プラグイン）。
+        "config_extra": {
+            "display": {
+                "busy_input_mode": "queue",
+                "memory_notifications": "off",
+                "background_process_notifications": "off",
+                "platforms": {"slack": {
+                    "interim_assistant_messages": False,
+                    "suppress_warning_notifications": True,
+                    "tool_progress": "off",
+                    "streaming": False,
+                }},
+            },
+        },
+        "env": [
+            ("SLACK_BOT_TOKEN", "本人の User OAuth Token（xoxp で始まる）。Bot トークンではない", False),
+            ("SLACK_APP_TOKEN", "影武者用の Slack App の App トークン（xapp で始まる）。operator とは別の App のもの", False),
+            ("SLACK_SELF_ID", "本人の Slack メンバー ID（U で始まる。上のトークンの持ち主）", False),
+            MODEL_KEY_ENV,
+        ],
+        "summary": "本人の不在中、本人の Slack アカウントで代わりに受ける（影武者）",
+        "desc": "本人の Slack ステータスが 🤖 のあいだ、本人宛の話を本人のアカウントで受ける窓口。依頼をカードにして triage に置き、結果を本人名義で報告する。",
+        "describe": ("本人の不在中に、本人の Slack アカウントで代わりに話を受ける窓口。"
+                     "受け方と報告の仕方は operator と同じ。"
+                     "【重要】実作業のカードをこのプロファイルに割り当ててはならない。"),
     },
     "fixer": {
         "model": SMART,
@@ -730,6 +791,9 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         cfg.update(_hotl_settings())
     if spec.get("workspace") and spec.get("shell", True):
         cfg["terminal"] = _workspace_terminal(spec)
+    if spec.get("config_extra"):
+        # 役だけの設定（影武者の表示の抑え方など）。**キットが決める既定に重ねる。**
+        _merge(cfg, copy.deepcopy(spec["config_extra"]))
     # 置くだけでは有効にならない（既定は無効）。配布物の側で有効にしておく。
     # 全役に載せるもの（UNIVERSAL_PLUGINS）があるので、どの役も plugins を持つ。
     cfg["plugins"] = {"enabled": plugins_of(spec, with_self=True), "disabled": []}
@@ -740,6 +804,15 @@ def build_config(kit: Path, name: str, spec: dict) -> dict:
         # 切り替える仕組み（env.sync_mcp_enabled）が「値が無い」と見て無効にする。
         cfg["mcp_servers"] = _fill_paths(servers)
     return cfg
+
+
+def _merge(base: dict, extra: dict) -> None:
+    """辞書を入れ子のまま重ねる（extra が勝つ）。"""
+    for key, value in extra.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _merge(base[key], value)
+        else:
+            base[key] = value
 
 
 def _fill_paths(value):

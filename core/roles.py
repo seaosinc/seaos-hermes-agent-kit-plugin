@@ -112,9 +112,15 @@ def names() -> List[str]:
     """
     import selection
 
-    off = set(selection.disabled())
+    off, on = set(selection.disabled()), set(selection.opted_in())
     # 配置表は1回だけ読む（all_specs は呼ぶたびに生成器を読み直す）
-    return [n for n, sp in all_specs().items() if n not in off or sp.get("essential")]
+    return [n for n, sp in all_specs().items()
+            if (n in on if sp.get("opt_in") else n not in off or sp.get("essential"))]
+
+
+def opt_in(name: str) -> bool:
+    """**入れると決めたときだけ入る役。** 配置表の `opt_in`（影武者）。"""
+    return bool((all_specs().get(name) or {}).get("opt_in"))
 
 
 def is_enabled(name: str) -> bool:
@@ -260,6 +266,25 @@ def _allowed_with_owner(name: str, source: Dict[str, str]) -> str:
     if owner and owner not in allowed:
         allowed.append(owner)
     return ",".join(allowed)
+
+
+def derived_env(name: str, source: Dict[str, str]) -> List[Tuple[str, str, str]]:
+    """**他の役から引き継いで配る値**（変数名, 値, 説明）。画面で入れさせない。
+
+    影武者（`access_from`）は、話しかけてよい人を元の役（operator）と共有する。
+    **本人（SLACK_SELF_ID）だけは除く。** 本人が許可に残ると、本人が手で打った発言が
+    依頼として通る。応答中の割り込みはフックを通らないので、許可の段で落とすしかない。
+
+    本人の ID が分からないうちは**誰も通さない**（空で配る）。本人が混ざるより安全側。
+    """
+    spec = all_specs().get(name) or {}
+    base = spec.get("access_from")
+    if not base:
+        return []
+    self_id = _raw_env_value(name, "SLACK_SELF_ID", source).strip()
+    allowed = [u.strip() for u in _allowed_with_owner(base, source).split(",") if u.strip()]
+    value = ",".join(u for u in allowed if u != self_id) if self_id else ""
+    return [("SLACK_ALLOWED_USERS", value, f"話しかけてよい人（{base} と共有。本人は除く）")]
 
 
 def managed_env_vars() -> List[str]:

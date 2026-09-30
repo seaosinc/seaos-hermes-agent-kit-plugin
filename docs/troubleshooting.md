@@ -138,8 +138,10 @@ Slack の鍵は「接続情報」ではなく、**エージェント一覧の op
 1. `SLACK_ALLOWED_USERS` に、話しかけた人のメンバー ID（`U` で始まる）が入っているか。
    `SLACK_OWNER_ID` の人は、入れなくても自動で話せます
 2. App をそのチャンネルに招待したか、`@App名` でメンションしたか
-3. `seaos-kit gateway status` で pid が出ているか。出ていなければ `seaos-kit gateway restart operator`
-4. 鍵や許可を変えたあと、`seaos-kit gateway restart operator` で窓口を再起動したか（窓口は起動時に読み込みます）
+3. `seaos-kit gateway status` で「ホスト: pid …」と「operator: 受け持たれている」が出ているか。
+   出ていなければ `seaos-kit gateway restart operator`（ゲートウェイが止まっていれば、それごと起こします）
+4. 鍵や許可を変えたあと、`seaos-kit gateway restart operator` で窓口を起こし直したか。
+   窓口は起こし直したときに鍵を読み直します。起こし直すのは operator だけで、ほかのエージェントや走っている作業は止まりません
 
 Hermes のログ（`<Hermes のホーム>/logs/agent.log`）に `Early reject of unauthorized user U…` と出ていれば、
 その人が 1. の一覧に入っていないため、入口で弾かれています。期限付きで話させたいだけなら、
@@ -196,9 +198,9 @@ Hermes Desktop を起動したときに Hermes 本体が Slack に繋がり、op
 （このキットを入れる前に、Hermes 自体を Slack に繋いでいた場合に起きます）
 
 1. `~/.hermes/.env` をテキストエディタで開き、`SLACK_` で始まる行を削除する（念のため、先にファイルをコピーしておく）
-2. ターミナルで `hermes gateway stop` を実行する
-3. `seaos-kit gateway restart operator` を実行する
-4. `seaos-kit doctor` で ✗ が消えたことを確かめる
+2. ターミナルで `seaos-kit gateway restart --host` を実行する（Hermes 本体の設定を読み直させるため、
+   ゲートウェイごと起こし直します。走っている作業は落ちるので、手が空いているときに）
+3. `seaos-kit doctor` で ✗ が消えたことを確かめる
 
 ### 実装を頼むと失敗する
 

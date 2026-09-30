@@ -56,6 +56,9 @@ SEAOS 画面の **operator の行の「設定」** を押し、次の値を入�
 seaos-kit gateway restart operator
 ```
 
+ゲートウェイは PC に1つで、全エージェントの窓口をまとめて受け持ちます。動いていれば operator だけを
+起こし直し（ほかのエージェントと走っている作業は止まりません）、止まっていればゲートウェイごと起こします。
+
 `seaos-kit` の場所は OS によって違います（→ [README の Windows の節](../README.md#windows-で使う場合)）。
 
 Windows でログオン時に自動で起こしたい場合も、README の Windows の節を見てください。
@@ -89,7 +92,7 @@ DM ならメンションは要りません。
 | 症状 | 確認すること |
 |---|---|
 | 返事が来ない | `SLACK_ALLOWED_USERS` に自分のメンバー ID が入っているか。App をチャンネルに招待したか。メンションしたか |
-| まったく反応しない | `seaos-kit gateway status` で pid が出ているか。出ていなければ `seaos-kit gateway restart operator` |
+| まったく反応しない | `seaos-kit gateway status` で「ホスト: pid …」と「operator: 受け持たれている」が出ているか。出ていなければ `seaos-kit gateway restart operator` |
 | operator 以外が返事をしているようだ | `seaos-kit doctor` を実行。「Slack の窓口が奪われていないか」に ✗ が出ていたら、案内どおりに直す（→ [困ったとき](troubleshooting.md)） |
 | 添付したファイルを読めないと言われる | Slack App に `files:read` の権限があるか（README のマニフェストで作れば入っています） |
 | 画像やファイルが返ってこない（「送れなかった」と言われる） | Slack App に `files:write` の権限があるか。頼んだ作業の結果（スクショなど）が DM に返ってこないなら `im:write` も。`seaos-kit doctor` の「Slack App の権限」に ✗ が出ます。**OAuth & Permissions → Bot Token Scopes** に足して App を再インストールする（トークンは変わりません） |

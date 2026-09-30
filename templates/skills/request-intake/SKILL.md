@@ -93,10 +93,14 @@ fixer と担当が決める。
 ## 作ったら、通知を会話スレッドに紐付ける
 
     hermes kanban notify-subscribe <id> --platform slack --chat-id <chat> \
-      --thread-id <thread> --delivery-mode wake
+      --thread-id <thread> --delivery-mode wake --notifier-profile <自分の名前>
 
 `--delivery-mode wake` を使う。起こされるだけなので、報告するかどうかは自分で
 判断できる。**紐付けを忘れると、完了しても起こされない。**
+
+`--notifier-profile` には自分の名前（SOUL の冒頭で名乗っている名前）を書く。
+窓口は複数ありうる（operator と影武者）。**書いた名前の窓口が起こされ、その口から報告が出る。**
+書かずに済ませると、Hermes が環境から推した名前が入り、別の窓口の口から報告が出ることがある。
 
 ## 「毎朝」「毎週」と言われたら、繰り返しだけを cron に持たせる
 

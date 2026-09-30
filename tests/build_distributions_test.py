@@ -667,11 +667,13 @@ def test_kanban_auto_subscription_is_disabled():
 
 def test_slack_reactions_are_explicitly_enabled_for_gateway():
     """Slack のリアクション機能は本体を変えず、gateway 設定から有効化する。"""
-    gw = [n for n, sp in bd.ROLES.items() if sp.get("gateway")]
-    assert len(gw) == 1
-    extra = bd.build_config(ROOT, gw[0], bd.ROLES[gw[0]])["platforms"]["slack"]["extra"]
+    extra = bd.build_config(ROOT, "operator", bd.ROLES["operator"])["platforms"]["slack"]["extra"]
     assert extra["reactions"] is True
     assert extra["reaction_triggers"] is True
+    # 影武者は本人のアカウントで動くので、絵文字が本人名義で付かないよう切る
+    extra = bd.build_config(ROOT, "shadow", bd.ROLES["shadow"])["platforms"]["slack"]["extra"]
+    assert extra["reactions"] is False
+    assert extra["reaction_triggers"] is False
 
 
 def test_gateway_answers_only_when_addressed():
@@ -685,19 +687,20 @@ def test_gateway_answers_only_when_addressed():
     設定を持つのは窓口の役だけ——他の役は Slack を受けない。
     """
     gw = [n for n, sp in bd.ROLES.items() if sp.get("gateway")]
-    assert len(gw) == 1, f"窓口は1つに保つ: {gw}"
-    slack = (bd.build_config(ROOT, gw[0], bd.ROLES[gw[0]])["platforms"]["slack"])
-    assert slack["extra"]["require_mention"] is True
-    assert slack["extra"]["thread_require_mention"] is True, \
-        "スレッドで呼ばれていなくても反応する（他人あての会話に割り込む）"
-    assert slack["extra"]["ignore_other_user_mentions"] is True
-    assert slack["extra"]["reply_in_thread"] is True, \
-        "チャンネルで平場に流している（他の会話に割り込む）"
+    assert "operator" in gw, gw
+    for name in gw:
+        slack = (bd.build_config(ROOT, name, bd.ROLES[name])["platforms"]["slack"])
+        assert slack["extra"]["require_mention"] is True, name
+        assert slack["extra"]["thread_require_mention"] is True, \
+            f"{name}: スレッドで呼ばれていなくても反応する（他人あての会話に割り込む）"
+        assert slack["extra"]["ignore_other_user_mentions"] is True, name
+        assert slack["extra"]["reply_in_thread"] is True, \
+            f"{name}: チャンネルで平場に流している（他の会話に割り込む）"
     for name, spec in bd.ROLES.items():
         if spec.get("gateway"):
             continue
         assert "platforms" not in bd.build_config(ROOT, name, spec), \
-            f"{name} が Slack の振る舞いを持っている（窓口は1つ）"
+            f"{name} が Slack の振る舞いを持っている（Slack を受けるのは窓口だけ）"
 
 
 def test_roles_that_write_spellings_can_look_them_up():
@@ -715,7 +718,7 @@ def test_roles_that_write_spellings_can_look_them_up():
     for name, spec in specs.items():
         cfg = bd.build_config(ROOT, name, spec)
         servers = cfg.get("mcp_servers") or {}
-        if name in ("operator", "broker") or spec.get("computer_use"):
+        if name == "broker" or spec.get("gateway") or spec.get("computer_use"):
             continue
         assert "context7" in servers, f"{name} が綴りを引けない"
         assert servers["context7"].get("url"), f"{name}/context7 に url が無い"

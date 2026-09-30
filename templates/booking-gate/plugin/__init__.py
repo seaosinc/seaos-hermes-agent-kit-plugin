@@ -48,6 +48,9 @@ DEFAULT_STALE_MINUTES = 5
 DEFAULT_MAX_PER_HOUR = 40  # 1人あたり1時間の発言上限。ただ乗り（コスト）への歯止め
 
 _cache: dict = {"config": None, "config_mtime": 0.0, "table": None, "table_mtime": 0.0}
+# このゲートを載せている役（register で決まる）。multiplex では全役が1つのプロセスに
+# 同居するので、環境変数ではなく Hermes が教える名前を使う。
+_profile: dict = {"name": None}
 _notified: dict[str, float] = {}
 _recent: dict[str, list[float]] = {}  # user_id -> 直近の発言時刻（1時間ぶん）
 _active: dict[str, dict] = {}  # user_id -> {"session_key": str, "end": datetime}
@@ -158,8 +161,18 @@ def _is_stale(table: dict, cfg: dict, now: datetime) -> bool:
 
 
 def _my_profile(cfg: dict) -> str:
-    """この gateway が動いているプロファイル。plist の HERMES_PROFILE が正。"""
-    return (os.environ.get("HERMES_PROFILE") or cfg.get("profile") or "operator").strip()
+    """このゲートを載せている役。register で Hermes から受け取った名前が正。"""
+    return (_profile["name"] or os.environ.get("HERMES_PROFILE") or cfg.get("profile") or "operator").strip()
+
+
+def _gives_notice(cfg: dict) -> bool:
+    """この窓口が、通さなかった人に案内を返すか。
+
+    **案内を返すのは、ボットとして立つ窓口だけ。** 影武者（shadow）は本人のアカウントで
+    話すので、案内を返すと本人の名前で「いまは話せません」と同僚に届いてしまう。
+    """
+    profiles = cfg.get("notice_profiles") or [cfg.get("profile") or "operator"]
+    return _my_profile(cfg) in {str(p).strip() for p in profiles}
 
 
 def _find_slot(table: dict, cfg: dict, user_id: str, now: datetime,
@@ -283,6 +296,22 @@ def _notice_text(table: dict | None, user_id: str, now: datetime, cfg: dict | No
     return base + "オーナーに許可を依頼してください。"
 
 
+def _adapters_of(gateway, source) -> dict:
+    """その発言が来た役の Slack の口。
+
+    **`gateway.adapters` は default の役の口である。** multiplex では各役の口が
+    別に持たれていて、default には Slack が無いので、そこを見ると案内が一通も
+    出ない（実際に出ていなかった）。発言の来た役（source.profile）の口を引く。
+    """
+    lookup = getattr(gateway, "_adapters_for_profile", None)
+    if callable(lookup):
+        try:
+            return lookup(getattr(source, "profile", None) or _profile["name"]) or {}
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[booking-gate] 役の口を引けなかった: %s", e)
+    return getattr(gateway, "adapters", None) or {}
+
+
 def _send_notice(gateway, source, text: str, reply_to=None) -> None:
     """案内を1通返す。送れなくても判定には影響させない。
 
@@ -290,13 +319,15 @@ def _send_notice(gateway, source, text: str, reply_to=None) -> None:
     複数人がいるスレッドに「あなたは時間外です」を全員へ見せる必要はないし、
     会話の流れも汚さない。人なら小声で言うところ。
     """
+    if not _gives_notice(_load_config()):
+        return
     user_id = source.user_id or ""
     last = _notified.get(user_id, 0.0)
     if time.time() - last < NOTICE_INTERVAL_SEC:
         return
     _notified[user_id] = time.time()
 
-    adapters = getattr(gateway, "adapters", None) or {}
+    adapters = _adapters_of(gateway, source)
     adapter = None
     for key, value in adapters.items():
         if getattr(key, "value", str(key)) == "slack":
@@ -371,6 +402,7 @@ def gate(event, gateway=None, session_store=None, **kwargs):
 
 
 def register(ctx):
+    _profile["name"] = getattr(ctx, "profile_name", None)
     ctx.register_hook("pre_gateway_dispatch", gate)
     # プラグインのログはゲートウェイのログに出ない。**外から確認できる痕跡を残す。**
     # これが無いと「配置も有効化もしたのにフックが動いていない」を検出できない。
@@ -379,6 +411,11 @@ def register(ctx):
     # 短命プロセスもプラグインを読み込むので、そこで書くと痕跡がその pid で
     # 上書きされ、doctor が「死んでいる」と誤判定する（実際に踏んだ）。
     if "gateway" not in sys.argv:
+        return
+    # 痕跡は主の窓口（config の profile）の分だけ書く。**ゲートを載せた窓口は複数ありうる**
+    # （影武者）が、doctor が確かめたいのは主の窓口のゲートが生きているかである。
+    cfg = _load_config()
+    if _my_profile(cfg) != (cfg.get("profile") or "operator"):
         return
     try:
         GATE_HOME.mkdir(parents=True, exist_ok=True)

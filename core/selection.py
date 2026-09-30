@@ -11,6 +11,10 @@
 **外せない役がある。** 窓口（operator）と詰まりを解く役（fixer）は、
 板の仕組みそのものが前提にしている（fixer は kanban の orchestrator で、
 operator には定期実行と共有記憶の起動が載る）。配置表の `essential` で示す。
+
+**入れると決めたときだけ入る役もある**（配置表の `opt_in`）。影武者（shadow）は
+本人のユーザートークンを預かるので、黙って全員に入れない。こちらは入れた役を
+`enabled` に記録する。
 """
 
 from __future__ import annotations
@@ -25,10 +29,11 @@ class SelectionError(RuntimeError):
     """呼び手に見せる、原因の分かる失敗。"""
 
 
-def disabled() -> List[str]:
-    """外した役の名前。**読めなければ何も外していない扱い**にする。
+def _read(key: str) -> List[str]:
+    """記録の一覧。**読めなければ空の扱い**にする。
 
-    壊れたファイルで全役が消えるより、全役が入るほうが戻しやすい。
+    壊れたファイルで全役が消えるより、全役が入るほうが戻しやすい
+    （入れると決めた役は、入らないほうが安全側）。
     """
     path = selection_file()
     if not path.is_file():
@@ -37,15 +42,25 @@ def disabled() -> List[str]:
         data = json.loads(path.read_text(encoding="utf-8")) or {}
     except (OSError, ValueError):
         return []
-    names = data.get("disabled") if isinstance(data, dict) else None
+    names = data.get(key) if isinstance(data, dict) else None
     return sorted({str(n) for n in names}) if isinstance(names, list) else []
 
 
-def is_enabled(name: str) -> bool:
-    return name not in disabled()
+def disabled() -> List[str]:
+    """外した役の名前。"""
+    return _read("disabled")
 
 
-def set_enabled(name: str, enabled: bool, *, essential: bool = False) -> bool:
+def opted_in() -> List[str]:
+    """入れると決めた役（`opt_in` の役）の名前。"""
+    return _read("enabled")
+
+
+def is_enabled(name: str, *, opt_in: bool = False) -> bool:
+    return name in opted_in() if opt_in else name not in disabled()
+
+
+def set_enabled(name: str, enabled: bool, *, essential: bool = False, opt_in: bool = False) -> bool:
     """入れる／外すを記録する。変わったら True。
 
     **記録するだけで、実機には触らない。** プロファイルを消すか残すかは
@@ -53,18 +68,22 @@ def set_enabled(name: str, enabled: bool, *, essential: bool = False) -> bool:
     """
     if not enabled and essential:
         raise SelectionError(f"{name} は外せません（チームの仕組みが前提にしている役です）")
-    current = set(disabled())
-    before = set(current)
-    if enabled:
-        current.discard(name)
+    off, on = set(disabled()), set(opted_in())
+    before = (set(off), set(on))
+    if opt_in:
+        (on.add if enabled else on.discard)(name)
+    elif enabled:
+        off.discard(name)
     else:
-        current.add(name)
-    if current == before:
+        off.add(name)
+    if (off, on) == before:
         return False
+    data: dict = {"disabled": sorted(off)}
+    if on:
+        data["enabled"] = sorted(on)
     path = selection_file()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"disabled": sorted(current)}, ensure_ascii=False, indent=2) + "\n",
-                    encoding="utf-8")
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return True
 
 

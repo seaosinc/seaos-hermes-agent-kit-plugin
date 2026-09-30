@@ -10,7 +10,7 @@ booking / hotl / workspace / mem0 の検査は、それぞれのモジュール�
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 import yaml
 
@@ -265,8 +265,24 @@ SLACK_SCOPES = {
 }
 
 
-def _slack_granted_scopes(token: str) -> Optional[set]:
-    """トークンに付いている権限。**`auth.test` の応答ヘッダ（x-oauth-scopes）が持っている。**"""
+# **影武者（本人のユーザートークン）が使う権限。** Bot 用の表とは別物で、
+# メンションは app_mention ではなく、チャンネルの発言をすべて読んで見つける。
+SLACK_USER_SCOPES = {
+    "chat:write": "本人名義で返事を書けない",
+    "im:history": "本人宛の DM が届かない",
+    "mpim:history": "グループ DM でのメンションが届かない",
+    "channels:history": "公開チャンネルでのメンションが届かない",
+    "groups:history": "非公開チャンネルでのメンションが届かない",
+    "files:read": "添付されたファイルを読めない",
+    "files:write": "画像やファイルを返せない",
+    "users:read": "ステータスの変化（user_status_changed）が届かない",
+    "users.profile:read": "ステータスを読み直せない（🤖 の ON/OFF を取りこぼす）",
+    "users.profile:write": "seaos-kit shadow on / off でステータスを切り替えられない",
+}
+
+
+def _slack_auth(token: str) -> Tuple[Optional[dict], Optional[set]]:
+    """`auth.test` の中身と、トークンに付いている権限（応答ヘッダ x-oauth-scopes）。"""
     import json
     import urllib.request
 
@@ -277,10 +293,15 @@ def _slack_granted_scopes(token: str) -> Optional[set]:
             header = r.headers.get("x-oauth-scopes")
             body = json.loads(r.read() or b"{}")
     except Exception:  # noqa: BLE001
-        return None
-    if not body.get("ok") or header is None:
-        return None
-    return {s.strip() for s in header.split(",") if s.strip()}
+        return None, None
+    if not body.get("ok"):
+        return None, None
+    return body, ({s.strip() for s in header.split(",") if s.strip()} if header is not None else None)
+
+
+def _slack_granted_scopes(token: str) -> Optional[set]:
+    """トークンに付いている権限。"""
+    return _slack_auth(token)[1]
 
 
 def _slack_scopes(rep: Report) -> None:
@@ -298,18 +319,90 @@ def _slack_scopes(rep: Report) -> None:
     if not holders:
         rep.note("Slack に繋ぐ窓口が無い")
         return
+    specs = roles.all_specs()
     for name, token in holders:
+        user_token = bool((specs.get(name) or {}).get("slack_user_token"))
+        table = SLACK_USER_SCOPES if user_token else SLACK_SCOPES
         granted = _slack_granted_scopes(token)
         if granted is None:
             rep.note(f"{name}: 権限を確かめられなかった（トークンが無効か、Slack に届かない）")
             continue
-        missing = [s for s in SLACK_SCOPES if s not in granted]
+        missing = [s for s in table if s not in granted]
         if not missing:
             rep.ok(f"{name}: 要る権限が揃っている")
             continue
         for scope in missing:
-            rep.ng(f"{name}: {scope} が無い（{SLACK_SCOPES[scope]}）")
-        rep.lines.append("    Slack App の OAuth & Permissions → Bot Token Scopes に足し、App を再インストールする")
+            rep.ng(f"{name}: {scope} が無い（{table[scope]}）")
+        where = "User Token Scopes" if user_token else "Bot Token Scopes"
+        rep.lines.append(f"    Slack App の OAuth & Permissions → {where} に足し、App を再インストールする")
+
+
+def _slack_app_tokens(rep: Report) -> None:
+    """**窓口どうしが同じ App トークンを持っていないか。**
+
+    gateway は1つのプロセスに全役が同居する（multiplex）。同じプロセスの中では
+    App トークンのロックがぶつからないので、同じ App トークンを2つの窓口に入れても
+    **両方が繋がってしまう。** Slack はイベントをどちらか片方にしか届けないので、
+    返事が来たり来なかったりする（原因が見えない）。ここで言う。
+    """
+    import env as env_mod
+
+    rep.section("窓口の App トークンが重なっていないか")
+    seen: dict = {}
+    clashes = []
+    for name in roles.names():
+        token = env_mod.read_env(profile_dir(name) / ".env").get("SLACK_APP_TOKEN")
+        if not token:
+            continue
+        if token in seen:
+            clashes.append((seen[token], name))
+        else:
+            seen[token] = name
+    if len(seen) + len(clashes) < 2:
+        rep.note("App トークンを持つ窓口は1つ以下")
+        return
+    if not clashes:
+        rep.ok("窓口ごとに別の App トークンを持っている")
+        return
+    for first, second in clashes:
+        rep.ng(f"{first} と {second} が同じ App トークンを持っている（イベントがどちらか片方にしか届かない）")
+    rep.lines.append("    窓口ごとに別の Slack App を作り、その App の App トークンを入れる")
+
+
+def _shadow(rep: Report) -> None:
+    """**影武者のトークンが、本人のユーザートークンか。**
+
+    Bot トークンを入れても繋がってしまい、「本人ではなくボットが返事をする」だけに
+    なる。本人の ID（SLACK_SELF_ID）が違うと、本人の発言が許可に残る。
+    """
+    import env as env_mod
+
+    specs = roles.all_specs()
+    shadows = [n for n in roles.names() if (specs.get(n) or {}).get("slack_user_token")]
+    if not shadows:
+        return
+    rep.section("影武者")
+    for name in shadows:
+        values = env_mod.read_env(profile_dir(name) / ".env")
+        token, self_id = values.get("SLACK_BOT_TOKEN", ""), values.get("SLACK_SELF_ID", "").strip()
+        if not token:
+            rep.note(f"{name}: トークンが入っていない（Slack に繋がない）")
+            continue
+        if not token.startswith("xoxp-"):
+            rep.ng(f"{name}: SLACK_BOT_TOKEN が本人のユーザートークン（xoxp-）ではない")
+            continue
+        body, _scopes = _slack_auth(token)
+        if body is None:
+            rep.note(f"{name}: トークンを確かめられなかった（無効か、Slack に届かない）")
+            continue
+        owner = body.get("user_id", "")
+        if not self_id:
+            rep.ng(f"{name}: SLACK_SELF_ID が空（本人を除けないので、誰も通さずにいる）")
+            rep.lines.append(f"    トークンの持ち主は {owner}。これを SLACK_SELF_ID に入れる")
+        elif self_id != owner:
+            rep.ng(f"{name}: SLACK_SELF_ID（{self_id}）がトークンの持ち主（{owner}）と違う")
+        else:
+            rep.ok(f"{name}: 本人（{owner}）のトークンで、本人は許可から外れている")
 
 
 def _env_hint(rep: Report) -> None:
@@ -401,8 +494,10 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     _orphan_secrets(rep)
     _profiles(rep)
     _slack_token_holders(rep)
+    _slack_app_tokens(rep)
     if deep:
         _slack_scopes(rep)
+        _shadow(rep)
     _env_hint(rep)
     _default_home(rep)
     _assignees(rep)

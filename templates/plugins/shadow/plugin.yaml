@@ -1,0 +1,6 @@
+name: shadow
+version: 0.1.0
+description: 本人の Slack ステータスが 🤖 のあいだだけ、本人のアカウントで代わりに受ける。返信には代理の印を付ける
+author: seaos-hermes-agent-collab-kit
+provides_hooks:
+  - pre_gateway_dispatch

@@ -151,6 +151,16 @@ def apply() -> Tuple[List[str], List[str]]:
             lines = _upsert(lines, var, value, desc)
             wrote += 1
 
+        # 他の役から引き継ぐ値（影武者の「話しかけてよい人」）。**空なら落とす**
+        # ——本人の ID が入るまでは誰も通さない。
+        for var, value, desc in roles.derived_env(name, source):
+            declared.append(var)
+            if value:
+                lines = _upsert(lines, var, value, desc)
+                wrote += 1
+            else:
+                lines = _drop(lines, var)
+
         pruned = 0
         for var in managed:
             if var in declared:
