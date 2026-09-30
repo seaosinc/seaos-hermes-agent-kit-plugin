@@ -33,8 +33,9 @@
 | `seaos-kit install` | 初回の仕上げ。定期的な見回り・作業部屋・共有の記憶を用意します。何度実行しても壊れません |
 | `seaos-kit update` | 画面の「エージェントを反映」と同じです |
 | `seaos-kit update --force-config` | エージェントの設定ファイルまで入れ直します。困ったときに案内されたら使います |
-| `seaos-kit gateway restart operator` | Slack の窓口（operator）を起こし直します |
-| `seaos-kit gateway status` | 窓口が動いているか（pid が出ていれば動いています） |
+| `seaos-kit gateway restart operator` | Slack の窓口（operator）だけを起こし直します。鍵や設定を変えたときは、反映すると手が空いたところで自動で起こし直されるので、急ぐときだけ使います。ゲートウェイが止まっていれば、それごと起こします |
+| `seaos-kit gateway restart --host` | ゲートウェイごと起こし直します。**全エージェントが一度止まり、走っている作業も落ちます** |
+| `seaos-kit gateway status` | ゲートウェイが動いているか（「ホスト: pid …」）と、その役が受け持たれているか |
 
 ## エージェント
 

@@ -120,7 +120,7 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
 | `display_information` → `name` | `SEAOS` | **アプリの名前。** サイドバーの「アプリ」、アプリのプロフィール、インストール画面、Slack App の管理画面に出ます | 35文字まで。日本語も使えます |
 | `display_information` → `description` | `チームのエージェントへの窓口` | アプリのプロフィールに出る、短い説明 | 140文字まで |
 | `features` → `bot_user` → `display_name` | `seaos` | **ボットの名前。** チャンネルで `@seaos` と**メンションするときの名前**で、ボットが投稿したメッセージの送り主としても出ます | 80文字まで。**半角の英小文字・数字・`-`・`_`・`.` だけ**（大文字・空白・日本語は使えません） |
-| `features` → `assistant_view` → `assistant_description` | `チームのエージェントに頼みごとができます` | Slack の AI アシスタントの画面で、このアプリを開いたときに出る説明 | |
+| `features` → `agent_view` → `agent_description` | `チームのエージェントに頼みごとができます` | Slack でこのアプリを開いたときに出る、エージェントの説明 | 300文字まで |
 
 例えば、アプリの名前を「FAQ エージェント」、メンションを `@faq-agent` にしたいなら、
 `display_information` の `name` を `FAQ エージェント`、`bot_user` の `display_name` を `faq-agent` にします。
@@ -148,8 +148,8 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
       "display_name": "seaos",
       "always_online": true
     },
-    "assistant_view": {
-      "assistant_description": "チームのエージェントに頼みごとができます"
+    "agent_view": {
+      "agent_description": "チームのエージェントに頼みごとができます"
     }
   },
   "oauth_config": {
@@ -172,7 +172,14 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
         "reactions:read",
         "reactions:write",
         "users:read",
-        "users:read.email"
+        "users:read.email",
+        "users.profile:read"
+      ],
+      "user": [
+        "channels:history",
+        "groups:history",
+        "im:history",
+        "mpim:history"
       ]
     }
   },
@@ -180,14 +187,20 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
     "event_subscriptions": {
       "bot_events": [
         "app_mention",
+        "app_home_opened",
         "message.channels",
         "message.groups",
         "message.im",
         "message.mpim",
-        "assistant_thread_started",
-        "assistant_thread_context_changed",
         "reaction_added",
-        "reaction_removed"
+        "reaction_removed",
+        "user_status_changed"
+      ],
+      "user_events": [
+        "message.channels",
+        "message.groups",
+        "message.im",
+        "message.mpim"
       ]
     },
     "interactivity": {
@@ -215,7 +228,11 @@ App は次のマニフェストから作ります（[api.slack.com/apps](https:/
 | | `assistant:write` | 「入力中…」の表示が出ない |
 | | `reactions:read` `reactions:write` | リアクションで操作できない |
 | | `users:read` `users:read.email` | 相手の名前やメールアドレスからゲストを引けない |
-| Event Subscriptions（bot events） | `app_mention` `message.channels` `message.groups` `message.im` `message.mpim` `assistant_thread_started` `assistant_thread_context_changed` `reaction_added` `reaction_removed` | メッセージやリアクションに反応しない |
+| | `users.profile:read` | 不在のあいだ、オーナー宛の話を代わりに受けない（→ [不在のあいだ代わりに受ける](docs/slack.md#不在のあいだ代わりに受ける)） |
+| User Token Scopes | `channels:history` `groups:history` `im:history` `mpim:history` | 同上 |
+| Event Subscriptions（bot events） | `app_mention` `app_home_opened` `message.channels` `message.groups` `message.im` `message.mpim` `reaction_added` `reaction_removed` | メッセージやリアクションに反応しない |
+| | `user_status_changed` | 同上（オーナーのステータスの変化に気づけない） |
+| Event Subscriptions（events on behalf of users） | `message.channels` `message.groups` `message.im` `message.mpim` | 同上 |
 
 `seaos-kit doctor` の「Slack App の権限」で、足りない権限を確かめられます。
 
@@ -258,14 +275,18 @@ seaos-kit doctor
 |---|---|---|
 | コマンドを打つ場所 | ターミナル | PowerShell |
 | `seaos-kit` の場所 | `~/.local/bin/seaos-kit` | `%LOCALAPPDATA%\Programs\seaos-kit\seaos-kit.cmd` |
-| PC の起動時に Slack 窓口を自動で起こす | 自動では起きません。落ちたら `seaos-kit gateway restart operator` | タスク スケジューラに登録します（下記） |
+| PC の起動時に Slack 窓口を自動で起こす | 自動では起きません。落ちたら `seaos-kit gateway restart operator`（全エージェントを受け持つゲートウェイが起きます） | タスク スケジューラに登録します（下記） |
 | 道具を入れるときの承認 | Mac のログインパスワード | 「このアプリがデバイスに変更を加えることを許可しますか？」で「はい」 |
 
 Windows でログオン時に Slack の窓口を自動で起こすには、PowerShell で一度だけ実行します。
+ゲートウェイは PC に1つで、全エージェントの窓口をまとめて受け持ちます。登録するのもこの1つです。
 
 ```
-schtasks /Create /SC ONLOGON /TN "hermes-gateway" /TR "hermes --profile operator gateway run"
+schtasks /Create /SC ONLOGON /TN "hermes-gateway" /TR "hermes gateway run"
 ```
+
+以前 `hermes --profile operator gateway run` で登録した場合は、同じコマンドに `/F` を付けて上書きしてください
+（operator がゲートウェイの持ち主になると、operator だけを起こし直せなくなります）。
 
 **コードを書く developer の作業部屋だけは、Windows での確認がまだ済んでいません。**
 動かない可能性があります。うまくいかない場合は、そのエージェントを外して使ってください。

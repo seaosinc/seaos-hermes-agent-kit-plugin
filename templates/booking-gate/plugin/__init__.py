@@ -48,6 +48,9 @@ DEFAULT_STALE_MINUTES = 5
 DEFAULT_MAX_PER_HOUR = 40  # 1人あたり1時間の発言上限。ただ乗り（コスト）への歯止め
 
 _cache: dict = {"config": None, "config_mtime": 0.0, "table": None, "table_mtime": 0.0}
+# このゲートを載せている役（register で決まる）。multiplex では全役が1つのプロセスに
+# 同居するので、環境変数ではなく Hermes が教える名前を使う。
+_profile: dict = {"name": None}
 _notified: dict[str, float] = {}
 _recent: dict[str, list[float]] = {}  # user_id -> 直近の発言時刻（1時間ぶん）
 _active: dict[str, dict] = {}  # user_id -> {"session_key": str, "end": datetime}
@@ -158,8 +161,8 @@ def _is_stale(table: dict, cfg: dict, now: datetime) -> bool:
 
 
 def _my_profile(cfg: dict) -> str:
-    """この gateway が動いているプロファイル。plist の HERMES_PROFILE が正。"""
-    return (os.environ.get("HERMES_PROFILE") or cfg.get("profile") or "operator").strip()
+    """このゲートを載せている役。register で Hermes から受け取った名前が正。"""
+    return (_profile["name"] or os.environ.get("HERMES_PROFILE") or cfg.get("profile") or "operator").strip()
 
 
 def _find_slot(table: dict, cfg: dict, user_id: str, now: datetime,
@@ -283,6 +286,22 @@ def _notice_text(table: dict | None, user_id: str, now: datetime, cfg: dict | No
     return base + "オーナーに許可を依頼してください。"
 
 
+def _adapters_of(gateway, source) -> dict:
+    """その発言が来た役の Slack の口。
+
+    **`gateway.adapters` は default の役の口である。** multiplex では各役の口が
+    別に持たれていて、default には Slack が無いので、そこを見ると案内が一通も
+    出ない（実際に出ていなかった）。発言の来た役（source.profile）の口を引く。
+    """
+    lookup = getattr(gateway, "_adapters_for_profile", None)
+    if callable(lookup):
+        try:
+            return lookup(getattr(source, "profile", None) or _profile["name"]) or {}
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[booking-gate] 役の口を引けなかった: %s", e)
+    return getattr(gateway, "adapters", None) or {}
+
+
 def _send_notice(gateway, source, text: str, reply_to=None) -> None:
     """案内を1通返す。送れなくても判定には影響させない。
 
@@ -296,7 +315,7 @@ def _send_notice(gateway, source, text: str, reply_to=None) -> None:
         return
     _notified[user_id] = time.time()
 
-    adapters = getattr(gateway, "adapters", None) or {}
+    adapters = _adapters_of(gateway, source)
     adapter = None
     for key, value in adapters.items():
         if getattr(key, "value", str(key)) == "slack":
@@ -371,6 +390,7 @@ def gate(event, gateway=None, session_store=None, **kwargs):
 
 
 def register(ctx):
+    _profile["name"] = getattr(ctx, "profile_name", None)
     ctx.register_hook("pre_gateway_dispatch", gate)
     # プラグインのログはゲートウェイのログに出ない。**外から確認できる痕跡を残す。**
     # これが無いと「配置も有効化もしたのにフックが動いていない」を検出できない。

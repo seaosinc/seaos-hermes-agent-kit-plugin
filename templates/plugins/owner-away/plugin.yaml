@@ -1,0 +1,4 @@
+name: owner-away
+version: 0.1.0
+description: オーナーの Slack ステータスが 🤖 のあいだ、オーナー宛の DM とメンションを operator が代わりに受ける
+author: seaos-hermes-agent-collab-kit
