@@ -38,7 +38,7 @@ mcp_shared:
 
 # **コードは書かない。** clone も push も委譲もしないので、実装の規約と
 # delegate-to-cli-agents スキルは載せない。書くのは外部サービスの状態と記録だけで、
-# リポジトリの中身を変えるのは箱を持つ developer / senior-developer の仕事である。
+# リポジトリの中身を変えるのは箱を持つ developer の仕事である。
 implements: false
 
 # 読み書きの手順だけを載せる。

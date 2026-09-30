@@ -65,6 +65,16 @@ def test_default_is_openrouter():
     assert required_keys("fixer") == {"OPENROUTER_API_KEY"}
 
 
+def test_openrouter_workspace_uses_jev_router():
+    """OpenRouter の developer は、実装モデルを Jev Router に選ばせる。"""
+    set_provider("openrouter")
+    out = Path(tempfile.mkdtemp(prefix="provider-dist-"))
+    with contextlib.redirect_stdout(io.StringIO()):
+        roles.generator().build(ROOT, out, {"developer"})
+    cfg = yaml.safe_load((out / "developer" / "config.yaml").read_text(encoding="utf-8"))
+    assert cfg["terminal"]["docker_env"]["OPENCODE_MODEL"] == "openrouter/typesafe/jev-router"
+
+
 def test_bedrock_config():
     """Bedrock では us-east-1 の Converse へ繋ぎ、段は global. のモデル（smart は gpt-6-sol）"""
     set_provider("bedrock")
@@ -74,7 +84,6 @@ def test_bedrock_config():
     assert "providers" not in cfg, cfg.get("providers")
     assert cfg["auxiliary"]["kanban_decomposer"]["provider"] == "main"
     assert built_config("operator")["model"]["default"] == "global.openai.gpt-5.6-luna"
-    assert built_config("senior-developer")["model"]["default"] == "global.anthropic.claude-opus-5-5"
 
 
 def test_bedrock_key_is_required():

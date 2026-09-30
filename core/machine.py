@@ -2,7 +2,7 @@
 
 エージェントが使う道具の一部は、Hermes もキットも持ってこない:
 
-  Docker     作業部屋（developer / senior-developer の箱）と共有記憶
+  Docker     作業部屋（developer の箱）と共有記憶
   Node.js    `npx` で起動する MCP サーバ（handler の Notion、ファイル読み取り）
 
 無くても導入は通り、**最初にその道具を使うカードで初めて落ちる。** 設定画面にも

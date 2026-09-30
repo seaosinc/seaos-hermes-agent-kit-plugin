@@ -94,8 +94,8 @@ FAST = os.environ.get("MODEL_FAST", _TIER_DEFAULTS["fast"])
 # 速い模型と上位の間。**文章の良し悪しが仕事の質になる役**に充てる。
 MID = os.environ.get("MODEL_MID", _TIER_DEFAULTS["mid"])
 SMART = os.environ.get("MODEL_SMART", _TIER_DEFAULTS["smart"])
-# 難度の高い実装だけに充てる上位モデル。**単価が高いので既定では使わない**——
-# ROLES で明示的に指定した役だけが引く（いまは senior-developer のみ）。
+# 難度の高い実装に充てる上位モデル。ローカル worker が `senior` の段を
+# 選んだときに使う。固定役の developer は OpenRouter の router に選定を任せる。
 SENIOR = os.environ.get("MODEL_SENIOR", _TIER_DEFAULTS["senior"])
 # profile.yaml の model には、生のモデル名のほかに段の名前（fast / smart / senior）を
 # 書ける（fast / mid / smart / senior）。**段で書けば、MODEL_MID などの
@@ -335,6 +335,11 @@ ROLES: dict[str, dict] = {
     },
     "developer": {
         "model": FAST,
+        # Hermes 側は窓口・検証役なので FAST のまま。実装を担う OpenCode は
+        # OpenRouter の Jev Router に難度ごとのモデル選定を任せる。
+        # Bedrock には同じ router が無いので、従来どおり FAST を固定する。
+        "opencode_model": ("openrouter/typesafe/jev-router"
+                           if PROVIDER == "openrouter" else ""),
         "skills": ["kanban-collaboration", "delegate-to-cli-agents",
                    "workspace-workflow"],
         "no_delegation": True,
@@ -360,55 +365,9 @@ ROLES: dict[str, dict] = {
                      "opencode に委譲して差分を検証し、push して PR を出す。**PR を出して終わりではなく、CI が緑になり、レビューの指摘が残っていない状態まで見届ける**（人の承認そのものは待たない）。"
                      "例:「機能を実装する」「バグを修正する」「テストが通るようにする」"
                      "「設定値を変えて反映する」。**変更の量ではなく成果条件で選ぶ**——"
-                     "1行の変更でも、リポジトリへ届けて終わるならここへ。"
-                     "**実装カードの既定の行き先はここである。** "
-                     "<!-- if-role: senior-developer -->難しそうに見えても、"
-                     "まずここへ振る——難度は走らせるまで分からない。詰まった事実が出てから "
-                     "fixer が senior-developer へ振り直す。<!-- end-if-role -->"),
-    },
-    # developer と**できることは同じ**で、モデルだけ上位に振った版。
-    # 規約（SOUL）は developer から借りる——差が出てよいのはモデルとエフォートだけで、
-    # 手順まで分かれると、どちらに投げたかで成果物の形が変わってしまう。
-    #
-    # **箱を持つ役が2つになった。** 最悪値は MAX_IN_PROGRESS 枚 × WORKSPACE_MEMORY で、
-    # 上の注記（役を増やしたら見直すこと）の対象がここに1つ増えている。
-    "senior-developer": {
-        "model": SENIOR,
-        # 上位モデルは既定 low。**難度で単価を上げる役であって、
-        # 毎回めいっぱい考えさせる役ではない。**
-        "reasoning": "low",
-        "soul_from": "developer",
-        # 借りた SOUL の後ろに、この役だけの節を足す（受け持つ範囲と受け取り方の差）。
-        "soul_extra": "SOUL.extra.md",
-        "skills": ["kanban-collaboration", "delegate-to-cli-agents",
-                   "workspace-workflow"],
-        "no_delegation": True,
-        "workspace": True,
-        "mcp_shared": ["context7"],
-        "env": [
-            MODEL_KEY_ENV,
-            ("GH_TOKEN", "GitHub の PAT（clone / push / PR と private パッケージの取得。repo / workflow / read:packages）。無いと GitHub を触る手が外れる", False),
-            # **AWS。いまは配線だけで、値は未設定。** Terraform を扱うときに要る。
-            # すべて任意——**空なら env apply が行ごと落とす**ので、作業部屋へは
-            # 転送されない。中途半端に空文字が入ると「Partial credentials」で
-            # 落ちるので、それを踏まないための形である。
-            #
-            # サーバ（EC2）ではインスタンスロールで足りるので、鍵の2つは要らない。
-            ("AWS_ACCESS_KEY_ID", "AWS のアクセスキー ID。サーバではインスタンスロールを使うので不要", False),
-            ("AWS_SECRET_ACCESS_KEY", "AWS のシークレットアクセスキー", False),
-            ("AWS_REGION", "AWS の既定リージョン（例: ap-northeast-1）", False),
-        ],
-        "summary": "難度の高い実装。セキュリティと品質も見る",
-        "desc": "developer の上位版。実装に加えてセキュリティとコード品質まで見る。設計判断を伴うもの、developer が詰まったものを引き取る。A2A 連携そのものは扱わない。",
-        "describe": ("developer と同じ開発役で、実装に加えて**セキュリティとコード品質まで見る**版。"
-                     "**難度ではなく根拠で選ぶ**——「難しそう」では選ばない（単価が高い）。"
-                     "次のどれかがカードに**事実として**書かれているときだけここへ: "
-                     "(1) developer が試して詰まり、何を試したかが記録されている "
-                     "(2) 設計判断が要る（選択肢が複数あり、採る案で後の形が変わる） "
-                     "(3) セキュリティか品質に影響が及ぶ（認証・権限・秘密の扱い・外部入力の経路）。"
-                     "<!-- if-role: developer -->**新規のカードは既定で developer へ振る。** "
-                     "難度は走らせるまで分からないので、"
-                     "詰まった事実が出てから fixer が振り直す。<!-- end-if-role -->"),
+                      "1行の変更でも、リポジトリへ届けて終わるならここへ。"
+                      "**実装カードの行き先はここ1つである。** 実装に使うモデルは、"
+                      "OpenRouter では Jev Router が依頼の難度に応じて選ぶ。"),
     },
 }
 
@@ -537,8 +496,8 @@ def build_soul(kit: Path, name: str, spec: dict) -> str:
                             f"<!-- WORKER-BASE:BEGIN -->\n{base}\n<!-- WORKER-BASE:END -->")
         body = body.replace("{{EXTRA}}", spec.get("extra", "") or "")
     else:
-        # **同じ規約の役は SOUL を借りる。** できることが同じでモデルだけ違う役
-        # （senior-developer）のために 14KB を書き写すと、直すたびに片方が取り残される。
+        # **同じ規約の役は SOUL を借りる。** 同じ手順を持つ役のために長い規約を
+        # 書き写すと、直すたびに片方が取り残される。
         src_name = spec.get("soul_from", name)
         body = (kit / "templates/profiles" / src_name / "SOUL.md").read_text(encoding="utf-8")
         if src_name != name:
@@ -550,7 +509,7 @@ def build_soul(kit: Path, name: str, spec: dict) -> str:
             body = head.replace(f"**{src_name}**", f"**{name}**") + "\n" + rest
         # 借りた SOUL に、その役だけの節を足す。**借りる＝同一ではない。**
         # 手順（clone → 実装 → 検証 → push）は同じでも、受け持つ範囲や
-        # カードの受け取り方が違う役がある（senior-developer）。
+        # カードの受け取り方が違う役がある。
         # 差分だけをここで継ぎ足し、共通部分は借り元の1箇所に保つ。
         if spec.get("soul_extra"):
             extra = (kit / "templates/profiles" / name / spec["soul_extra"]).read_text(encoding="utf-8")
@@ -701,7 +660,8 @@ def _workspace_terminal(spec: dict) -> dict:
             "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION",
         ],
         # 固定値。委譲先のモデルを担当に覚えさせず、ここ1箇所で決める。
-        "docker_env": {"OPENCODE_MODEL": f"{OPENCODE_PROVIDER}/{spec['model']}",
+        "docker_env": {"OPENCODE_MODEL": (spec.get("opencode_model") or
+                                             f"{OPENCODE_PROVIDER}/{spec['model']}"),
                        # ホストと箱のパスの対応（seaos-path が読む。Windows でだけ意味を持つ）
                        "SEAOS_PATH_MAP": path_map()},
     }
@@ -825,10 +785,10 @@ IGNORE = shutil.ignore_patterns("__pycache__")
 
 # **無効にした役を名指しする規約は、配る前に落とす。**
 #
-#     <!-- if-role: senior-developer -->振り直してよい<!-- else -->振り直し先は無い<!-- end-if-role -->
+#     <!-- if-role: developer -->実装へ振る<!-- else -->実装役は無い<!-- end-if-role -->
 #
-# 規約に「詰まったら senior-developer へ振り直す」と書いたまま senior-developer を
-# 外すと、fixer はそこへ振る。Hermes は担当の実在を確かめないので、カードは起動に
+# 規約に役名を書いたままその役を外すと、fixer はそこへ振る。Hermes は担当の
+# 実在を確かめないので、カードは起動に
 # 失敗し続けて止まり、親は子の完了を永久に待つ。**書かれた名前は、呼ばれる。**
 # 複数の役を空白区切りで書けば、全員が有効なときだけ残る。
 _ROLE_BLOCK = re.compile(
@@ -863,7 +823,7 @@ def copy_skills(kit: Path, d: Path, spec: dict) -> None:
 #   provisioner / machine-guard: 道具（Docker、Node.js）はコマンド1本で入り、管理者の承認は
 #     結局人が押すので、エージェントに任せる意味が無かった。設定画面の「ツール」に
 #     OS ごとのコマンドを出す形に置き換えた。
-RETIRED_ROLES = ("provisioner",)
+RETIRED_ROLES = ("provisioner", "senior-developer")
 RETIRED_CRONS = ("machine-guard",)
 
 

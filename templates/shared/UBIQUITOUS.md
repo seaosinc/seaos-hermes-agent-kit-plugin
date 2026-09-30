@@ -53,9 +53,6 @@
 <!-- if-role: developer -->
 - 固定役: `developer`（リポジトリの実装）
 <!-- end-if-role -->
-<!-- if-role: senior-developer -->
-- 固定役: `senior-developer`（難度の高いリポジトリの実装）
-<!-- end-if-role -->
 <!-- if-role: handler -->
 - 業務別ワーカー: `handler`（外部サービスの読み書き）
 <!-- end-if-role -->

@@ -75,7 +75,6 @@ Amazon Bedrock を使う場合は、先に「モデルの取り寄せ先」を�
 | operator | ユーザーとの窓口。依頼を受けて結果を報告する | 外せない |
 | fixer | 詰まりを解決し、完了を判定する | 外せない |
 | developer | 実装・検証・PR 作成。CI とレビュー指摘の解消まで | ○ |
-| senior-developer | 難度の高い実装。セキュリティと品質も見る | ○ |
 | handler | 外部サービスの読み書き（GitHub / Backlog ほか） | ○ |
 | recruiter | エージェントそのものを新設・改修する | ○ |
 | broker | 外部エージェントとの連携 | ○ |
@@ -268,7 +267,7 @@ Windows でログオン時に Slack の窓口を自動で起こすには、Power
 schtasks /Create /SC ONLOGON /TN "hermes-gateway" /TR "hermes --profile operator gateway run"
 ```
 
-**コードを書くエージェント（developer / senior-developer）の作業部屋だけは、Windows での確認がまだ済んでいません。**
+**コードを書く developer の作業部屋だけは、Windows での確認がまだ済んでいません。**
 動かない可能性があります。うまくいかない場合は、そのエージェントを外して使ってください。
 
 ---

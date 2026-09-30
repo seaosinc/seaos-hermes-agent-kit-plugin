@@ -43,7 +43,7 @@ def rules(out: Path, role: str) -> str:
 
 def test_no_markers_leak():
     """囲みの印そのものは、全役有効でも一部無効でも配布物に残らない。"""
-    for enabled in (None, ALL - {"senior-developer", "recruiter", "broker"}):
+    for enabled in (None, ALL - {"recruiter", "broker"}):
         out = build(enabled)
         for f in out.rglob("*.md"):
             text = f.read_text(encoding="utf-8")
@@ -52,7 +52,7 @@ def test_no_markers_leak():
 
 def test_disabled_names_disappear_from_routing_rules():
     """外した役の名前が、振る側（fixer / operator）の規約に残らない。"""
-    off = {"senior-developer", "recruiter", "broker", "handler"}
+    off = {"recruiter", "broker", "handler"}
     out = build(ALL - off)
     for role in ("fixer", "operator"):
         text = rules(out, role)
@@ -66,14 +66,9 @@ def test_disabled_names_disappear_from_routing_rules():
 
 def test_full_build_keeps_everything():
     out = build(None)
-    assert "senior-developer は、難度ではなく根拠で振る" in rules(out, "fixer")
+    assert "senior-developer" not in rules(out, "fixer")
+    assert "Jev Router" in rules(out, "developer")
     assert "recruiter" in rules(out, "operator")
-
-
-def test_description_follows_selection():
-    spec = bd.ROLES["developer"]["describe"]
-    assert "senior-developer" in bd.strip_role_blocks(spec, None)
-    assert "senior-developer" not in bd.strip_role_blocks(spec, ALL - {"senior-developer"})
 
 
 def _board(home: Path, rows):
@@ -93,9 +88,9 @@ def test_guard_blocks_unrunnable_assignees():
     (home / "seaos-kit" / "roles.json").write_text(json.dumps({"disabled": ["avatar"]}))
     _board(home, [
         ("t_ok", "developer", "動ける", "ready"),
-        ("t_gone", "senior-developer", "存在しない", "ready"),
+        ("t_gone", "gone-role", "存在しない", "ready"),
         ("t_off", "avatar", "無効", "ready"),
-        ("t_todo", "senior-developer", "まだ todo", "todo"),
+        ("t_todo", "gone-role", "まだ todo", "todo"),
     ])
     log = home / "calls.txt"
     fake = home / "hermes"

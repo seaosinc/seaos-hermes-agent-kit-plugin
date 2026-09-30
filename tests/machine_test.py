@@ -89,6 +89,12 @@ def test_provisioner_is_retired():
     """provisioner と machine-guard は廃止した。配らず、入っている環境からは update が外す。"""
     assert "provisioner" not in bd.ROLES
     assert "provisioner" in bd.RETIRED_ROLES
+
+
+def test_senior_developer_is_retired():
+    """実装モデルを router が選ぶので、senior-developer は配らず update で外す。"""
+    assert "senior-developer" not in bd.ROLES
+    assert "senior-developer" in bd.RETIRED_ROLES
     assert "machine-guard" not in bd.ROLES["operator"]["cron"]
     assert "machine-guard" not in bd.CRON_JOBS
     assert "machine-guard" in bd.RETIRED_CRONS

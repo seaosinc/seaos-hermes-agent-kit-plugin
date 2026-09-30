@@ -77,9 +77,8 @@ def test_broken_file_enables_everything():
 def test_keys_of_disabled_role_stay_managed():
     """外した役の鍵を「知らない鍵」として掃除しない（入れ直したときに消えている）。"""
     reset()
-    # AWS の鍵を宣言しているのは developer と senior-developer だけ
+    # AWS の鍵を宣言している developer を外しても、鍵は管理下に残す
     selection.set_enabled("developer", False)
-    selection.set_enabled("senior-developer", False)
     assert "AWS_REGION" in roles.managed_env_vars(), roles.managed_env_vars()
 
 

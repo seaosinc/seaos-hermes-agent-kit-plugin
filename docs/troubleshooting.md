@@ -83,7 +83,7 @@ hermes plugins remove seaos-hermes-agent-kit
 ### 「接続情報」に OPENROUTER_API_KEY しか出ない
 
 「接続情報」には、**有効にしているエージェントが使う鍵だけ**が出ます。
-GitHub（`GH_TOKEN`）は developer / senior-developer / handler、Notion・Backlog は handler、AWS は developer / senior-developer が使います。
+GitHub（`GH_TOKEN`）は developer / handler、Notion・Backlog は handler、AWS は developer が使います。
 これらのエージェントを「エージェント」の一覧で有効にすると、対応する鍵が出てきます。
 
 何も選んでいない初期状態では、全エージェントが有効です。入れ直したのに外れた状態になっている場合は、
@@ -232,7 +232,7 @@ operator が振り直しを知らせます。そのまま任せて大丈夫で�
 
 ## Windows
 
-- **コードを書くエージェント（developer / senior-developer）の作業部屋は、Windows での確認がまだ済んでいません。**
+- **コードを書く developer の作業部屋は、Windows での確認がまだ済んでいません。**
   動かない可能性があります。うまくいかない場合は、この2つを外して使ってください
 - ログオン時に Slack の窓口を自動で起こすには、README の [Windows で使う場合](../README.md#windows-で使う場合) の `schtasks` を実行してください
 - 道具のインストール中に「このアプリがデバイスに変更を加えることを許可しますか？」が出たら「はい」を押してください。

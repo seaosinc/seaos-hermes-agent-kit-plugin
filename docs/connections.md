@@ -16,11 +16,11 @@
 |---|---|---|---|
 | `OPENROUTER_API_KEY` | **必須**（OpenRouter を使うとき） | 全員 | 何も動きません |
 | `AWS_BEARER_TOKEN_BEDROCK` | **必須**（Bedrock を使うとき） | 全員 | 何も動きません |
-| `GH_TOKEN` | 任意 | developer / senior-developer / handler | GitHub の読み書き（clone・PR・Issue）ができません |
+| `GH_TOKEN` | 任意 | developer / handler | GitHub の読み書き（clone・PR・Issue）ができません |
 | `NOTION_TOKEN` | 任意 | handler | Notion を読めません |
 | `BACKLOG_DOMAIN` | 任意 | handler | Backlog を読めません（`BACKLOG_API_KEY` とセット） |
 | `BACKLOG_API_KEY` | 任意 | handler | 同上 |
-| `AWS_ACCESS_KEY_ID` | 任意 | developer / senior-developer | AWS を触れません（3つセット） |
+| `AWS_ACCESS_KEY_ID` | 任意 | developer | AWS を触れません（3つセット） |
 | `AWS_SECRET_ACCESS_KEY` | 任意 | 同上 | 同上 |
 | `AWS_REGION` | 任意 | 同上 | 同上 |
 

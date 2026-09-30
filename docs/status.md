@@ -75,8 +75,8 @@ AWS の箱（Ubuntu）でキットを動かす想定のため。このリポジ�
    macOS では同じパスが返るので、規約は OS によらず1通り。実機で確かめること:
    Docker Desktop が `C:\…:/seaos/…:ro` を受け付けるか、宣言した `C:\…` のパスで
    完了の添付が通るか。
-2. **AWS を developer / senior-developer に触らせる。** Terraform を扱い始めると要る。
-   いまこの2役が持つのは箱（terminal / workspace）と GH_TOKEN だけで、AWS の状態を
+2. **AWS を developer に触らせる。** Terraform を扱い始めると要る。
+   いま developer が持つのは箱（terminal / workspace）と GH_TOKEN だけで、AWS の状態を
    読む手が無い。作業部屋にも `aws` は入っていない（git / gh / mise / opencode /
    jq / rg / curl のみ）。
 
@@ -180,7 +180,7 @@ AWS の箱（Ubuntu）でキットを動かす想定のため。このリポジ�
   「選ぶな」に書き換え、窓口なら常駐も止める
 - 外した役の鍵は `.env` に残す（入れ直したときに入れ直さなくて済む）
 - **外した役の名前を、規約から落とす。** Hermes は担当の実在を確かめないので、
-  「詰まったら senior-developer へ」と書いたまま外すと、振られたカードは ready のまま
+  存在しない役へ振る規約を残すと、振られたカードは ready のまま
   誰にも起動されず、親は永久に待つ。規約とスキルの `<!-- if-role: 役 -->…<!-- else -->…
   <!-- end-if-role -->` を、反映のたびに有効な役に合わせて開く（`strip_role_blocks`）
 - **それでも残った名前は `assignee-guard` が拾う**（毎分）。存在しない・無効にした役に
@@ -230,7 +230,7 @@ Hermes もキットも持ってこない道具がある。無くても導入は�
 
 | 道具 | 要る役 |
 |---|---|
-| Docker | 箱を持つ役（developer / senior-developer）、共有記憶 |
+| Docker | 箱を持つ developer、共有記憶 |
 | Node.js | `npx` で起動する MCP を持つ役（handler） |
 | uv | 要らない。Hermes が `~/.hermes/bin/uv` を持っている |
 

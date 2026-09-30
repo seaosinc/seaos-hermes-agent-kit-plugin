@@ -74,7 +74,7 @@ servers:
         #   create_pull_request / update_pull_request / update_pull_request_branch
         #   merge_pull_request
         #     — リポジトリの中身と歴史を変える手。箱を持つ developer /
-        #       senior-developer の仕事であり、箱を持たないこの役に渡すと
+        #       developer の仕事であり、箱を持たないこの役に渡すと
         #       「調べていたはずが実装を始める」が起きる
         #   pull_request_review_write / add_comment_to_pending_review /
         #   add_reply_to_pull_request_comment / request_copilot_review
