@@ -305,6 +305,29 @@ ROLES: dict[str, dict] = {
                      "【重要】実作業のカードをこのプロファイルに割り当ててはならない。"
                      "呼ばれるのは、止まったときと、子カードが全部終わったときだけである。"),
     },
+    # 仕組みの整備役。ボード・ゲートウェイ・定期実行・各役の設定と配布物・共有の記憶・Desktop が
+    # 正しく回っていることを受け持つ。fixer は板の中で判断するだけで手を持たないので、
+    # 仕組みの不具合を直接直す手をここに置く。人が Desktop / CLI から呼ぶほか、fixer や分解器も振る。
+    "mechanic": {
+        "model": SMART,
+        # **外せない役。** 仕組みが壊れたときに直す手なので、外していると、壊れたときに誰も直せない。
+        "essential": True,
+        # 箱に入れない。**直す対象はこの PC そのもの**（~/.hermes、ゲートウェイ、ボード）。
+        "workspace": False,
+        # 汎用のトラブルシューティングは配る。この PC に固有の手当ては、mechanic が
+        # `local-` のスキルとして書き残し、その PC にだけ置く（配らない）。
+        "skills": ["kanban-collaboration", "troubleshoot-desktop", "troubleshoot-slack", "troubleshoot-board",
+                   "troubleshoot-scheduled", "troubleshoot-memory", "troubleshoot-windows"],
+        "mcp_shared": ["context7"],
+        "env": [MODEL_KEY_ENV],
+        "summary": "SEAOS の仕組みそのものの不具合を直す",
+        "desc": "SEAOS の仕組み（ボード、ゲートウェイ、定期実行、各役の設定と配布物、共有の記憶、Desktop）の不具合を、直接手を入れて直す整備役。",
+        "describe": ("SEAOS の仕組みそのもの（ボード、ゲートウェイ、定期実行、各役の設定と配布物、"
+                     "共有の記憶、アクセス許可、Hermes Desktop）の不具合を直す整備役。"
+                     "例:「完了したのに報告が来ない原因を突き止めて直す」「止まったままのカードを直す」"
+                     "「定期実行が登録されていないのを直す」。"
+                     "mechanic を呼ぶのは、仕組みの不具合で依頼が進まなくなったときである。たとえば、完了しても報告が来ない、カードが同じ状態のまま動かない、定期実行が失敗し続けている、見張り（guard）が止まりを知らせた、といったとき。mechanic が直すのは依頼を運ぶ仕組みであって、依頼の内容そのものには対処しない。"),
+    },
     "broker": {
         "model": FAST,
         "skills": ["kanban-collaboration"],
@@ -334,29 +357,6 @@ ROLES: dict[str, dict] = {
         "describe": ("人間の分身としてこの PC の画面を操作する役。クリック・キー入力・スクリーンショット。"
                      "例:「この PC の画面のスクショを撮って送る」「このアプリの設定画面を開いて値を確かめる」。"
                      "CLI や API で済む作業、Web ページのスクショ（developer が作業部屋で撮る）は扱わない。"),
-    },
-    # 仕組みの整備役。ボード・ゲートウェイ・定期実行・各役の設定と配布物・共有の記憶・Desktop が
-    # 正しく回っていることを受け持つ。fixer は板の中で判断するだけで手を持たないので、
-    # 仕組みの不具合を直接直す手をここに置く。人が Desktop / CLI から呼ぶほか、fixer や分解器も振る。
-    "mechanic": {
-        "model": SMART,
-        # **外せない役。** 仕組みが壊れたときに直す手なので、外していると、壊れたときに誰も直せない。
-        "essential": True,
-        # 箱に入れない。**直す対象はこの PC そのもの**（~/.hermes、ゲートウェイ、ボード）。
-        "workspace": False,
-        # 汎用のトラブルシューティングは配る。この PC に固有の手当ては、mechanic が
-        # `local-` のスキルとして書き残し、その PC にだけ置く（配らない）。
-        "skills": ["kanban-collaboration", "troubleshoot-desktop", "troubleshoot-slack", "troubleshoot-board",
-                   "troubleshoot-scheduled", "troubleshoot-memory", "troubleshoot-windows"],
-        "mcp_shared": ["context7"],
-        "env": [MODEL_KEY_ENV],
-        "summary": "SEAOS の仕組みそのものの不具合を直す",
-        "desc": "SEAOS の仕組み（ボード、ゲートウェイ、定期実行、各役の設定と配布物、共有の記憶、Desktop）の不具合を、直接手を入れて直す整備役。",
-        "describe": ("SEAOS の仕組みそのもの（ボード、ゲートウェイ、定期実行、各役の設定と配布物、"
-                     "共有の記憶、アクセス許可、Hermes Desktop）の不具合を直す整備役。"
-                     "例:「完了したのに報告が来ない原因を突き止めて直す」「止まったままのカードを直す」"
-                     "「定期実行が登録されていないのを直す」。"
-                     "mechanic を呼ぶのは、仕組みの不具合で依頼が進まなくなったときである。たとえば、完了しても報告が来ない、カードが同じ状態のまま動かない、定期実行が失敗し続けている、見張り（guard）が止まりを知らせた、といったとき。mechanic が直すのは依頼を運ぶ仕組みであって、依頼の内容そのものには対処しない。"),
     },
     "developer": {
         "model": FAST,
