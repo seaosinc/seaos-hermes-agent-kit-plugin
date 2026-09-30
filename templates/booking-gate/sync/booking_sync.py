@@ -19,6 +19,7 @@ LLM は一切通らない。許可の判断を LLM に任せると、カード�
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import re
@@ -295,15 +296,38 @@ def load_identity_cache() -> dict:
         return {}
 
 
+# Slack への問い合わせが失敗したときに受け止めるもの。**途中で切れた読み取り**
+# （http.client.IncompleteRead）は URLError でも TimeoutError でもないので、ここに入れないと
+# 同期そのものが落ちて許可表が書かれず、オーナー以外の全員が止まる（Windows の PC で実際に起きた）。
+FETCH_ERRORS = (urllib.error.URLError, http.client.HTTPException, OSError, TimeoutError, ValueError)
+FETCH_TRIES = 3
+
+
+def slack_get(url: str, token: str, *, timeout: float = 15) -> dict:
+    """Slack の Web API を GET して JSON を返す。**途中で切れたら読み直す**（最大 FETCH_TRIES 回）。
+
+    それでも読めなければ最後の失敗を投げる。呼び手は FETCH_ERRORS で受け止め、その回はあきらめる。
+    """
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    last: Exception | None = None
+    for attempt in range(FETCH_TRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except FETCH_ERRORS as e:
+            last = e
+            time.sleep(1 + attempt)
+    assert last is not None
+    raise last
+
+
 def slack_lookup(token: str, email: str) -> str | None:
     url = "https://slack.com/api/users.lookupByEmail?" + urllib.parse.urlencode(
         {"email": email}
     )
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.loads(r.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, ValueError) as e:
+        data = slack_get(url, token, timeout=10)
+    except FETCH_ERRORS as e:
         log(f"Slack 参照に失敗 {email}: {e}")
         return None
     if not data.get("ok"):
@@ -342,11 +366,9 @@ def _fetch_directory(token: str, cache: dict) -> tuple[dict, list]:
         url = "https://slack.com/api/users.list?" + urllib.parse.urlencode(
             {"limit": 200, **({"cursor": cursor} if cursor else {})}
         )
-        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
         try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                data = json.loads(r.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, ValueError) as e:
+            data = slack_get(url, token)
+        except FETCH_ERRORS as e:
             log(f"ユーザー一覧を取れない: {e}")
             break
         if not data.get("ok"):
@@ -398,11 +420,9 @@ def slack_channel_members(token: str, channel_id: str) -> list[str] | None:
         url = "https://slack.com/api/conversations.members?" + urllib.parse.urlencode(
             {"channel": channel_id, "limit": 200, **({"cursor": cursor} if cursor else {})}
         )
-        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
         try:
-            with urllib.request.urlopen(req, timeout=15) as r:
-                data = json.loads(r.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, ValueError) as e:
+            data = slack_get(url, token)
+        except FETCH_ERRORS as e:
             log(f"{channel_id} のメンバーを取れない: {e}")
             return None
         if not data.get("ok"):
