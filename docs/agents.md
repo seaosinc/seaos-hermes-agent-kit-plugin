@@ -84,8 +84,17 @@ Windows の Docker Desktop は、WSL2 が無いと動きません。WSL2 は Win
 2. PC を再起動する
 3. そのあとで Docker Desktop を入れる
 
-**「WSL のインストールが壊れている可能性があります」と出たとき**（エラーコード `REGDB_E_CLASSNOTREG` など）は、表示どおり何かキーを押して修復させ、再起動してからもう一度 1 を実行します。
-修復で直らなければ、管理者の PowerShell で `winget install --id Microsoft.WSL` を実行して再起動します。
+**「WSL のインストールが壊れている可能性があります（`Wsl/CallMsi/Install/REGDB_E_CLASSNOTREG`）」と出たとき**は、
+WSL ではなく Windows のインストーラー（MSI）が動いていません。管理者の PowerShell で動かし直してから、もう一度 1 を実行します。
+
+```powershell
+Set-Service msiserver -StartupType Manual
+Start-Service msiserver
+msiexec /unregister
+msiexec /regserver
+```
+
+`Start-Service` で起動できない（「無効」と言われる）ときは、会社のポリシーで Windows のインストーラーが止められています。情報システムの担当に頼んでください。
 
 それでも Docker Desktop が「仮想化が無効」などと言うときは、PC の BIOS で仮想化（Intel VT-x / AMD-V）が切られています。会社の PC なら、情報システムの担当に頼んでください。
 

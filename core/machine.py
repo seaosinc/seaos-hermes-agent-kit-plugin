@@ -49,6 +49,7 @@ class Tool:
     after: List[str] = field(default_factory=list)   # 入れたあとにやること（seaos-kit の下位コマンド）
     start: Dict[str, str] = field(default_factory=dict)  # OS -> 入っているが止まっているときの、起こし方の案内（文章）
     note: str = ""                                   # 入れる人への一言
+    os_note: Dict[str, str] = field(default_factory=dict)  # OS -> その OS だけの一言（note の前に出す）
 
 
 CATALOG: Dict[str, Tool] = {
@@ -69,6 +70,11 @@ CATALOG: Dict[str, Tool] = {
             "win32": "Docker Desktop を起動してください（スタートメニューから開けます）",
         },
         note="入れたあと Docker Desktop を一度起動し、利用規約に同意してください",
+        # **Windows の Docker Desktop は WSL2 が無いと動かない。** WSL2 は既定では入っていない。
+        os_note={
+            "win32": ("先に WSL2 を入れてください。PowerShell を管理者として開き "
+                      "`wsl --install --no-distribution` を実行して、PC を再起動します"),
+        },
     ),
     "node": Tool(
         name="node",
@@ -161,7 +167,7 @@ def status() -> List[Dict]:
             "installable": os_kind() in tool.install,
             "installCommand": " ".join(tool.install.get(os_kind(), [])),
             "startHint": tool.start.get(os_kind(), ""),
-            "note": tool.note,
+            "note": "。".join(n for n in (tool.os_note.get(os_kind(), ""), tool.note) if n),
         }
         if tool.name == "docker":
             row["running"] = _docker_running() if path else False
