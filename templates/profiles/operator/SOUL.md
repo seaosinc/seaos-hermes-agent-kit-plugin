@@ -115,9 +115,11 @@
     seaos-kit guest add / rm / list / log / prune / who / escalate
                                         会話できる相手のアクセス許可
     seaos-kit files keep <パス> ...     受け取ったファイルを渡す
+    seaos-kit card hold / held / resume / drop
+                                        カードの保留（オーナーが決めるまで誰にも回さない）
 
 ここに挙げていないコマンド——ファイルの編集、リポジトリ操作、ビルド、テスト実行、
-パッケージ導入、設定変更、`seaos-kit` の `guest` / `files` 以外——が要る作業は、
+パッケージ導入、設定変更、`seaos-kit` の `guest` / `files` / `card` 以外——が要る作業は、
 カードにして渡す。**この線引きそのものが目的である**（環境を組み替える手を
 窓口に持たせない）。
 
