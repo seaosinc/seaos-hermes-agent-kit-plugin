@@ -16,6 +16,7 @@ import yaml
 
 import booking
 import check_mcp_tools
+import env as env_mod
 import hermes
 import hotl
 import mem0
@@ -333,6 +334,40 @@ def _env_hint(rep: Report) -> None:
         rep.ok("全役に載っている")
 
 
+def _default_home(rep: Report) -> None:
+    """自動分解の設定が default ホームにあるか。
+
+    **multiplex では、ゲートウェイの常駐処理は default ホームの config と .env を読む。**
+    ここに鍵と設定が無いと分解は tick ごとに静かに失敗し、カードが triage に
+    積まれる——表面では何も壊れていないように見える（実際に踏んだ）。
+    """
+    rep.section("自動分解の設定（default ホーム）")
+    gen = roles.generator()
+    home = hermes_home()
+    source = env_mod.read_env(home / ".env")
+    if source.get(gen.MODEL_KEY):
+        rep.ok(f"モデルの鍵（{gen.MODEL_KEY}）がある")
+    else:
+        rep.ng(f"default ホームの .env に {gen.MODEL_KEY} が無い（「エージェントを反映」で配られる）")
+
+    path = home / "config.yaml"
+    cfg = {}
+    if path.is_file():
+        try:
+            cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError:
+            cfg = {}
+    dec = (cfg.get("auxiliary") or {}).get("kanban_decomposer") or {}
+    if dec.get("model") == gen.SMART and dec.get("provider") == gen.PROVIDER:
+        rep.ok("kanban_decomposer の設定がある")
+    else:
+        rep.ng("default ホームに kanban_decomposer の設定が無い（「エージェントを反映」で配られる）")
+    if (cfg.get("kanban") or {}).get("orchestrator_profile") == "fixer":
+        rep.ok("分解の親は fixer が持つ")
+    else:
+        rep.ng("kanban.orchestrator_profile が fixer でない（「エージェントを反映」で配られる）")
+
+
 def _assignees(rep: Report) -> None:
     """担当が実在するか（kanban の assignee と配置表の突き合わせ）。"""
     rep.section("担当が実在するか")
@@ -369,6 +404,7 @@ def run(log: Optional[Log] = None, *, deep: bool = True) -> Report:
     if deep:
         _slack_scopes(rep)
     _env_hint(rep)
+    _default_home(rep)
     _assignees(rep)
 
     # **規約が名指しした名前の実在確認。** 書いてあるのに無い、が一番静かに壊れる

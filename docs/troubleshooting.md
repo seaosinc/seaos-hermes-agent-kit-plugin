@@ -175,6 +175,20 @@ Hermes の更新で直るのを待ってください。
 Hermes のログに `marking openrouter unhealthy … (payment / credit error)` と出ていれば、
 OpenRouter のクレジットが足りないか、支払いに失敗しています。OpenRouter の管理画面で残高を確認してください。
 
+### カードが triage のまま進まない
+
+頼みごとはカードになったのに、誰も作業を始めず triage に積まれたままのときは、
+カードを担当に割り振る **自動分解（auto-decompose）** が動いていません。
+
+Hermes 0.21.5 以降の multiplex 構造では、自動分解は **Hermes 本体のホーム
+（`~/.hermes`）の設定と鍵**を読みます。デスクトップ本体を設定していない環境では
+そこにモデルの鍵が無く、分解が静かに止まります（表面には何も出ません）。
+
+1. `seaos-kit doctor` の「**自動分解の設定（default ホーム）**」を見る
+2. ✗ が出ていれば、**「エージェントを反映」** を押す（設定と鍵が default ホームに配られ、
+   次の分解 tick（約1分）から triage のカードが処理され始めます）
+3. 急ぐときは手動でも進められます: `hermes -p operator kanban decompose --all`
+
 ### doctor に「Slack の窓口が奪われていないか」の ✗ が出る
 
 operator と同じ Slack の鍵が、Hermes 本体の設定（`~/.hermes/.env`）にも入っています。

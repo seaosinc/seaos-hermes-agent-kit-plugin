@@ -94,6 +94,12 @@ def apply_env(log: Optional[Log] = None) -> Result:
     result.lines.extend(report)
     for item in missing:
         result.lines.append(f"{item} が空のままです")
+    # **default ホームにも配る。** multiplex ではゲートウェイの常駐処理
+    # （自動分解）は default の config と .env を読む。ここが無いと分解が
+    # 静かに死に、triage にカードが積まれる
+    import default_home
+
+    result.lines.extend(default_home.sync())
     if log:
         for line in result.lines:
             log(line)
