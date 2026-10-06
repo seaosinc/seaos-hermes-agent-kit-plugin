@@ -1,21 +1,158 @@
-# Security Policy
+# セキュリティポリシー
 
-## Supported Versions
+このリポジトリ（`seaosinc/seaos-hermes-agent-kit-plugin`）のセキュリティ上の問題を見つけたときの、報告のしかたと、私たちの対応のしかたを定めます。
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+このプラグインは、Hermes の上で**複数のエージェントに Slack・GitHub・Notion・Backlog・コンテナ・API キーを扱わせる**ものです。エージェントの境界が破れると、秘密の漏えいや意図しない外部サービスの変更に直結します。安全に関する報告を歓迎し、誠実に対応します。
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+---
 
-## Reporting a Vulnerability
+## 1. 対象範囲
 
-Use this section to tell people how to report a vulnerability.
+### 対象（このポリシーで受け付けるもの）
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+- このリポジトリのコード：`core/`、`dashboard/`、`desktop/`、`templates/`（SOUL・スキル・MCP 設定・定期実行・プラグイン・作業部屋の Dockerfile）、`.github/workflows/`
+- このキットが**生成して配布する設定**（`dist/<役>/config.yaml`、`distribution.yaml`、各役の `.env` の配り方、作業部屋の `docker` 設定）
+- このキットが置くファイルと権限（`~/.hermes/seaos-kit/.env`、`profiles/<役>/.env`、`mem0.json`、`booking-gate/`）
+
+### 対象外（それぞれの窓口へ）
+
+| 対象外 | 報告先 |
+|---|---|
+| Hermes 本体（ゲートウェイ、kanban、ツール、プラグインの読み込み、Desktop アプリ） | [NousResearch/hermes-agent の SECURITY.md](https://github.com/NousResearch/hermes-agent/blob/main/SECURITY.md) |
+| 利用する MCP サーバ本体（`@notionhq/notion-mcp-server`、`backlog-mcp-server`、`slack-mcp-server`、`@modelcontextprotocol/server-filesystem`、GitHub の MCP、context7） | 各プロジェクト |
+| OpenRouter、Amazon Bedrock、Slack、GitHub、Notion、Backlog、mem0 といった外部サービス自体の問題 | 各サービス |
+| 利用者自身の設定ミス（鍵を公開リポジトリに置いた、`SLACK_ALLOW_ALL_USERS` を有効にした等）。ただし**キットがその設定ミスを誘発する・検知できない**場合は対象 | — |
+| LLM の判断の誤りそのもの（指示を取り違える、品質が低い）。ただし**規約や設定で閉じているはずの境界を越える**場合は対象 | — |
+| 他人の環境・本番環境への攻撃、ソーシャルエンジニアリング、物理的な侵入、サービス妨害（DoS） | 受け付けません |
+
+---
+
+## 2. サポートされる版
+
+このキットは git から配布され、入っている環境は定期実行（`kit-sync`、10 分ごと）で `main` に追従します。**修正は `main` にだけ入ります。**
+
+| 版 | サポート |
+|---|---|
+| `main` の最新（最新のタグ `v0.1.N` と、`plugin.yaml` の最新の `version`） | ✅ |
+| それより古いコミット・タグ | ❌（`main` へ追従してください） |
+
+Hermes 本体については、CI が検査に使っている版（`.github/hermes-version`）で動作を確かめています。それより古い Hermes との組み合わせで起きる問題は、まず Hermes を上げてから報告してください。
+
+---
+
+## 3. 脆弱性の報告方法
+
+**公開の Issue や Pull Request、Slack のチャンネル、Discord には書かないでください。** 修正が配られる前に攻撃方法が広まります。
+
+### 報告先
+
+1. **GitHub の非公開報告（推奨）**：このリポジトリの **Security → Report a vulnerability** から送ってください（[直接リンク](https://github.com/seaosinc/seaos-hermes-agent-kit-plugin/security/advisories/new)）。報告はメンテナだけが読め、修正と公開までのやりとりを同じ場所で続けられます。
+2. GitHub を使えない場合は、リポジトリの管理者（Owner / Maintainer）へ**非公開の経路**で連絡してください（社内の方は Slack の DM、社外の方は GitHub プロフィールにある連絡先）。
+
+日本語でも英語でも構いません。
+
+### 報告に含めてほしいこと
+
+- 問題の種類（例：秘密の漏えい、役の境界の迂回、アクセスゲートの迂回、コンテナからホストへの到達、任意コード実行）
+- 影響を受けるファイルまたは設定のパス（分かれば `main` のコミット）
+- **再現手順**：最小の構成、入力（カードの本文、Slack のメッセージ、MCP の応答など）、観測した結果
+- 想定される影響（誰が、何を、どこまでできるか）
+- 可能なら、修正の提案や回避策
+- クレジットに載せてよい名前（匿名も可）
+
+### 報告者にお願いすること
+
+- 検証は**自分が管理する環境**でだけ行ってください。他人の Hermes、他社の Slack ワークスペース、本番のリポジトリを対象にしないでください。
+- 到達できた秘密（API キー、トークン、個人情報）は、**証明に必要な最小限**だけ記録し、保存・転送・利用しないでください。
+- 修正が公開されるまで、問題の詳細を公表しないでください（→ 5. 協調的な公開）。
+
+---
+
+## 4. 対応の流れと目安
+
+| 段階 | 目安 |
+|---|---|
+| 受領の連絡 | **3 営業日以内** |
+| 一次評価（対象かどうか、暫定の深刻度） | **7 日以内** |
+| 進捗の連絡 | 少なくとも **14 日ごと**（解決まで） |
+| 修正の目標 | Critical：7 日 ／ High：30 日 ／ Medium：90 日 ／ Low：次の通常の更新 |
+
+深刻度は [CVSS v3.1](https://www.first.org/cvss/v3.1/specification-document) を参考に、**このキットの実際の配置**（どの役が、どの鍵と道具を持って、何に届くか）を踏まえて決めます。
+
+受け付けない（対象外・再現しない・既知）と判断した場合も、理由を添えて返事をします。判断に納得がいかない場合は、その旨を伝えてください。再評価します。
+
+修正は次の形で配ります。
+
+- `main` への修正コミット（`kit-sync` により、入っている環境へ 10 分以内に届きます。設定ファイルの変更を伴う場合は `seaos-kit update --force-config` が要ることを案内します）
+- 深刻度 High 以上は **GitHub Security Advisory**（必要なら CVE）を公開し、影響と対処を書きます
+- 利用者が手で行う対処（鍵のローテーション、設定の変更）が要る場合は、Advisory と `docs/troubleshooting.md` に手順を書きます
+
+---
+
+## 5. 協調的な公開（Coordinated Disclosure）
+
+- 報告から **90 日**、または修正の公開のどちらか早いほうまで、詳細の公表を控えてください。
+- 修正に 90 日より長くかかる場合は、理由と見込みを伝え、公開の時期を相談します。
+- 公開は GitHub Security Advisory で行い、報告者の希望があればクレジットを載せます。
+- 報告者が先に公表した場合でも、利用者を守るために修正は続けます。
+
+---
+
+## 6. セーフハーバー
+
+このポリシーに沿って誠実に行われた調査と報告について、SEAOS は法的措置を取りません。また、調査の過程で意図せず対象外の範囲に触れた場合も、速やかに停止して報告してくれる限り、誠実な調査として扱います。
+
+このポリシーは、他者のシステムへの攻撃や、他者のデータの取得を許可するものではありません。
+
+---
+
+## 7. このプロジェクトで「脆弱性」とみなすもの
+
+一般的な脆弱性（インジェクション、権限昇格、情報漏えい、供給網）に加えて、**このキットが設計上閉じているはずの境界が破れる**ものを脆弱性として扱います。報告のときの参考にしてください。
+
+| 境界 | 破れた例 |
+|---|---|
+| **秘密は `.env` の外へ出ない** | API キーやトークンの**値**が、設定画面の応答、ログ、Slack の投稿、カードの本文、作業部屋のイメージ、`distribution.yaml` に現れる |
+| **各役には宣言した鍵だけが配られる** | ある役の `.env` に、その役が宣言していない鍵が配られる（例：Slack の鍵が窓口以外に届く） |
+| **シェルを持たない役はコマンドを実行できない** | `handler` のように `shell: false` の役が、terminal / file、MCP の allowlist 外の書き込み道具、ホストの任意ファイルの読み取りに到達する |
+| **書いてよいのはカードが命じたことだけ** | 読み取った外部の文章（チケット本文、PR コメント、Web ページ、Notion）に埋め込まれた指示で、エージェントが外部サービスを変更したり、鍵を送ったりする（プロンプトインジェクション）。※モデルの判断ミスではなく、**規約・allowlist・設定の側で防げたはずのもの**を対象とします |
+| **アクセスゲートを通らずに窓口と話せない** | `booking-gate` を迂回して、許可の無い Slack ユーザーがエージェントを動かせる。表が古いときに fail-open になる |
+| **承認を外しているのは recruiter だけ** | HOTL の設定（`approvals.mode: off`、`protected_instruction_files: false`）が他の役に波及する |
+| **作業部屋はホストに届かない** | 箱の中から、読み取り専用で渡したマウントへの書き込み、`docker_forward_env` 以外のホストの環境変数や `~/.hermes` への到達、資源上限の回避 |
+| **板の外で仕事は起きない** | 定期実行・フック・プラグインを通じて、キット外の任意コードが実行される。配布物の更新（`profile update`）で利用者のファイルが上書き・削除される |
+| **供給網** | 配布物の生成・CI・`npx -y` で取り寄せる MCP サーバの経路で、改ざんされたコードが入る |
+
+---
+
+## 8. 利用者側で守ってほしいこと
+
+脆弱性ではありませんが、このキットを安全に使うための前提です。`seaos-kit doctor` の多くはこれらを検査します。
+
+- **鍵は設定画面か CLI からだけ入れる。** テンプレート・SOUL・カード・Slack に値を書かない。`.env` は 600 のまま。
+- **GitHub のトークンは最小権限で、触らせたいリポジトリに限る。** 役ごとに別の鍵を使える（役つきの接続情報）。
+- **`SLACK_ALLOW_ALL_USERS` を使わない。** 話してよい相手は `SLACK_ALLOWED_USERS` と `seaos-kit guest add` で明示する。`always_allow` に自分の ID を入れておく（締め出し防止）。
+- **Hermes 本体の `.env` に窓口と同じ Slack の鍵を残さない**（本体が先に Slack へ繋がり、窓口が止まる）。
+- **コードを書く役は Docker（作業部屋）の上でだけ動かす。** 箱無しで `--auto` の委譲を動かさない。
+- **Hermes と Node.js の MCP サーバを最新に保つ。** キットは `kit-sync` で自動追従するが、Hermes 本体と Docker は利用者が更新する。
+- Windows では**管理者ではない通常の PowerShell** で操作する。
+- `seaos-kit doctor` を定期的に（または `kit-maintain` の日次の結果を）確認する。
+
+---
+
+## 9. 私たちが継続的に行っていること
+
+- CI で、導入時のセキュリティ検査（Hermes の `plugin_guard`）が **SAFE** であることを毎回確かめる
+- CI で、固定した Hermes の版に対する実機の導入テストを流し、週に一度、最新の Hermes への追従 PR を自動で出す
+- 生成物に秘密が焼かれていないこと、各役に配られる鍵・道具・MCP が配置表どおりであることを回帰テストで守る
+- 規約に書いた道具・コマンド・役の名前が実在することを機械的に照合し（`refcheck`）、「存在しないので動かない」が静かに残らないようにする
+- MCP の allowlist に実在しない名前が無いことを `tools/list` と突き合わせる
+
+---
+
+## 10. 謝辞
+
+誠実に報告してくださった方のお名前（希望者のみ）を、Security Advisory とリリースノートに記載します。
+
+---
+
+*このポリシーは必要に応じて更新します。最新版は `main` の `SECURITY.md` です。*
